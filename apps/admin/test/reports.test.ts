@@ -33,6 +33,8 @@ const base: AdminOrder = {
   slaDueAt: null,
   slaMissed: null,
   offerExpiresAt: null,
+  failedReason: null,
+  returnedAt: null,
   distanceMeters: 5000,
   scheduledPickupAt: null,
   deliveredAt: "2026-10-05T07:45:00Z",

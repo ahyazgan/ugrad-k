@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  FAILED_DELIVERY_REASONS,
   INELIGIBILITY_LABELS,
   OFFER_RESPONSE_LABELS,
   ORDER_STATUS_LABELS,
@@ -8,6 +9,7 @@ import {
   formatTL,
   istanbulTime,
   rankCouriers,
+  type FailedDeliveryReason,
   type OrderStatus,
 } from "@yazgan/shared";
 import Link from "next/link";
@@ -29,7 +31,8 @@ const PAYMENT_STATUS: Record<string, string> = {
 };
 
 // Yöneticinin elle yapabileceği geçişler (kurye atama ayrı işlem)
-const MANUAL: OrderStatus[] = ["onaylandi", "alindi", "yolda", "teslim_edildi", "sorunlu", "iptal"];
+// Göndericiye iade başlatma (geri_donuyor) ayrı işlemdir: neden ister ve iade ücretini ekler
+const MANUAL: OrderStatus[] = ["onaylandi", "alindi", "yolda", "teslim_edildi", "sorunlu", "iptal", "geri_teslim"];
 
 function Info({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -54,6 +57,9 @@ export default function SiparisDetayPage() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [podUrl, setPodUrl] = useState<string | null>(null);
   const [signatureUrl, setSignatureUrl] = useState<string | null>(null);
+  const [failReason, setFailReason] = useState<FailedDeliveryReason>("alici_yok");
+  const [failedPhotoUrl, setFailedPhotoUrl] = useState<string | null>(null);
+  const [returnPhotoUrl, setReturnPhotoUrl] = useState<string | null>(null);
 
   const order = data?.order;
 
@@ -61,6 +67,10 @@ export default function SiparisDetayPage() {
     if (order?.podPhotoPath) repo.podUrl(order.podPhotoPath).then(setPodUrl);
     if (order?.podSignaturePath) repo.podUrl(order.podSignaturePath).then(setSignatureUrl);
   }, [order?.podPhotoPath, order?.podSignaturePath]);
+  useEffect(() => {
+    if (order?.failedPhotoPath) repo.podUrl(order.failedPhotoPath).then(setFailedPhotoUrl);
+    if (order?.returnPodPhotoPath) repo.podUrl(order.returnPodPhotoPath).then(setReturnPhotoUrl);
+  }, [order?.failedPhotoPath, order?.returnPodPhotoPath]);
 
   async function act(fn: () => Promise<void>) {
     setBusy(true);
@@ -184,6 +194,28 @@ export default function SiparisDetayPage() {
               ) : (
                 <p className="text-sm text-slate-500">Bu sipariş son durumda.</p>
               )}
+              {order.status === "yolda" || order.status === "sorunlu" ? (
+                <div className="flex flex-wrap items-end gap-2 border-t border-slate-100 pt-3">
+                  <div className="min-w-48">
+                    <Select label="Teslim edilemedi" value={failReason} onChange={(e) => setFailReason(e.target.value as FailedDeliveryReason)}>
+                      {Object.entries(FAILED_DELIVERY_REASONS).map(([k, v]) => (
+                        <option key={k} value={k}>
+                          {v}
+                        </option>
+                      ))}
+                    </Select>
+                  </div>
+                  <Button
+                    variant="secondary"
+                    disabled={busy}
+                    data-testid="start-return"
+                    onClick={() => act(() => repo.reportFailedDelivery(order.id, failReason, note))}
+                  >
+                    Göndericiye iade başlat
+                  </Button>
+                  <span className="text-xs text-slate-500">Dönüş ayağı ücreti (gidişin %50&apos;si) eklenir; müşteriye bildirilir.</span>
+                </div>
+              ) : null}
               <ErrorText>{actionError}</ErrorText>
             </div>
           </Card>
@@ -234,6 +266,36 @@ export default function SiparisDetayPage() {
               {order.problemNote ? <Info label="Sorun">{order.problemNote}</Info> : null}
             </div>
           </Card>
+
+          {order.failedAt ? (
+            <Card title="Teslim edilemedi">
+              <div className="grid gap-4 sm:grid-cols-2" data-testid="failed-delivery">
+                <Info label="Neden">{order.failedReason ? FAILED_DELIVERY_REASONS[order.failedReason] : "—"}</Info>
+                <Info label="Zaman">{fmtDateTime(order.failedAt)}</Info>
+                <Info label="Kurye notu">{order.failedNote}</Info>
+                <Info label="Alıcıyı arama">{order.failedCallAttempts != null ? `${order.failedCallAttempts} kez` : "—"}</Info>
+                <Info label="Adres fotoğrafı">
+                  {failedPhotoUrl ? (
+                    <a className="text-brand underline" href={failedPhotoUrl} target="_blank" rel="noreferrer">
+                      Görüntüle
+                    </a>
+                  ) : order.failedPhotoPath ? (
+                    "Yüklendi"
+                  ) : (
+                    "Yok"
+                  )}
+                </Info>
+                <Info label="Göndericiye iade">
+                  {order.returnedAt ? `${fmtDateTime(order.returnedAt)}${order.returnReceiverName ? ` · teslim alan: ${order.returnReceiverName}` : ""}` : "Yolda"}
+                  {returnPhotoUrl ? (
+                    <a className="ml-2 text-brand underline" href={returnPhotoUrl} target="_blank" rel="noreferrer">
+                      Kanıt
+                    </a>
+                  ) : null}
+                </Info>
+              </div>
+            </Card>
+          ) : null}
 
           {order.status === "teslim_edildi" ? (
             <Card title="Teslim kanıtı">

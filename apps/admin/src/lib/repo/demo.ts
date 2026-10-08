@@ -7,6 +7,7 @@
 import {
   DEFAULT_PRICING_SETTINGS,
   ORDER_TRANSITIONS,
+  applyFailedDeliveryReturn,
   buildQuote,
   calculateMonthlyInvoice,
   courierCompliance,
@@ -261,6 +262,15 @@ async function seed(): Promise<State> {
       distanceMeters: q.distanceMeters,
       scheduledPickupAt: null,
       deliveredAt: status === "teslim_edildi" ? hoursAgo(ago - (deliveryMin.get(idx) ?? 60) / 60) : null,
+      failedReason: null,
+      returnedAt: null,
+      failedAt: null,
+      failedNote: null,
+      failedCallAttempts: null,
+      failedPhotoPath: null,
+      returnPodPhotoPath: null,
+      returnPodSignaturePath: null,
+      returnReceiverName: null,
       pickupDetails: "Kat 2",
       pickupContactName: cust.fullName,
       pickupContactPhone: cust.phone,
@@ -296,6 +306,31 @@ async function seed(): Promise<State> {
         note: null,
       })),
     });
+  }
+  // Teslim edilemeyip göndericiye iade edilmiş örnek sipariş (en eski teslimlerden biri)
+  const ret = orders.find((o) => o.status === "teslim_edildi" && !o.urgent && o.courierId === "kur-2");
+  if (ret) {
+    const at = ret.deliveredAt!;
+    ret.status = "geri_teslim";
+    ret.deliveredAt = null;
+    ret.returnedAt = at;
+    ret.failedAt = new Date(new Date(at).getTime() - 30 * 60_000).toISOString();
+    ret.failedReason = "alici_yok";
+    ret.failedNote = "Ofis kapalı, telefon cevap vermedi";
+    ret.failedCallAttempts = 3;
+    ret.failedPhotoPath = "demo/kapi.jpg";
+    ret.returnPodPhotoPath = "demo/iade.jpg";
+    ret.returnReceiverName = "Gönderen";
+    ret.podPhotoPath = null;
+    ret.podReceiverName = null;
+    ret.priceQuote = applyFailedDeliveryReturn(ret.priceQuote, { roundTrip: ret.roundTrip }, DEFAULT_PRICING_SETTINGS);
+    ret.subtotalKurus = ret.priceQuote.subtotalKurus;
+    ret.totalKurus = ret.priceQuote.totalKurus;
+    ret.history = [
+      ...ret.history.filter((h) => h.toStatus !== "teslim_edildi"),
+      { fromStatus: "yolda", toStatus: "geri_donuyor", at: ret.failedAt, note: "Teslim edilemedi: alici_yok — Ofis kapalı, telefon cevap vermedi" },
+      { fromStatus: "geri_donuyor", toStatus: "geri_teslim", at, note: null },
+    ];
   }
   // Varış kayıtları: teslim edilen siparişlerde alışa ve teslime varış, ölçülen bekleme
   for (const o of orders.filter((x) => x.status === "teslim_edildi")) {
@@ -438,6 +473,7 @@ async function seed(): Promise<State> {
       arrivalMaxRadiusM: 300,
       maxBreakMinutes: 45,
       offerAutoBreakAfter: 3,
+      failedDeliveryMinWaitMinutes: 10,
     },
     consented: new Set(["cus-1", "cus-2", "cus-3"]),
     apiKeys: [],
@@ -641,6 +677,7 @@ export function createDemoRepo(): AdminRepo {
       if (o.paymentStatus === "odendi") o.paymentStatus = "iade_edildi";
     }
     if (to === "sorunlu") o.problemNote = note;
+    if (to === "geri_teslim") o.returnedAt = new Date().toISOString();
   }
 
   return {
@@ -708,6 +745,20 @@ export function createDemoRepo(): AdminRepo {
       if (!o) throw new RepoError("Sipariş bulunamadı");
       transition(o, status, note ?? null);
       refreshCounts(s);
+      touchOrders();
+    },
+    async reportFailedDelivery(orderId, reason, note) {
+      const s = await get();
+      const o = s.orders.find((x) => x.id === orderId);
+      if (!o) throw new RepoError("Sipariş bulunamadı");
+      transition(o, "geri_donuyor", `Teslim edilemedi: ${reason}${note.trim() ? ` — ${note.trim()}` : ""}`);
+      o.failedAt = new Date().toISOString();
+      o.failedReason = reason;
+      o.failedNote = note.trim() || null;
+      const extraBridgeCrossings = o.pickupSide === "avrupa" && o.dropoffSide === "anadolu" ? 1 : 0;
+      o.priceQuote = applyFailedDeliveryReturn(o.priceQuote, { roundTrip: o.roundTrip, extraBridgeCrossings }, s.settings);
+      o.subtotalKurus = o.priceQuote.subtotalKurus;
+      o.totalKurus = o.priceQuote.totalKurus;
       touchOrders();
     },
     subscribeOrders(cb) {
@@ -1084,6 +1135,15 @@ export function createDemoRepo(): AdminRepo {
         distanceMeters: q.distanceMeters,
         scheduledPickupAt: req.scheduledPickupAt,
         deliveredAt: null,
+        failedReason: null,
+        returnedAt: null,
+        failedAt: null,
+        failedNote: null,
+        failedCallAttempts: null,
+        failedPhotoPath: null,
+        returnPodPhotoPath: null,
+        returnPodSignaturePath: null,
+        returnReceiverName: null,
         pickupDetails: req.pickup.details ?? null,
         pickupContactName: req.pickup.contactName ?? null,
         pickupContactPhone: req.pickup.contactPhone ?? null,

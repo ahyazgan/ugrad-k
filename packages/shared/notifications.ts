@@ -5,7 +5,7 @@
  * Tüm mesajlar bilgilendirme amaçlıdır (İYS ticari ileti onayı gerektirmez).
  */
 import { BRAND } from "./brand.ts";
-import type { OrderStatus } from "./orders.ts";
+import { FAILED_DELIVERY_REASONS, type FailedDeliveryReason, type OrderStatus } from "./orders.ts";
 
 export type Channel = "push" | "whatsapp" | "sms";
 
@@ -39,6 +39,9 @@ export interface NotificationOrder {
   podReceiverName: string | null;
   cancelReason: string | null;
   problemNote: string | null;
+  /** Teslim edilemedi nedeni ve iade teslim alan */
+  failedReason?: FailedDeliveryReason | null;
+  returnReceiverName?: string | null;
   /** Teslim kodu istenen siparişte alıcıya gönderilen 4 haneli kod */
   deliveryCode?: string | null;
   /**
@@ -162,6 +165,35 @@ export function buildNotifications(event: OrderStatus, o: NotificationOrder, cfg
         channels: ["push"],
         title: "Siparişinizle ilgili bilgi",
         text: `${o.orderNo} ile ilgili bir aksaklık var; ekibimiz sizinle iletişime geçecek.`,
+      });
+      break;
+    case "geri_donuyor": {
+      const reason = o.failedReason ? FAILED_DELIVERY_REASONS[o.failedReason].toLocaleLowerCase("tr-TR") : "alıcıya ulaşılamadı";
+      out.push({
+        to: customer,
+        channels: ["push", "sms"],
+        title: "Teslim edilemedi",
+        text: `${BRAND.name}: ${o.orderNo} teslim edilemedi (${reason}). Paket size geri getiriliyor; dönüş ayağı ücreti eklenir. Takip: ${url}`,
+        whatsappTemplate: { name: "teslim_edilemedi", params: [o.orderNo, reason, url] },
+      });
+      if (o.dropoffContactPhone) {
+        const name = firstName(o.dropoffContactName);
+        out.push({
+          to: { role: "receiver", phone: o.dropoffContactPhone },
+          channels: ["sms"],
+          title: "Gönderi iade ediliyor",
+          text: `${name ? `Merhaba ${name}, ` : ""}size gönderilen paket teslim alınamadığı için göndericiye iade ediliyor (${BRAND.name}).`,
+        });
+      }
+      out.push(...admins("Teslim edilemedi", `TESLİM EDİLEMEDİ ${o.orderNo}: ${reason}. Paket göndericiye dönüyor.`));
+      break;
+    }
+    case "geri_teslim":
+      out.push({
+        to: customer,
+        channels: ["push", "sms"],
+        title: "Paket size geri teslim edildi",
+        text: `${BRAND.name}: ${o.orderNo} paketi size geri teslim edildi${o.returnReceiverName ? ` (teslim alan: ${o.returnReceiverName})` : ""}.`,
       });
       break;
     case "onaylandi":

@@ -19,11 +19,17 @@ describe("şema senkronu", () => {
   it("order_status enum'u aynı", () => {
     const m = sql.match(/create type public\.order_status as enum \(([^)]*)\)/);
     const values = [...(m?.[1] ?? "").matchAll(/'([a-z_]+)'/g)].map((x) => x[1]);
+    // Sonradan eklenenler: alter type ... add value
+    values.push(...[...sql.matchAll(/alter type public\.order_status add value if not exists '([a-z_]+)'/g)].map((x) => x[1]));
     expect(values).toEqual([...ORDER_STATUSES]);
   });
 
   it("izinli geçişler aynı", () => {
-    const block = sql.split("insert into public.order_status_transitions")[1]?.split(";")[0] ?? "";
+    const block = sql
+      .split("insert into public.order_status_transitions")
+      .slice(1)
+      .map((b) => b.split(";")[0])
+      .join("\n");
     const pairs = [...block.matchAll(/\('([a-z_]+)', '([a-z_]+)'\)/g)].map((x) => `${x[1]}>${x[2]}`).sort();
     const expected = Object.entries(ORDER_TRANSITIONS)
       .flatMap(([from, tos]) => tos.map((to) => `${from}>${to}`))

@@ -1,5 +1,6 @@
 import type {
   CourierDocument,
+  FailedDeliveryReason,
   IncidentKind,
   OrderStatus,
   PlaceDetails,
@@ -104,6 +105,9 @@ export interface OrderDetail extends OrderSummary {
   /** Kurye alış / teslim adresine vardı (otomatik veya "Vardım") */
   arrivedPickupAt: string | null;
   arrivedDropoffAt: string | null;
+  /** Teslim edilemedi → göndericiye iade */
+  failedReason: FailedDeliveryReason | null;
+  failedAt: string | null;
   paymentMethod: OrderInput["paymentMethod"];
   paymentStatus: string;
   paidKurus: number | null;
@@ -234,10 +238,17 @@ export interface Api {
       | { type: "pickup"; waitingMinutes: number }
       | { type: "on_the_way" }
       | { type: "deliver"; pod: ProofOfDelivery }
+      /** Teslim edilemeyen paketi göndericiye teslim (kanıtla) */
+      | { type: "return_deliver"; pod: ProofOfDelivery }
       | { type: "problem"; note: string }
       | { type: "release"; note: string },
   ): Promise<void>;
   pushLocation(loc: CourierLocation, orderId: string | null): Promise<void>;
+  /**
+   * Teslim edilemedi: neden, alıcıyı arama sayısı, adres fotoğrafı (zorunlu). Paket göndericiye döner,
+   * dönüş ayağı ücreti eklenir. Sunucu varış ve en az bekleme şartını denetler.
+   */
+  reportFailedDelivery(orderId: string, input: { reason: FailedDeliveryReason; note: string; callAttempts: number; photoUri: string }): Promise<void>;
   /** Kurye adrese vardığını bildirir (adrese 300 m içinde olmalı) */
   markArrived(orderId: string, stop: "alis" | "teslim", at: CourierLocation | null): Promise<{ arrivedAt: string }>;
   courierEarnings(): Promise<CourierEarnings>;

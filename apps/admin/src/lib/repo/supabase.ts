@@ -84,6 +84,8 @@ export const toAdminOrder = (r: Row): AdminOrder => ({
   distanceMeters: r.distance_meters,
   scheduledPickupAt: r.scheduled_pickup_at,
   deliveredAt: r.delivered_at,
+  failedReason: r.failed_reason ?? null,
+  returnedAt: r.returned_at ?? null,
 });
 
 const toEarning = (r: Row): EarningRow => ({
@@ -238,6 +240,13 @@ export function createSupabaseRepo(url: string, anonKey: string): AdminRepo & { 
         podPhotoPath: r.pod_photo_path,
         podSignaturePath: r.pod_signature_path,
         podReceiverName: r.pod_receiver_name,
+        failedAt: r.failed_at ?? null,
+        failedNote: r.failed_note ?? null,
+        failedCallAttempts: r.failed_call_attempts ?? null,
+        failedPhotoPath: r.failed_photo_path ?? null,
+        returnPodPhotoPath: r.return_pod_photo_path ?? null,
+        returnPodSignaturePath: r.return_pod_signature_path ?? null,
+        returnReceiverName: r.return_receiver_name ?? null,
         history: (check(h, "Geçmiş okunamadı") ?? []).map((x: Row) => ({
           fromStatus: x.from_status,
           toStatus: x.to_status,
@@ -308,6 +317,14 @@ export function createSupabaseRepo(url: string, anonKey: string): AdminRepo & { 
       return () => {
         client.removeChannel(ch);
       };
+    },
+    async reportFailedDelivery(orderId, reason, note) {
+      check(
+        await client.rpc("report_failed_delivery", { p_order_id: orderId, p_reason: reason, p_note: note, p_photo_path: null, p_call_attempts: 0 }),
+        "Kaydedilemedi",
+      );
+      // İade ücreti pricing.ts ile sunucuda eklenir
+      await invoke("reprice-order", { orderId });
     },
     subscribeOrders(onChange) {
       const ch = client
@@ -572,6 +589,7 @@ export function createSupabaseRepo(url: string, anonKey: string): AdminRepo & { 
         arrivalMaxRadiusM: r.arrival_max_radius_m ?? 300,
         maxBreakMinutes: r.max_break_minutes ?? 45,
         offerAutoBreakAfter: r.offer_auto_break_after ?? 3,
+        failedDeliveryMinWaitMinutes: r.failed_delivery_min_wait_minutes ?? 10,
       };
     },
     async saveOpsSettings(s) {
@@ -599,6 +617,7 @@ export function createSupabaseRepo(url: string, anonKey: string): AdminRepo & { 
             arrival_max_radius_m: s.arrivalMaxRadiusM,
             max_break_minutes: s.maxBreakMinutes,
             offer_auto_break_after: s.offerAutoBreakAfter,
+            failed_delivery_min_wait_minutes: s.failedDeliveryMinWaitMinutes,
           })
           .eq("id", 1),
         "Ayarlar kaydedilemedi",

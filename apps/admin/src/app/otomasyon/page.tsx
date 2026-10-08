@@ -25,6 +25,12 @@ const NUMBERS: Array<{ key: keyof OpsSettings; label: string; hint: string; allo
     hint: "Üst üste bu kadar teklife yanıt vermeyen kurye molaya alınır (0 = kapalı)",
     allowZero: true,
   },
+  {
+    key: "failedDeliveryMinWaitMinutes",
+    label: "Teslim edilemedi için en az bekleme (dk)",
+    hint: "0–60; kurye teslim adresinde bu kadar beklemeden iade başlatamaz",
+    allowZero: true,
+  },
 ];
 
 export default function OtomasyonPage() {
@@ -243,6 +249,10 @@ function OpsForm({ initial, onSaved }: { initial: OpsSettings; onSaved: () => vo
     }
     if (form.maxBreakMinutes < 5 || form.maxBreakMinutes > 240 || form.offerAutoBreakAfter < 0 || form.offerAutoBreakAfter > 20) {
       setSaveError("Mola: en uzun 5–240 dk, otomatik mola 0–20 teklif");
+      return;
+    }
+    if (form.failedDeliveryMinWaitMinutes < 0 || form.failedDeliveryMinWaitMinutes > 60) {
+      setSaveError("Teslim edilemedi bekleme süresi 0–60 dk olmalı");
       return;
     }
     try {

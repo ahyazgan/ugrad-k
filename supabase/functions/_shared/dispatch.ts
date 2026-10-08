@@ -33,6 +33,8 @@ export function toNotificationOrder(r: Row): NotificationOrder {
     podReceiverName: r.pod_receiver_name,
     cancelReason: r.cancel_reason,
     problemNote: r.problem_note,
+    failedReason: r.failed_reason ?? null,
+    returnReceiverName: r.return_receiver_name ?? null,
     deliveryCode: (Array.isArray(r.secret) ? r.secret[0] : r.secret)?.delivery_code ?? null,
     assignment: r.offer_expires_at ? (r.offer_accepted_at ? "accepted" : "offer") : "direct",
     customer: {

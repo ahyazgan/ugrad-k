@@ -108,4 +108,13 @@ describe("buildNotifications", () => {
     expect(r.text).toBe(`Merhaba Ali, ${BRAND.name} kuryesi Mehmet adresinizde; paketinizi teslim almak için hazır olun. Teslim kodunuz: 4821.`);
     expect(r.whatsappTemplate).toEqual({ name: "alici_kurye_kapida_kod", params: ["Ali", "Mehmet", "4821"] });
   });
+
+  it("teslim edilemedi: müşteriye neden ve iade, alıcıya SMS, yöneticiye uyarı", () => {
+    const m = buildNotifications("geri_donuyor", { ...order, status: "geri_donuyor", failedReason: "alici_yok" }, cfg);
+    expect(m.map((x) => x.to.role)).toEqual(["customer", "receiver", "admin"]);
+    expect(m[0]!.text).toContain("teslim edilemedi (alıcıya ulaşılamadı). Paket size geri getiriliyor");
+    expect(m[0]!.whatsappTemplate!.name).toBe("teslim_edilemedi");
+    const back = buildNotifications("geri_teslim", { ...order, status: "geri_teslim", returnReceiverName: "Ayşe" }, cfg);
+    expect(back[0]!.text).toContain("geri teslim edildi (teslim alan: Ayşe)");
+  });
 });

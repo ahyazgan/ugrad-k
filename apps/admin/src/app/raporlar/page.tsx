@@ -122,7 +122,7 @@ export default function RaporlarPage() {
         <div className={loading ? "opacity-60" : undefined}>
           <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-3" data-testid="report-totals">
             <Stat label="Ciro (KDV hariç)" value={formatTL(t.revenueKurus)} hint={`${t.delivered} teslimat`} />
-            <Stat label="Sipariş" value={t.orders} hint={`${t.cancelled} iptal (${pct(t.cancelRate)})`} />
+            <Stat label="Sipariş" value={t.orders} hint={`${t.cancelled} iptal (${pct(t.cancelRate)})${t.returned ? ` · ${t.returned} iade` : ""}`} />
             <Stat label="Ortalama sipariş" value={t.delivered ? formatTL(t.avgOrderKurus) : "—"} />
             <Stat label="Ortalama teslim süresi" value={minutes(t.avgDeliveryMin)} hint="Sipariş (veya planlı alış) → teslim" />
             <Stat

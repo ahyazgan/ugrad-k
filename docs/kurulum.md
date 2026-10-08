@@ -37,6 +37,7 @@ Kodun tamamı yazıldı ve testlerden geçti. Bu rehber, sistemi **gerçek hesap
 30. [Adrese varış ve bekleme ölçümü](#30-adrese-varış-ve-bekleme-ölçümü)
 31. [Kurye molası](#31-kurye-molası)
 32. [Acil durum (SOS)](#32-acil-durum-sos)
+33. [Teslim edilemedi → göndericiye iade](#33-teslim-edilemedi--göndericiye-iade)
 
 ---
 
@@ -216,6 +217,7 @@ Panel → Otomasyon → **Sistem durumu** kartında her görevin en son ne zaman
    | `acil_gecikme` | `{{1}} numaralı acil gönderiniz gecikebilir, tahmini teslim {{2}}. Taahhüt aşılırsa acil ek ücreti sonraki siparişinizden düşülür. Takip: {{3}}` |
    | `kurye_alista` | `Kuryemiz {{1}}, {{2}} numaralı gönderi için alış adresinizde. Paketi hazırlayabilirsiniz.` |
    | `alici_kurye_kapida` | `Merhaba {{1}}, Yazgan Kurye kuryesi {{2}} adresinizde; paketinizi teslim almak için hazır olun.` |
+   | `teslim_edilemedi` | `{{1}} numaralı gönderiniz teslim edilemedi ({{2}}). Paket size geri getiriliyor; dönüş ayağı ücreti eklenir. Takip: {{3}}` |
    | `alici_kurye_kapida_kod` | `Merhaba {{1}}, Yazgan Kurye kuryesi {{2}} adresinizde; paketinizi teslim almak için hazır olun. Teslim kodunuz: {{3}}.` |
 
 4. Webhook: Callback URL `https://<ref>.supabase.co/functions/v1/whatsapp-webhook`, Verify token: kendi belirlediğiniz rastgele metin → **messages** alanına abone olun.
@@ -474,3 +476,11 @@ Kayıtlı müşteriler `siparis@<alan adı>` adresine yazar; yapay zeka asistan�
 - **Yönetici**: `ADMIN_ALERT_PHONES` numaralarına **hemen** WhatsApp/SMS gider (kurye adı ve telefonu, tür, not, Google Haritalar konum bağlantısı, elindeki iş). Panelin her sayfasının üstünde kırmızı bant çıkar: *Konumu aç*, *Kuryeyi ara*, *Gördüm*, *Kapat…* (ne yapıldığı yazılır). Kurye "Gördüm"ü uygulamada görür.
 - **Tekrar**: görülmeyen alarm 5 dakikada bir, en fazla 3 kez yeniden gönderilir (§6 `otomatik-dagitim`). Kayıtlar panel → Kuryeler → *Acil durum kayıtları*.
 - **Kurulum**: `sos` Edge Function'ını yükleyin (`pnpm deploy:functions`); `ADMIN_ALERT_PHONES` boşsa alarm kimseye gitmez (Canlıya hazırlık kartı "eksik" gösterir). İş kazası halinde SGK'ya 3 iş günü içinde iş kazası bildirimi yapılması gerekir; kayıt bunun için tarih ve konum sağlar.
+
+## 33. Teslim edilemedi → göndericiye iade
+
+- **Kurye**: teslim adresinde *Teslim edilemedi* → neden (alıcıya ulaşılamadı, adres bulunamadı, alıcı teslim almadı, iş yeri kapalı, diğer), alıcıyı arama, **adres fotoğrafı (zorunlu)**, not. Alıcıya ulaşılamadı / kapalı / diğer nedenlerinde kurye teslim adresine vardığını bildirmiş (§30) ve en az *Teslim edilemedi için en az bekleme* (varsayılan 10 dk) beklemiş olmalı; "alıcıya ulaşılamadı"da en az bir arama şart. Sipariş **Göndericiye dönüyor** olur; kurye paketi alış adresine götürüp fotoğraf/imzayla *Göndericiye teslim eder* → **Göndericiye iade edildi**.
+- **Ücret**: dönüş ayağı kuralı — gidişin ek ücretler dahil taşıma bedelinin %50'si (`return_leg_discount_pct`), satır "Teslim edilemedi – göndericiye iade". Gidiş-dönüş siparişte dönüş zaten alındığı için ek ücret yok. Dönüşte ücretli köprü yönüne (Anadolu→Avrupa) geçiliyorsa köprü eklenir. Kurumsal indirime tabidir; kurye dönüş km'si için de hakediş alır. İade edilen iş faturalanır (bireyselde hemen, kurumsalda ay sonu).
+- **Bildirim**: müşteriye neden ve iade bilgisi (WhatsApp şablonu `teslim_edilemedi`, yoksa SMS), alıcıya SMS, yöneticiye uyarı; iade tamamlanınca müşteriye "geri teslim edildi".
+- **Panel**: sipariş detayında *Teslim edilemedi* kartı (neden, arama sayısı, adres fotoğrafı, iade kanıtı). Yönetici yolda/sorunlu siparişte *Göndericiye iade başlat* diyebilir (kanıt şartı yok). Raporlarda "iade" sayısı; ciroya dahildir.
+- **Kurumsal API**: `status` `geri_donuyor` / `geri_teslim`, `failedReason`, `returnedAt` alanları; webhook olayları aynı.

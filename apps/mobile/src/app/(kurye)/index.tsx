@@ -10,7 +10,7 @@ import { api, ApiError, type OrderSummary, type Shift } from "@/lib/api";
 import { formatTime } from "@/lib/format";
 import { currentPosition, lastKnownPosition, setActiveOrderForLocation, startTracking, stopTracking } from "@/lib/location";
 
-const ACTIVE = ["kuryeye_atandi", "alindi", "yolda", "sorunlu"];
+const ACTIVE = ["kuryeye_atandi", "alindi", "yolda", "sorunlu", "geri_donuyor"];
 
 export default function KuryeIsler() {
   const [shift, setShift] = useState<Shift | null | undefined>(undefined);
@@ -37,6 +37,7 @@ export default function KuryeIsler() {
       // müşteri yalnız kendi siparişine bağlı konumu görür (RLS). Yanıt bekleyen teklif sayılmaz.
       const live =
         j.find((x) => x.status === "yolda") ??
+        j.find((x) => x.status === "geri_donuyor") ??
         j.find((x) => x.status === "alindi") ??
         j.find((x) => x.status === "kuryeye_atandi" && !x.offerExpiresAt);
       if (j.some((x) => x.offerExpiresAt)) lastKnownPosition().then(setMe, () => undefined);
@@ -64,7 +65,7 @@ export default function KuryeIsler() {
     setError(null);
     try {
       if (shift) {
-        const open = jobs.filter((j) => ["alindi", "yolda"].includes(j.status));
+        const open = jobs.filter((j) => ["alindi", "yolda", "geri_donuyor"].includes(j.status));
         if (open.length) throw new ApiError("Elinizde paket varken vardiya kapatılamaz");
         await api.endShift(await currentPosition());
         await stopTracking();
@@ -94,7 +95,7 @@ export default function KuryeIsler() {
       } else {
         await api.startBreak();
         // Elde iş yoksa molada konum paylaşılmaz (KVKK: yalnız gerekli veri)
-        if (!jobs.some((j) => ["kuryeye_atandi", "alindi", "yolda"].includes(j.status) && !j.offerExpiresAt)) await stopTracking();
+        if (!jobs.some((j) => ["kuryeye_atandi", "alindi", "yolda", "geri_donuyor"].includes(j.status) && !j.offerExpiresAt)) await stopTracking();
       }
       setNow(Date.now());
       await load();
@@ -107,7 +108,7 @@ export default function KuryeIsler() {
 
   const offers = jobs.filter((j): j is OrderSummary & { offerExpiresAt: string } => !!j.offerExpiresAt);
   const active = jobs.filter((j) => ACTIVE.includes(j.status) && !j.offerExpiresAt);
-  const done = jobs.filter((j) => j.status === "teslim_edildi");
+  const done = jobs.filter((j) => j.status === "teslim_edildi" || j.status === "geri_teslim");
 
   return (
     <Screen>
@@ -190,7 +191,7 @@ export default function KuryeIsler() {
 
       {done.length ? (
         <>
-          <Title>Bugün teslim edilen ({done.length})</Title>
+          <Title>Bugün tamamlanan ({done.length})</Title>
           {done.map((j) => (
             <Card key={j.id} style={{ gap: 4 }}>
               <Text style={{ fontWeight: "600" }}>

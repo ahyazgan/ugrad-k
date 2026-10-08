@@ -1,5 +1,5 @@
 import * as ImagePicker from "expo-image-picker";
-import { router, useLocalSearchParams } from "expo-router";
+import { Stack, router, useLocalSearchParams } from "expo-router";
 import { formatTL } from "@yazgan/shared";
 import { useEffect, useState } from "react";
 import { Image, Text } from "react-native";
@@ -9,7 +9,9 @@ import { api, ApiError, type CashCollection, type OrderDetail } from "@/lib/api"
 import { setActiveOrderForLocation } from "@/lib/location";
 
 export default function Teslim() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, mode } = useLocalSearchParams<{ id: string; mode?: string }>();
+  // Teslim edilemeyen paketin göndericiye iadesi: kod sorulmaz, kanıt ayrı kaydedilir
+  const returning = mode === "iade";
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [signature, setSignature] = useState<string | null>(null);
   const [receiver, setReceiver] = useState("");
@@ -38,7 +40,7 @@ export default function Teslim() {
     if (!res.canceled && res.assets[0]) setPhotoUri(res.assets[0].uri);
   }
 
-  const needsCode = !!order?.deliveryCodeRequired && !codeOk;
+  const needsCode = !returning && !!order?.deliveryCodeRequired && !codeOk;
 
   async function verifyCode() {
     setCodeMsg(null);
@@ -56,7 +58,7 @@ export default function Teslim() {
     setError(null);
     try {
       await api.courierAction(id, {
-        type: "deliver",
+        type: returning ? "return_deliver" : "deliver",
         pod: { photoUri, signatureSvg: signature, receiverName: receiver.trim(), cashCollection: needsCash ? (collection as CashCollection) : null },
       });
       setActiveOrderForLocation(null);
@@ -70,8 +72,15 @@ export default function Teslim() {
 
   return (
     <Screen>
+      {returning ? <Stack.Screen options={{ title: "Göndericiye teslim" }} /> : null}
+      {returning ? (
+        <Card style={{ borderColor: "#9A3412" }}>
+          <Text style={{ fontWeight: "700" }}>Teslim edilemeyen paket göndericiye iade ediliyor</Text>
+          <Muted>Paketi alış adresindeki yetkiliye teslim edin; fotoğraf veya imza alın.</Muted>
+        </Card>
+      ) : null}
       <Card>
-        <Field label="Teslim alan kişi" placeholder="Ad Soyad / unvan" value={receiver} onChangeText={setReceiver} testID="receiver" />
+        <Field label={returning ? "Paketi geri alan kişi" : "Teslim alan kişi"} placeholder="Ad Soyad / unvan" value={receiver} onChangeText={setReceiver} testID="receiver" />
       </Card>
       <Card>
         <Text style={{ fontWeight: "600" }}>Fotoğraf</Text>
@@ -83,7 +92,7 @@ export default function Teslim() {
         <Text style={{ fontWeight: "600" }}>İmza</Text>
         <SignaturePad onChange={setSignature} />
       </Card>
-      {order?.deliveryCodeRequired ? (
+      {order?.deliveryCodeRequired && !returning ? (
         <Card>
           <Text style={{ fontWeight: "600" }}>Teslim kodu</Text>
           <Muted>Alıcıdan SMS ile gelen 4 haneli kodu isteyin.</Muted>
@@ -110,7 +119,7 @@ export default function Teslim() {
       ) : null}
       <ErrorBox message={error} />
       <Button
-        title="Teslimi tamamla"
+        title={returning ? "İadeyi tamamla" : "Teslimi tamamla"}
         onPress={submit}
         loading={busy}
         disabled={receiver.trim().length < 2 || (!photoUri && !signature) || (needsCash && !collection) || needsCode}

@@ -1,6 +1,7 @@
 import type {
   Holiday,
   IstanbulSide,
+  FailedDeliveryReason,
   MonthlyInvoice,
   OfferResponse,
   OrderStatus,
@@ -52,6 +53,9 @@ export interface AdminOrder {
   distanceMeters: number;
   scheduledPickupAt: string | null;
   deliveredAt: string | null;
+  /** Teslim edilemedi → göndericiye iade */
+  failedReason: FailedDeliveryReason | null;
+  returnedAt: string | null;
 }
 
 export type CashCollection = "nakit" | "iban" | "alinmadi";
@@ -130,6 +134,13 @@ export interface AdminOrderDetail extends AdminOrder {
   podPhotoPath: string | null;
   podSignaturePath: string | null;
   podReceiverName: string | null;
+  failedAt: string | null;
+  failedNote: string | null;
+  failedCallAttempts: number | null;
+  failedPhotoPath: string | null;
+  returnPodPhotoPath: string | null;
+  returnPodSignaturePath: string | null;
+  returnReceiverName: string | null;
   history: Array<{ fromStatus: OrderStatus | null; toStatus: OrderStatus; at: string; note: string | null }>;
   /** Otomatik atamada kuryelere giden teklifler ve sonuçları */
   offers: OrderOffer[];
@@ -301,6 +312,8 @@ export interface OpsSettings {
   maxBreakMinutes: number;
   /** Üst üste bu kadar teklife yanıt vermeyen kurye otomatik molaya alınır (0 = kapalı) */
   offerAutoBreakAfter: number;
+  /** "Teslim edilemedi" için teslim adresinde en az bekleme (dk) */
+  failedDeliveryMinWaitMinutes: number;
 }
 
 export interface PromoCodeRow extends Promo {
@@ -476,6 +489,8 @@ export interface AdminRepo {
   getOrder(id: string): Promise<AdminOrderDetail>;
   assignCourier(orderId: string, courierId: string): Promise<void>;
   setStatus(orderId: string, status: OrderStatus, note?: string): Promise<void>;
+  /** Teslim edilemedi → göndericiye iade (yönetici; kanıt şartı yok) ve iade ücretinin eklenmesi */
+  reportFailedDelivery(orderId: string, reason: FailedDeliveryReason, note: string): Promise<void>;
   subscribeOrders(onChange: () => void): () => void;
   // Acil durum (SOS)
   listIncidents(filter: { openOnly?: boolean; limit?: number }): Promise<Incident[]>;

@@ -65,6 +65,15 @@ export function createSupabaseApi(url: string, anonKey: string): Api & { client:
     return id;
   };
 
+  /** Teslim kanıtı / adres fotoğrafını özel "pod" deposuna yükler */
+  async function uploadPod(orderId: string, name: string, uri: string) {
+    const path = `${orderId}/${name}`;
+    const body = await (await fetch(uri)).arrayBuffer();
+    const { error } = await client.storage.from("pod").upload(path, body, { contentType: "image/jpeg" });
+    if (error) throw new ApiError(`Fotoğraf yüklenemedi: ${error.message}`);
+    return path;
+  }
+
   async function invoke<T>(name: string, body: object): Promise<T> {
     const { data, error } = await client.functions.invoke(name, { body: body as Record<string, unknown> });
     if (error) {
@@ -196,6 +205,8 @@ export function createSupabaseApi(url: string, anonKey: string): Api & { client:
         waitingMinutes: r!.waiting_minutes ?? 0,
         arrivedPickupAt: r!.arrived_pickup_at ?? null,
         arrivedDropoffAt: r!.arrived_dropoff_at ?? null,
+        failedReason: r!.failed_reason ?? null,
+        failedAt: r!.failed_at ?? null,
         pickupDetails: r!.pickup_details,
         dropoffDetails: r!.dropoff_details,
         pickupContactName: r!.pickup_contact_name,
@@ -327,7 +338,7 @@ export function createSupabaseApi(url: string, anonKey: string): Api & { client:
           "id, order_no, status, pickup_address, dropoff_address, total_kurus, urgent, created_at, offer_expires_at, offer_accepted_at, pickup_lat, pickup_lng, dropoff_lat, dropoff_lng",
         )
         .eq("courier_id", await uid())
-        .or(`status.in.(kuryeye_atandi,alindi,yolda,sorunlu),delivered_at.gte.${new Date(todayStart).toISOString()}`)
+        .or(`status.in.(kuryeye_atandi,alindi,yolda,sorunlu,geri_donuyor),completed_at.gte.${new Date(todayStart).toISOString()}`)
         .order("created_at", { ascending: true });
       fail(error, "İşler okunamadı");
       return (data ?? []).map(toSummary);
@@ -359,16 +370,11 @@ export function createSupabaseApi(url: string, anonKey: string): Api & { client:
           return rpc({ p_status: "sorunlu", p_note: action.note });
         case "release":
           return rpc({ p_status: "onaylandi", p_note: action.note });
-        case "deliver": {
+        case "deliver":
+        case "return_deliver": {
           const stamp = Date.now();
-          let photoPath: string | null = null;
+          const photoPath = action.pod.photoUri ? await uploadPod(orderId, `foto-${stamp}.jpg`, action.pod.photoUri) : null;
           let signaturePath: string | null = null;
-          if (action.pod.photoUri) {
-            photoPath = `${orderId}/foto-${stamp}.jpg`;
-            const body = await (await fetch(action.pod.photoUri)).arrayBuffer();
-            const { error } = await client.storage.from("pod").upload(photoPath, body, { contentType: "image/jpeg" });
-            if (error) throw new ApiError(`Fotoğraf yüklenemedi: ${error.message}`);
-          }
           if (action.pod.signatureSvg) {
             signaturePath = `${orderId}/imza-${stamp}.svg`;
             const { error } = await client.storage
@@ -377,7 +383,7 @@ export function createSupabaseApi(url: string, anonKey: string): Api & { client:
             if (error) throw new ApiError(`İmza yüklenemedi: ${error.message}`);
           }
           return rpc({
-            p_status: "teslim_edildi",
+            p_status: action.type === "deliver" ? "teslim_edildi" : "geri_teslim",
             p_pod_photo_path: photoPath,
             p_pod_signature_path: signaturePath,
             p_pod_receiver_name: action.pod.receiverName,
@@ -385,6 +391,19 @@ export function createSupabaseApi(url: string, anonKey: string): Api & { client:
           });
         }
       }
+    },
+    async reportFailedDelivery(orderId, input) {
+      const photoPath = await uploadPod(orderId, `teslim-edilemedi-${Date.now()}.jpg`, input.photoUri);
+      const { error } = await client.rpc("report_failed_delivery", {
+        p_order_id: orderId,
+        p_reason: input.reason,
+        p_note: input.note.trim() || null,
+        p_photo_path: photoPath,
+        p_call_attempts: input.callAttempts,
+      });
+      if (error) throw new ApiError(error.message);
+      // İade ücreti (dönüş ayağı) sunucuda pricing.ts ile eklenir
+      await invoke("reprice-order", { orderId });
     },
     async pushLocation(loc, orderId) {
       const { error } = await client.from("courier_locations").insert({

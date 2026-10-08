@@ -20,7 +20,7 @@ type Row = Record<string, unknown>;
 
 export const API_RATE_LIMIT = { perKey: 120, windowSeconds: 60 };
 const ORDER_COLUMNS =
-  "id, order_no, external_ref, status, created_at, scheduled_pickup_at, picked_up_at, delivered_at, pickup_address, dropoff_address, urgent, service_level, round_trip, declared_value_kurus, delivery_code_required, subtotal_kurus, vat_kurus, total_kurus, tracking_token, pod_receiver_name, cancel_reason";
+  "id, order_no, external_ref, status, created_at, scheduled_pickup_at, picked_up_at, delivered_at, pickup_address, dropoff_address, urgent, service_level, round_trip, declared_value_kurus, delivery_code_required, subtotal_kurus, vat_kurus, total_kurus, tracking_token, pod_receiver_name, cancel_reason, failed_reason, returned_at";
 
 export async function sha256Hex(s: string): Promise<string> {
   const d = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
@@ -71,6 +71,9 @@ export function apiOrder(r: Row, baseUrl = trackingBaseUrl) {
     trackingUrl: `${baseUrl.replace(/\/$/, "")}/${r.tracking_token}`,
     proofOfDelivery: r.pod_receiver_name ? { receiverName: r.pod_receiver_name } : null,
     cancelReason: r.cancel_reason ?? null,
+    // Teslim edilemedi → göndericiye iade (status geri_donuyor / geri_teslim)
+    failedReason: r.failed_reason ?? null,
+    returnedAt: r.returned_at ?? null,
   };
 }
 
@@ -176,7 +179,7 @@ export async function handleCorporateApi(req: Request, ctx: Ctx, deps: { env: En
       .limit(limit);
     const status = q.get("status");
     if (status) {
-      if (!(status in ORDER_STATUS_LABELS)) throw new HttpError(400, "status geçersiz", "status");
+      if (!Object.prototype.hasOwnProperty.call(ORDER_STATUS_LABELS, status)) throw new HttpError(400, "status geçersiz", "status");
       query = query.eq("status", status);
     }
     const ext = q.get("externalRef");

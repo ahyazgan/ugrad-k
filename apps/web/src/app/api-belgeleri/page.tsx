@@ -151,6 +151,10 @@ export default function ApiDocsPage() {
 
       <h2 className="mt-12 text-xl font-bold text-slate-900">Sipariş durumları</h2>
       <p className="mt-2 font-mono text-sm text-slate-700">beklemede → onaylandi → kuryeye_atandi → alindi → yolda → teslim_edildi · iptal · sorunlu</p>
+      <p className="mt-1 text-sm text-slate-600">
+        Teslim edilemezse: <span className="font-mono">yolda → geri_donuyor → geri_teslim</span> (paket göndericiye iade edilir;{" "}
+        <span className="font-mono">failedReason</span>: alici_yok, adres_bulunamadi, alici_reddetti, kapali, diger; dönüş ayağı ücreti eklenir).
+      </p>
 
       <h2 className="mt-12 text-xl font-bold text-slate-900">Hatalar</h2>
       <p className="mt-2 text-slate-700">

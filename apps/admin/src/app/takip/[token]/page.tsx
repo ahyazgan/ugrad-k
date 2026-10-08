@@ -61,9 +61,10 @@ export default function TakipPage() {
   }
 
   const reached = new Map(data.history.map((h) => [h.status, h.at]));
-  const closed = data.status === "teslim_edildi" || data.status === "iptal";
+  const closed = data.status === "teslim_edildi" || data.status === "iptal" || data.status === "geri_teslim";
+  const returning = data.status === "geri_donuyor" || data.status === "geri_teslim";
   const eta =
-    !closed && data.pickup_lat != null && data.pickup_lng != null
+    !closed && !returning && data.pickup_lat != null && data.pickup_lng != null
       ? etaAt(
           {
             status: data.status,
@@ -90,6 +91,9 @@ export default function TakipPage() {
           ) : null}
           {data.status === "teslim_edildi" ? (
             <p className="mt-1 text-emerald-700">Teslim saati: {fmtTime(data.delivered_at)}</p>
+          ) : null}
+          {data.status === "geri_donuyor" ? (
+            <p className="mt-1 text-orange-700">Alıcıya ulaşılamadı; paket göndericiye geri götürülüyor.</p>
           ) : null}
           {eta ? (
             <p className="mt-1 text-lg font-semibold text-slate-900" data-testid="eta">
@@ -127,7 +131,12 @@ export default function TakipPage() {
 
         <section className="rounded-xl border border-slate-200 bg-white p-4">
           <ol className="space-y-3">
-            {(data.status === "iptal" ? [...STEPS.filter((s) => reached.has(s)), "iptal" as const] : STEPS).map((s) => {
+            {(data.status === "iptal"
+              ? [...STEPS.filter((s) => reached.has(s)), "iptal" as const]
+              : returning
+                ? [...STEPS.filter((s) => reached.has(s) && s !== "teslim_edildi"), "geri_donuyor" as const, "geri_teslim" as const]
+                : STEPS
+            ).map((s) => {
               const at = reached.get(s);
               const current = s === data.status;
               return (

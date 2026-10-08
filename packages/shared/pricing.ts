@@ -190,7 +190,9 @@ export type PriceLineCode =
   /** Önceki gecikmeli acil teslimin telafisi (eksi tutar) */
   | "credit"
   /** Kampanya veya davet indirimi (eksi tutar) */
-  | "promo";
+  | "promo"
+  /** Teslim edilemeyen gönderinin göndericiye iadesi (dönüş ayağı kuralı) */
+  | "failed_return";
 
 export interface PriceLine {
   code: PriceLineCode;
@@ -541,7 +543,16 @@ export function corporateTierFor(
 }
 
 /** Kurumsal indirime tabi kalemler (taşıma bedeli). Köprü, bekleme, ağır paket ve uzak alış indirimsizdir. */
-export const DISCOUNTABLE_LINE_CODES: PriceLineCode[] = ["base", "extra_km", "economy", "urgent", "night_holiday", "return_leg", "promo"];
+export const DISCOUNTABLE_LINE_CODES: PriceLineCode[] = [
+  "base",
+  "extra_km",
+  "economy",
+  "urgent",
+  "night_holiday",
+  "return_leg",
+  "failed_return",
+  "promo",
+];
 
 export function discountableKurus(quote: Pick<PriceQuote, "lines">): number {
   return quote.lines.filter((l) => DISCOUNTABLE_LINE_CODES.includes(l.code)).reduce((s, l) => s + l.amountKurus, 0);
@@ -622,6 +633,20 @@ export function formatTL(kurus: number): string {
   );
 }
 
+/** Satırlar değişince toplamları yeniden hesaplar; KDV oranı teklifin kendisinden korunur (sipariş anındaki oran) */
+function retotal(quote: PriceQuote, lines: PriceLine[], settings: PricingSettings): PriceQuote {
+  const subtotalKurus = lines.reduce((s, l) => s + l.amountKurus, 0);
+  const vatPct = quote.subtotalKurus > 0 ? Math.round((quote.vatKurus / quote.subtotalKurus) * 10_000) / 100 : settings.vatPct;
+  const vatKurus = pct(subtotalKurus, vatPct);
+  return { ...quote, lines, subtotalKurus, vatKurus, totalKurus: subtotalKurus + vatKurus };
+}
+
+/** Satırı köprü satırından önce (yoksa sona) ekler */
+function insertBeforeBridge(lines: PriceLine[], line: PriceLine) {
+  const bridgeIdx = lines.findIndex((l) => l.code === "bridge");
+  lines.splice(bridgeIdx === -1 ? lines.length : bridgeIdx, 0, line);
+}
+
 /**
  * Alışta oluşan beklemeyi onaylanmış teklife ekler (veya günceller). Diğer kalemler
  * sipariş anındaki gibi kalır; yalnızca bekleme satırı ve toplamlar yeniden hesaplanır.
@@ -634,18 +659,44 @@ export function applyWaitingFee(
   const fee = waitingFeeKurus(waitingMinutes, settings);
   const lines = quote.lines.filter((l) => l.code !== "waiting");
   if (fee > 0) {
-    const waitingLine: PriceLine = {
+    insertBeforeBridge(lines, {
       code: "waiting",
       label: `Bekleme (${waitingMinutes} dk, ilk ${settings.waitingFreeMinutes} dk ücretsiz)`,
       amountKurus: fee,
-    };
-    // Köprü satırından önce, değilse sona
-    const bridgeIdx = lines.findIndex((l) => l.code === "bridge");
-    lines.splice(bridgeIdx === -1 ? lines.length : bridgeIdx, 0, waitingLine);
+    });
   }
-  const subtotalKurus = lines.reduce((s, l) => s + l.amountKurus, 0);
-  // KDV oranı teklifin kendisinden korunur (sipariş anındaki oran)
-  const vatPct = quote.subtotalKurus > 0 ? Math.round((quote.vatKurus / quote.subtotalKurus) * 10_000) / 100 : settings.vatPct;
-  const vatKurus = pct(subtotalKurus, vatPct);
-  return { ...quote, lines, subtotalKurus, vatKurus, totalKurus: subtotalKurus + vatKurus };
+  return retotal(quote, lines, settings);
+}
+
+/** Gidişin ek ücretler dahil taşıma bedeli (dönüş ayağı bu tutar üzerinden hesaplanır) */
+const OUTBOUND_TRANSPORT_CODES: PriceLineCode[] = ["base", "extra_km", "economy", "urgent", "night_holiday"];
+/** İade dönüşündeki ek köprü geçişi satırının etiketi (yeniden hesapta tanınır) */
+export const FAILED_RETURN_BRIDGE_LABEL = "Köprü / tünel geçişi (iade dönüşü)";
+
+/**
+ * Teslim edilemeyen gönderinin göndericiye iadesi. Gidiş-dönüş kuralıyla aynı: dönüş ayağı, gidişin
+ * ek ücretler dahil taşıma bedelinin %(100 − returnLegDiscountPct)'i. Sipariş zaten gidiş-dönüşse dönüş
+ * ayağı alınmıştır, ek ücret yok. Dönüşte ücretli köprü yönüne (Anadolu→Avrupa) geçiliyorsa
+ * `extraBridgeCrossings` kadar geçiş eklenir. Kuryenin dönüş km'si hakedişe girsin diye meta güncellenir.
+ * Tekrar çağrılırsa önceki iade satırları değiştirilir (idempotent).
+ */
+export function applyFailedDeliveryReturn(
+  quote: PriceQuote,
+  opts: { roundTrip: boolean; extraBridgeCrossings?: number },
+  settings: PricingSettings = DEFAULT_PRICING_SETTINGS,
+): PriceQuote {
+  const lines = quote.lines.filter((l) => l.code !== "failed_return" && !(l.code === "bridge" && l.label === FAILED_RETURN_BRIDGE_LABEL));
+  if (opts.roundTrip) return retotal(quote, lines, settings);
+  const outbound = lines.filter((l) => OUTBOUND_TRANSPORT_CODES.includes(l.code)).reduce((s, l) => s + l.amountKurus, 0);
+  insertBeforeBridge(lines, {
+    code: "failed_return",
+    label: `Teslim edilemedi – göndericiye iade (dönüş ayağı, %${settings.returnLegDiscountPct} indirimli)`,
+    amountKurus: outbound - pct(outbound, settings.returnLegDiscountPct),
+  });
+  const crossings = opts.extraBridgeCrossings ?? 0;
+  if (crossings > 0 && settings.bridgeFeeKurus > 0) {
+    lines.push({ code: "bridge", label: FAILED_RETURN_BRIDGE_LABEL, amountKurus: crossings * settings.bridgeFeeKurus });
+  }
+  const next = retotal(quote, lines, settings);
+  return { ...next, meta: { ...quote.meta, returnDistanceKm: quote.meta.returnDistanceKm ?? quote.meta.distanceKm } };
 }

@@ -1,6 +1,7 @@
 import { router, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import { Text, TextInput, View } from "react-native";
+import { FailedDeliveryForm } from "@/components/FailedDelivery";
 import { OfferCard } from "@/components/OfferCard";
 import { StatusBadge } from "@/components/StatusBadge";
 import { TileMap, type MapMarker } from "@/components/TileMap";
@@ -83,6 +84,7 @@ export default function IsDetay() {
   const [busy, setBusy] = useState(false);
   const [waiting, setWaiting] = useState("0");
   const [noteFor, setNoteFor] = useState<"problem" | "release" | null>(null);
+  const [failing, setFailing] = useState(false);
   const [note, setNote] = useState("");
   const [now, setNow] = useState(() => Date.now());
 
@@ -164,7 +166,7 @@ export default function IsDetay() {
         ) : null}
       </Card>
 
-      {s !== "teslim_edildi" && s !== "iptal" ? <JobMap order={order} /> : null}
+      {s !== "teslim_edildi" && s !== "iptal" && s !== "geri_teslim" ? <JobMap order={order} /> : null}
 
       <Stop
         title="1 · ALIŞ"
@@ -226,7 +228,30 @@ export default function IsDetay() {
       {(s === "yolda" || s === "sorunlu") && order.arrivedDropoffAt ? (
         <Muted>Teslim adresine vardınız · {formatTime(order.arrivedDropoffAt)} (alıcıya &quot;kurye kapıda&quot; mesajı gitti)</Muted>
       ) : null}
-      {s === "yolda" || s === "sorunlu" ? (
+      {s === "geri_donuyor" ? (
+        <Card style={{ gap: 8, borderColor: "#9A3412" }}>
+          <Text style={{ fontWeight: "700", fontSize: 16 }}>Paketi göndericiye geri götürün</Text>
+          <Muted>Alış adresine dönün ve paketi göndericiye teslim edin (fotoğraf veya imza).</Muted>
+          <Button title="Yol tarifi (alış)" variant="secondary" onPress={() => openDirections(order.pickupLat, order.pickupLng, order.pickupAddress)} />
+          <Button
+            title="Göndericiye teslim et"
+            onPress={() => router.push({ pathname: "/teslim/[id]", params: { id, mode: "iade" } })}
+            testID="return-deliver"
+          />
+        </Card>
+      ) : null}
+      {(s === "yolda" || s === "sorunlu") && failing ? (
+        <FailedDeliveryForm
+          order={order}
+          now={now}
+          onCancel={() => setFailing(false)}
+          onDone={() => {
+            setFailing(false);
+            load();
+          }}
+        />
+      ) : null}
+      {(s === "yolda" || s === "sorunlu") && !failing ? (
         <Button
           title="Teslim et"
           onPress={() => router.push({ pathname: "/teslim/[id]", params: { id } })}
@@ -235,7 +260,10 @@ export default function IsDetay() {
         />
       ) : null}
 
-      {["kuryeye_atandi", "alindi", "yolda"].includes(s) && !noteFor && !offerPending ? (
+      {(s === "yolda" || s === "sorunlu") && !failing && !noteFor ? (
+        <Button title="Teslim edilemedi" variant="secondary" onPress={() => setFailing(true)} testID="failed-open" />
+      ) : null}
+      {["kuryeye_atandi", "alindi", "yolda"].includes(s) && !noteFor && !offerPending && !failing ? (
         <View style={{ flexDirection: "row", gap: 8 }}>
           <View style={{ flex: 1 }}>
             <Button title="Sorun bildir" variant="secondary" onPress={() => setNoteFor("problem")} />

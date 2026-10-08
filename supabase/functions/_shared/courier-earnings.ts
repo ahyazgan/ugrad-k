@@ -41,7 +41,8 @@ export function earningRow(o: Row, model = DEFAULT_COST_MODEL, settings?: { free
   return {
     order_id: o.id,
     courier_id: o.courier_id,
-    delivered_at: o.delivered_at ?? new Date().toISOString(),
+    // İade edilen işte tamamlanma (göndericiye teslim) anı
+    delivered_at: o.completed_at ?? o.delivered_at ?? new Date().toISOString(),
     km: e.km,
     job_kurus: e.jobKurus,
     km_kurus: e.kmKurus,

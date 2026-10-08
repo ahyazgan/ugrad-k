@@ -1,4 +1,4 @@
-import { ORDER_STATUS_LABELS, ageLabel, etaAt, formatTL, istanbulTime, slaState, trackingBaseUrl, type OrderStatus } from "@yazgan/shared";
+import { FAILED_DELIVERY_REASONS, ORDER_STATUS_LABELS, ageLabel, etaAt, formatTL, istanbulTime, slaState, trackingBaseUrl, type OrderStatus } from "@yazgan/shared";
 import { useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import { Linking, Pressable, Share, Text, TextInput, View } from "react-native";
@@ -24,7 +24,12 @@ const STEPS: OrderStatus[] = ["beklemede", "onaylandi", "kuryeye_atandi", "alind
 
 function Timeline({ order }: { order: OrderDetail }) {
   const reached = new Map(order.history.map((h) => [h.status, h.at]));
-  const steps = order.status === "iptal" || order.status === "sorunlu" ? [...STEPS.filter((s) => reached.has(s)), order.status] : STEPS;
+  const steps =
+    order.status === "iptal" || order.status === "sorunlu"
+      ? [...STEPS.filter((s) => reached.has(s)), order.status]
+      : order.status === "geri_donuyor" || order.status === "geri_teslim"
+        ? [...STEPS.filter((s) => reached.has(s) && s !== "teslim_edildi"), "geri_donuyor" as const, "geri_teslim" as const]
+        : STEPS;
   return (
     <View style={{ gap: 10 }}>
       {steps.map((s) => {
@@ -64,7 +69,7 @@ function OrderMap({ order }: { order: OrderDetail }) {
     { kind: "dropoff", lat: order.dropoffLat, lng: order.dropoffLng },
     ...(courier ? [{ kind: "courier" as const, lat: courier.lat, lng: courier.lng }] : []),
   ];
-  const active = !["teslim_edildi", "iptal", "sorunlu"].includes(order.status);
+  const active = !["teslim_edildi", "iptal", "sorunlu", "geri_donuyor", "geri_teslim"].includes(order.status);
   const eta = active
     ? etaAt(
         {
@@ -220,7 +225,19 @@ export default function SiparisDetay() {
         <Timeline order={order} />
       </Card>
 
-      {!["teslim_edildi", "iptal"].includes(order.status) ? <OrderMap order={order} /> : null}
+      {!["teslim_edildi", "iptal", "geri_teslim"].includes(order.status) ? <OrderMap order={order} /> : null}
+      {order.failedAt ? (
+        <Card style={{ borderColor: "#9A3412" }}>
+          <Text style={{ fontWeight: "700" }} testID="failed-info">
+            Teslim edilemedi{order.failedReason ? `: ${FAILED_DELIVERY_REASONS[order.failedReason]}` : ""}
+          </Text>
+          <Muted>
+            {order.status === "geri_teslim"
+              ? "Paket size geri teslim edildi."
+              : "Paket size geri getiriliyor. Dönüş ayağı ücreti (gidişin %50'si) fiyata eklendi."}
+          </Muted>
+        </Card>
+      ) : null}
       {order.deliveryCode && order.status !== "teslim_edildi" && order.status !== "iptal" ? (
         <Card>
           <Text style={{ fontWeight: "700" }} testID="delivery-code">

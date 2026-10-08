@@ -1,5 +1,6 @@
 // İş mantığı — Deno.serve'den bağımsız, sahte Ctx ile test edilebilir.
 import {
+  applyFailedDeliveryReturn,
   applyWaitingFee,
   buildQuote,
   orderRowFromQuote,
@@ -120,7 +121,7 @@ export async function handleRepriceOrder(req: Request, ctx: Ctx): Promise<Respon
 
   const { data: order, error } = await ctx.admin
     .from("orders")
-    .select("id, courier_id, status, waiting_minutes, price_quote, total_kurus")
+    .select("id, courier_id, status, waiting_minutes, price_quote, total_kurus, failed_at, round_trip, pickup_side, dropoff_side")
     .eq("id", body.orderId)
     .single();
   if (error || !order) throw new HttpError(404, "Sipariş bulunamadı");
@@ -129,12 +130,17 @@ export async function handleRepriceOrder(req: Request, ctx: Ctx): Promise<Respon
     const { data: p } = await ctx.admin.from("profiles").select("role").eq("id", user.id).single();
     if (p?.role !== "admin") throw new HttpError(403, "Bu sipariş için yetkiniz yok");
   }
-  if (["teslim_edildi", "iptal"].includes(order.status) && order.courier_id === user.id) {
+  if (["teslim_edildi", "iptal", "geri_teslim"].includes(order.status) && order.courier_id === user.id) {
     throw new HttpError(409, "Kapanmış siparişin fiyatı değiştirilemez");
   }
 
   const { settings } = await ctx.loadPricing();
-  const quote: PriceQuote = applyWaitingFee(order.price_quote, order.waiting_minutes ?? 0, settings);
+  let quote: PriceQuote = applyWaitingFee(order.price_quote, order.waiting_minutes ?? 0, settings);
+  // Teslim edilemedi → göndericiye iade ücreti (dönüşte Anadolu→Avrupa ücretli geçiş varsa köprü)
+  if (order.failed_at) {
+    const extraBridge = order.pickup_side === "avrupa" && order.dropoff_side === "anadolu" ? 1 : 0;
+    quote = applyFailedDeliveryReturn(quote, { roundTrip: !!order.round_trip, extraBridgeCrossings: extraBridge }, settings);
+  }
   const changed = quote.totalKurus !== order.total_kurus;
   if (changed) {
     const { error: uErr } = await ctx.admin

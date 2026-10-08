@@ -11,6 +11,8 @@ const TONE: Record<OrderStatus, [bg: string, fg: string]> = {
   teslim_edildi: [colors.successLight, colors.success],
   iptal: ["#F3F4F6", colors.muted],
   sorunlu: [colors.dangerLight, colors.danger],
+  geri_donuyor: ["#FFEDD5", "#9A3412"],
+  geri_teslim: ["#F3F4F6", "#44403C"],
 };
 
 export function StatusBadge({ status }: { status: OrderStatus }) {

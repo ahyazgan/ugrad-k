@@ -61,6 +61,15 @@ fs.mkdirSync(out, { recursive: true });
   await page.locator("tr", { hasText: "Teslim edildi" }).nth(2).getByRole("link", { name: /^YK-\d+$/ }).click();
   await page.getByTestId("arrival-pickup").getByText(/varıştan ölçüldü/).waitFor();
   await nav("Siparişler");
+  await page.getByRole("button", { name: "Tümü" }).click();
+  await page.getByRole("button", { name: "Filtrele" }).click();
+  // Teslim edilemeyip göndericiye iade edilmiş sipariş: neden, arama, iade
+  await page.locator("tr", { hasText: "Göndericiye iade edildi" }).first().getByRole("link", { name: /^YK-\d+$/ }).click();
+  await page.getByTestId("failed-delivery").getByText("Alıcıya ulaşılamadı").waitFor();
+  await page.getByTestId("failed-delivery").getByText("3 kez").waitFor();
+  await page.getByText(/Teslim edilemedi – göndericiye iade/).waitFor();
+  await shot("03a-iade");
+  await nav("Siparişler");
 
   // ───── Telefon siparişi: kayıtlı müşteri, son adresten seçim
   await page.getByRole("link", { name: "+ Telefon siparişi" }).click();

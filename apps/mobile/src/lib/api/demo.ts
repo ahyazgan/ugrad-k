@@ -7,6 +7,7 @@
  */
 import {
   applyPromo,
+  applyFailedDeliveryReturn,
   applyWaitingFee,
   courierBalance,
   courierEarning,
@@ -125,6 +126,8 @@ export function createDemoApi(): Api {
     slaMissed: null,
     arrivedPickupAt: null,
     arrivedDropoffAt: null,
+    failedReason: null,
+    failedAt: null,
     paymentMethod: req.paymentMethod,
     paymentStatus: "odenmedi",
     paidKurus: null,
@@ -495,7 +498,33 @@ export function createDemoApi(): Api {
           move(orderId, "teslim_edildi");
           return;
         }
+        case "return_deliver": {
+          if (!action.pod.photoUri && !action.pod.signatureSvg) throw new ApiError("Teslim için fotoğraf veya imza gerekli");
+          const o = orders.get(orderId);
+          if (o?.paymentMethod === "nakit" && o.paymentStatus !== "odendi" && !action.pod.cashCollection) {
+            throw new ApiError("Kuryeye ödemeli siparişte tahsilat bilgisi gerekli");
+          }
+          if (o && action.pod.cashCollection) cash.set(orderId, action.pod.cashCollection);
+          move(orderId, "geri_teslim");
+          return;
+        }
       }
+    },
+    async reportFailedDelivery(orderId, input) {
+      const o = orders.get(orderId);
+      if (!o) throw new ApiError("Sipariş bulunamadı", undefined, 404);
+      if (!input.photoUri) throw new ApiError("Adresin fotoğrafını çekin (kanıt)");
+      if (input.reason !== "alici_reddetti" && input.reason !== "adres_bulunamadi" && !o.arrivedDropoffAt) {
+        throw new ApiError("Önce teslim adresine vardığınızı bildirin");
+      }
+      if (input.reason === "alici_yok" && input.callAttempts < 1) throw new ApiError("Alıcıyı en az bir kez arayın");
+      // Demo: en az bekleme süresi (gerçekte 10 dk) denetlenmez
+      move(orderId, "geri_donuyor", `Teslim edilemedi: ${input.reason}${input.note.trim() ? ` — ${input.note.trim()}` : ""}`);
+      o.failedReason = input.reason;
+      o.failedAt = new Date().toISOString();
+      o.priceQuote = applyFailedDeliveryReturn(o.priceQuote, { roundTrip: o.roundTrip }, DEFAULT_PRICING_SETTINGS);
+      o.totalKurus = o.priceQuote.totalKurus;
+      notify(orderId);
     },
     async pushLocation() {
       // Demo: konum sunucuya gönderilmez

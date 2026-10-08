@@ -52,7 +52,7 @@ Bu dosya Claude Code için proje hafızasıdır. Her oturumda önce bunu oku.
 
 ## Sipariş durumları
 `beklemede → onaylandi → kuryeye_atandi → alindi → yolda → teslim_edildi`
-Ek: `iptal`, `sorunlu`
+Ek: `iptal`, `sorunlu`; teslim edilemezse `yolda → geri_donuyor → geri_teslim` (göndericiye iade, dönüş ayağı ücreti; `report_failed_delivery`, docs/kurulum.md §33). Tamamlanmış iş = `teslim_edildi` veya `geri_teslim` (`orders.completed_at`; hakediş, fatura, raporlar)
 
 ## Kurallar (Claude Code için)
 - Arayüz dili **Türkçe**, kod ve değişken adları İngilizce
