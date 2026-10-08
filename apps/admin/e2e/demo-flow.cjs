@@ -61,7 +61,7 @@ fs.mkdirSync(out, { recursive: true });
   await t("dropoff-search").fill("levent");
   await t("dropoff-suggestion-0").click();
   await t("dropoff-details").fill("Kanyon B Blok");
-  await t("opt-urgent").check();
+  await t("opt-level").selectOption("acil");
   await t("total").waitFor();
   console.log("TELEFON FIYAT", await t("total").innerText());
   await shot("03b-telefon-siparisi");
@@ -210,6 +210,13 @@ fs.mkdirSync(out, { recursive: true });
   console.log("ONIZLEME", preview.replace(/\n/g, " | ").slice(0, 400));
   await page.getByRole("button", { name: "Tarifeyi kaydet" }).click();
   await page.getByText("Kaydedildi").waitFor();
+  // Endeks (enflasyon) güncellemesi: para alanları yuvarlanarak artar, köprü sabit
+  await page.getByLabel("Endeks / enflasyon güncellemesi (%)").fill("10");
+  await page.getByRole("button", { name: "Para alanlarına uygula" }).click();
+  if ((await page.getByLabel(/^Açılış ücreti/).inputValue()) !== "385") throw new Error("endeks açılışa uygulanmadı");
+  if ((await kmTiers.inputValue()) !== "10:24, *:17.5") throw new Error("endeks kademelere uygulanmadı: " + (await kmTiers.inputValue()));
+  if ((await page.getByLabel(/^Köprü geçiş ücreti/).inputValue()) !== "25") throw new Error("köprü endekslenmemeli");
+  console.log("MARJ", (await page.locator("table").first().innerText()).replace(/\n/g, " | ").slice(0, 600));
   // Geçersiz kademe kaydı engellenir
   await kmTiers.fill("abc");
   await page.getByText("Geçersiz alanlar: Km kademeleri").waitFor();

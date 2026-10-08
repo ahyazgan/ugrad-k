@@ -3,11 +3,15 @@ import { BRAND, DEFAULT_PRICING_SETTINGS as S } from "@yazgan/shared";
 export const FAQ: Array<{ q: string; a: string }> = [
   {
     q: "Fiyat nasıl hesaplanıyor?",
-    a: `Alış ve teslim adresleri arasındaki gerçek sürüş mesafesine göre. İlk ${S.includedKm} km açılış ücretine dahildir; sonrası kademeli km ücretiyle eklenir. Acil, gece, gidiş-dönüş ve büyük paket gibi ek ücretler fiyat özetinde tek tek gösterilir; gizli ücret yoktur. Fiyatlara KDV (%${S.vatPct}) eklenir.`,
+    a: `Alış ve teslim adresleri arasındaki gerçek sürüş mesafesine göre. İlk ${S.includedKm} km açılış ücretine dahildir; sonrası kademeli km ücretiyle eklenir. Acil, gece, Pazar, gidiş-dönüş ve büyük paket gibi ek ücretler fiyat özetinde tek tek gösterilir; gizli ücret yoktur. Fiyatlara KDV (%${S.vatPct}) eklenir.`,
   },
   {
     q: "Kurye ne kadar sürede gelir?",
     a: "Siparişiniz onaylanır onaylanmaz alış noktasına en yakın uygun kuryeye otomatik olarak atanır. Acil seçeneğinde 60 dakika içinde teslim hedeflenir; gönderiniz alındıktan sonra başka iş yapılmadan doğrudan teslim edilir.",
+  },
+  {
+    q: "Ekonomi gönderi nedir?",
+    a: `Acelesi olmayan gönderiler için %${S.economyDiscountPct} indirimli seçenek: Pazartesi–Cumartesi saat ${S.economyCutoffHour}:00'e kadar verilen siparişler aynı gün içinde, aynı yöne giden işlerle birlikte teslim edilir.`,
   },
   {
     q: "Avrupa yakasına teslimat yapıyor musunuz?",
@@ -35,7 +39,7 @@ export const FAQ: Array<{ q: string; a: string }> = [
   },
   {
     q: "Hangi gönderileri taşımıyorsunuz?",
-    a: "Yasal olarak taşınması yasak veya tehlikeli maddeler, nakit para, değerli mücevher ve canlı hayvan taşımıyoruz. Motosiklet çantasına sığmayan büyük gönderiler için önceden bilgi verin.",
+    a: `Yasal olarak taşınması yasak veya tehlikeli maddeler, nakit para, değerli mücevher ve canlı hayvan taşımıyoruz. Motosikletle en fazla ${S.maxWeightKg ?? 20} kg taşıyoruz; çantaya sığmayan büyük gönderiler için önceden bilgi verin.`,
   },
   {
     q: `${BRAND.name} uygulamasını indirmem gerekiyor mu?`,

@@ -3,6 +3,7 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import {
   calculateMonthlyInvoice,
+  monthlyInvoiceItem,
   holidayFromRow,
   pricingSettingsFromRow,
   pricingSettingsToRow,
@@ -46,6 +47,7 @@ export const toAdminOrder = (r: Row): AdminOrder => ({
   status: r.status,
   createdAt: r.created_at,
   urgent: r.urgent,
+  serviceLevel: r.service_level ?? (r.urgent ? "acil" : "standart"),
   roundTrip: r.round_trip,
   pickupAddress: r.pickup_address,
   pickupSide: r.pickup_side,
@@ -337,13 +339,17 @@ export function createSupabaseRepo(url: string, anonKey: string): AdminRepo & { 
           .order("delivered_at"),
         client.from("pricing_settings").select("*").eq("id", 1).single(),
       ]);
-      const orders = (check(o, "Siparişler okunamadı") ?? []).map(toAdminOrder);
+      const rows = check(o, "Siparişler okunamadı") ?? [];
+      const orders = rows.map(toAdminOrder);
       const settings = pricingSettingsFromRow(check(s, "Fiyat ayarı okunamadı"));
       return {
         account: toCorporate(check(acc, "Hesap okunamadı")),
         month,
         orders,
-        invoice: calculateMonthlyInvoice(orders.map((x) => x.subtotalKurus), settings),
+        invoice: calculateMonthlyInvoice(
+          rows.map((r: Row) => monthlyInvoiceItem(r.subtotal_kurus, r.price_quote)),
+          settings,
+        ),
       };
     },
 

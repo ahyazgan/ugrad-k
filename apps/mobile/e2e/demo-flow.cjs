@@ -39,7 +39,7 @@ fs.mkdirSync(out, { recursive: true });
     await tid('address-save').click();
     await tid('address-pickup').waitFor();
   }
-  await page.getByText('Acil (60 dk)').click();
+  await tid('level-acil').click();
   await shot('06-form-dolu');
   await tid('see-price').click();
   await page.getByText('Toplam', { exact: true }).waitFor();

@@ -1,6 +1,6 @@
 "use client";
 
-import { AYDINLATMA_METNI, BRAND, formatTL, kvkkUrl } from "@yazgan/shared";
+import { AYDINLATMA_METNI, BRAND, formatTL, kvkkUrl, SERVICE_LEVEL_LABELS, SERVICE_LEVELS, type ServiceLevel } from "@yazgan/shared";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
@@ -23,7 +23,7 @@ export default function TelefonSiparisiPage() {
   const [fullName, setFullName] = useState("");
   const [pickup, setPickup] = useState<Point | null>(null);
   const [dropoff, setDropoff] = useState<Point | null>(null);
-  const [opts, setOpts] = useState({ urgent: false, roundTrip: false, largePackage: false, weightKg: "", packageDescription: "", customerNote: "", scheduled: "" });
+  const [opts, setOpts] = useState({ serviceLevel: "standart" as ServiceLevel, roundTrip: false, largePackage: false, weightKg: "", packageDescription: "", customerNote: "", scheduled: "" });
   const [payment, setPayment] = useState<"nakit" | "cari">("nakit");
   const [consent, setConsent] = useState(false);
   const [quote, setQuote] = useState<{ key: string; q?: AdminQuote; error?: string } | null>(null);
@@ -49,7 +49,7 @@ export default function TelefonSiparisiPage() {
       ? {
           pickup: { ...pickup, details: pickup.details || undefined, contactName: pickup.contactName || undefined, contactPhone: pickup.contactPhone || undefined },
           dropoff: { ...dropoff, details: dropoff.details || undefined, contactName: dropoff.contactName || undefined, contactPhone: dropoff.contactPhone || undefined },
-          urgent: opts.urgent,
+          serviceLevel: opts.serviceLevel,
           roundTrip: opts.roundTrip,
           largePackage: opts.largePackage,
           weightKg: opts.weightKg ? Number(opts.weightKg.replace(",", ".")) : null,
@@ -165,11 +165,22 @@ export default function TelefonSiparisiPage() {
               <Input label="Ağırlık (kg)" inputMode="decimal" value={opts.weightKg} onChange={(e) => setOpts({ ...opts, weightKg: e.target.value })} />
               <Input label="Planlı alış (boşsa hemen)" type="datetime-local" value={opts.scheduled} onChange={(e) => setOpts({ ...opts, scheduled: e.target.value })} />
               <Input label="Kuryeye not" value={opts.customerNote} onChange={(e) => setOpts({ ...opts, customerNote: e.target.value })} />
+              <Select
+                label="Hizmet"
+                value={opts.serviceLevel}
+                onChange={(e) => setOpts({ ...opts, serviceLevel: e.target.value as ServiceLevel })}
+                data-testid="opt-level"
+              >
+                {SERVICE_LEVELS.map((l) => (
+                  <option key={l} value={l}>
+                    {SERVICE_LEVEL_LABELS[l]}
+                  </option>
+                ))}
+              </Select>
             </div>
             <div className="mt-3 flex flex-wrap gap-4 text-sm">
               {(
                 [
-                  ["urgent", "Acil (60 dk)"],
                   ["roundTrip", "Gidiş-dönüş"],
                   ["largePackage", "Büyük paket"],
                 ] as const

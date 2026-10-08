@@ -16,10 +16,15 @@ export function pricingRows(s: PricingSettings = DEFAULT_PRICING_SETTINGS): Arra
   } else {
     rows.push({ label: "Ek km başına", value: tl(s.perKmKurus) });
   }
+  const hh = (h: number) => `${String(h).padStart(2, "0")}:00`;
   rows.push(
+    { label: `Ekonomi: gün içinde teslim (Pzt–Cmt ${hh(s.nightEndHour)}–${hh(s.economyCutoffHour)} arası alış)`, value: `−%${s.economyDiscountPct}` },
     { label: "Acil teslimat (60 dakika)", value: `+%${s.urgentSurchargePct}` },
-    { label: `Gece (${String(s.nightStartHour).padStart(2, "0")}:00–${String(s.nightEndHour).padStart(2, "0")}:00) ve resmi tatil`, value: `+%${s.nightHolidaySurchargePct}` },
+    { label: `Gece (${hh(s.nightStartHour)}–${hh(s.nightEndHour)})`, value: `+%${s.nightSurchargePct}` },
+    { label: "Pazar", value: `+%${s.sundaySurchargePct}` },
+    { label: "Resmi tatil (arife 13:00'ten itibaren)", value: `+%${s.nightHolidaySurchargePct}` },
   );
+  rows.push({ label: "Gece, Pazar ve tatil ekleri birlikte gelirse", value: "yalnızca en yükseği" });
   if (s.maxSurchargePct != null) rows.push({ label: "Ek ücretlerin toplamı en fazla", value: `%${s.maxSurchargePct}` });
   rows.push(
     { label: `Bekleme (ilk ${s.waitingFreeMinutes} dk ücretsiz), her ${s.waitingBlockMinutes} dk`, value: tl(s.waitingBlockFeeKurus) },
@@ -27,6 +32,13 @@ export function pricingRows(s: PricingSettings = DEFAULT_PRICING_SETTINGS): Arra
     { label: `${s.heavyThresholdKg} kg üzeri / büyük paket`, value: `+${tl(s.heavySurchargeKurus)}` },
     { label: "Avrupa yakasına köprü geçişi", value: `+${tl(s.bridgeFeeKurus)}` },
   );
+  if (s.remotePickupPerKmKurus > 0) {
+    rows.push({
+      label: `Uzak alış: merkezimize ${s.freePickupRadiusKm} km'den uzak adreslerde km başına (en fazla ${tl(s.remotePickupMaxKurus)})`,
+      value: `+${tl(s.remotePickupPerKmKurus)}`,
+    });
+  }
+  if (s.maxWeightKg != null) rows.push({ label: "Motosikletle taşınabilen en fazla ağırlık", value: `${s.maxWeightKg} kg` });
   return rows;
 }
 

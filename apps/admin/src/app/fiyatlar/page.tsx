@@ -1,6 +1,17 @@
 "use client";
 
-import { calculatePrice, formatTL, type Holiday, type PricingSettings } from "@yazgan/shared";
+import {
+  calculatePrice,
+  DEFAULT_COST_MODEL,
+  estimateJobCost,
+  formatTL,
+  indexPricingSettings,
+  INDEXED_MONEY_FIELDS,
+  type CostModel,
+  type Holiday,
+  type PriceInput,
+  type PricingSettings,
+} from "@yazgan/shared";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Button, Card, ErrorText, Input, PageHeader, Table, Td } from "@/components/ui";
 import { fmtDateTime } from "@/lib/dates";
@@ -8,13 +19,18 @@ import { repo } from "@/lib/repo";
 import { formatKmTiers, parseCap, parseKmTiers } from "@/lib/pricing-form";
 import { useLoad } from "@/lib/use-load";
 
-type Kind = "tl" | "pct" | "int" | "kg" | "hour";
-const FIELDS: Array<{ key: keyof PricingSettings; label: string; kind: Kind; hint?: string }> = [
+type Kind = "tl" | "pct" | "int" | "kg" | "hour" | "coord";
+type Field = { key: keyof PricingSettings; label: string; kind: Kind; hint?: string };
+const FIELDS: Field[] = [
   { key: "baseFeeKurus", label: "Açılış ücreti", kind: "tl" },
   { key: "includedKm", label: "Açılışa dahil km", kind: "int" },
   { key: "perKmKurus", label: "Ek km ücreti (kademe yoksa)", kind: "tl" },
+  { key: "economyDiscountPct", label: "Ekonomi indirimi", kind: "pct", hint: "Gün içi teslim; acil olmayan işler rotada birleştirilir" },
+  { key: "economyCutoffHour", label: "Ekonomi son alış saati", kind: "hour", hint: "Pzt–Cmt gece bitişinden bu saate kadar seçilebilir" },
   { key: "urgentSurchargePct", label: "Acil ek ücreti", kind: "pct" },
-  { key: "nightHolidaySurchargePct", label: "Gece / resmi tatil ek ücreti", kind: "pct" },
+  { key: "nightSurchargePct", label: "Gece ek ücreti", kind: "pct" },
+  { key: "sundaySurchargePct", label: "Pazar ek ücreti", kind: "pct" },
+  { key: "nightHolidaySurchargePct", label: "Resmi tatil ek ücreti", kind: "pct", hint: "Gece, Pazar ve tatil toplanmaz; en yükseği uygulanır" },
   { key: "nightStartHour", label: "Gece başlangıç saati", kind: "hour" },
   { key: "nightEndHour", label: "Gece bitiş saati", kind: "hour" },
   { key: "halfDayStartHour", label: "Arife tatil başlangıç saati", kind: "hour" },
@@ -25,8 +41,24 @@ const FIELDS: Array<{ key: keyof PricingSettings; label: string; kind: Kind; hin
   { key: "heavyThresholdKg", label: "Ağır paket eşiği (kg)", kind: "kg" },
   { key: "heavySurchargeKurus", label: "Ağır / büyük paket ücreti", kind: "tl" },
   { key: "bridgeFeeKurus", label: "Köprü geçiş ücreti", kind: "tl", hint: "Avrupa yakasına giden/gelen siparişe 1 kez" },
+  { key: "freePickupRadiusKm", label: "Ücretsiz alış yarıçapı (km)", kind: "kg", hint: "Merkeze tahmini yol mesafesi; dışında uzak alış ücreti" },
+  { key: "remotePickupPerKmKurus", label: "Uzak alış km ücreti", kind: "tl" },
+  { key: "remotePickupMaxKurus", label: "Uzak alış ücreti en fazla", kind: "tl" },
+  { key: "serviceCenterLat", label: "Merkez enlem", kind: "coord" },
+  { key: "serviceCenterLng", label: "Merkez boylam", kind: "coord" },
   { key: "vatPct", label: "KDV", kind: "pct" },
 ];
+
+const COST_FIELDS: Array<{ key: keyof CostModel; label: string; kind: "tl" | "pct" }> = [
+  { key: "courierPerJobKurus", label: "Kuryeye iş başı", kind: "tl" },
+  { key: "courierPerKmKurus", label: "Kuryeye km başı (yakıt dahil)", kind: "tl" },
+  { key: "urgentBonusPct", label: "Acil işte kurye primi", kind: "pct" },
+  { key: "offHoursBonusPct", label: "Gece/Pazar/tatil kurye primi", kind: "pct" },
+  { key: "economyJobPayPct", label: "Ekonomide iş başı ödeme oranı", kind: "pct" },
+  { key: "overheadPerJobKurus", label: "İş başı genel gider", kind: "tl" },
+  { key: "cardFeePct", label: "Kart komisyonu", kind: "pct" },
+];
+const COST_STORAGE = "fiyatlar.maliyet.v1";
 
 const toInput = (v: number, kind: Kind) => (kind === "tl" ? (v / 100).toString().replace(".", ",") : String(v));
 const fromInput = (s: string, kind: Kind) => {
@@ -37,18 +69,44 @@ const fromInput = (s: string, kind: Kind) => {
   if (kind === "int") return Number.isInteger(n) ? n : null;
   return n;
 };
+const fromCoord = (s: string) => {
+  const n = Number(s.replace(",", "."));
+  return Number.isFinite(n) && Math.abs(n) <= 180 ? n : null;
+};
 
-const SCENARIOS = [
-  { label: "5 km standart (gündüz)", input: { distanceMeters: 5_000 } },
-  { label: "12 km acil", input: { distanceMeters: 12_000, urgent: true } },
-  { label: "8 km gece", input: { distanceMeters: 8_000, night: true } },
-  { label: "12 km acil + gece", input: { distanceMeters: 12_000, urgent: true, night: true } },
-  { label: "22 km köprü geçişli", input: { distanceMeters: 22_000, bridgeCrossings: 1 } },
-  { label: "6 km gidiş-dönüş, 12 kg", input: { distanceMeters: 6_000, roundTrip: true, weightKg: 12 } },
-  { label: "4 km, 32 dk bekleme", input: { distanceMeters: 4_000, waitingMinutes: 32 } },
-];
-const DAY = new Date("2026-10-07T11:00:00Z"); // Çarşamba 14:00 İstanbul
+const DAY = new Date("2026-10-07T08:00:00Z"); // Çarşamba 11:00 İstanbul
 const NIGHT = new Date("2026-10-07T20:30:00Z"); // 23:30 İstanbul
+const SUNDAY = new Date("2026-10-11T09:00:00Z"); // Pazar 12:00 İstanbul
+const SCENARIOS: Array<{ label: string; input: PriceInput }> = [
+  { label: "5 km standart (gündüz)", input: { distanceMeters: 5_000, pickupAt: DAY } },
+  { label: "5 km ekonomi", input: { distanceMeters: 5_000, serviceLevel: "ekonomi", pickupAt: DAY } },
+  { label: "12 km acil", input: { distanceMeters: 12_000, serviceLevel: "acil", pickupAt: DAY } },
+  { label: "8 km gece", input: { distanceMeters: 8_000, pickupAt: NIGHT } },
+  { label: "8 km Pazar", input: { distanceMeters: 8_000, pickupAt: SUNDAY } },
+  { label: "12 km acil + gece", input: { distanceMeters: 12_000, serviceLevel: "acil", pickupAt: NIGHT } },
+  { label: "22 km köprü geçişli", input: { distanceMeters: 22_000, bridgeCrossings: 1, pickupAt: DAY } },
+  { label: "6 km gidiş-dönüş, 12 kg", input: { distanceMeters: 6_000, returnDistanceMeters: 6_000, roundTrip: true, weightKg: 12, pickupAt: DAY } },
+  { label: "4 km, 32 dk bekleme", input: { distanceMeters: 4_000, waitingMinutes: 32, pickupAt: DAY } },
+  { label: "Tuzla'dan alış, 8 km", input: { distanceMeters: 8_000, pickupPoint: { lat: 40.816, lng: 29.3 }, pickupAt: DAY } },
+];
+
+/** Senaryo hesaplanamazsa (ör. ekonomi saat dışı) null */
+const tryPrice = (input: PriceInput, s: PricingSettings) => {
+  try {
+    return calculatePrice(input, s);
+  } catch {
+    return null;
+  }
+};
+
+function loadCostModel(): CostModel {
+  try {
+    const raw = typeof window === "undefined" ? null : window.localStorage.getItem(COST_STORAGE);
+    return raw ? { ...DEFAULT_COST_MODEL, ...(JSON.parse(raw) as Partial<CostModel>) } : DEFAULT_COST_MODEL;
+  } catch {
+    return DEFAULT_COST_MODEL;
+  }
+}
 
 export default function FiyatlarPage() {
   const { data, error, reload } = useLoad(() => repo.getPricing());
@@ -56,6 +114,11 @@ export default function FiyatlarPage() {
   const [tiers, setTiers] = useState("");
   const [kmTiers, setKmTiers] = useState("");
   const [cap, setCap] = useState("");
+  const [maxWeight, setMaxWeight] = useState("");
+  const [indexPct, setIndexPct] = useState("");
+  const [indexMsg, setIndexMsg] = useState<string | null>(null);
+  const [cost, setCost] = useState<CostModel>(DEFAULT_COST_MODEL);
+  const [costText, setCostText] = useState<Record<string, string>>({});
   const [saveMsg, setSaveMsg] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [holiday, setHoliday] = useState<Holiday>({ date: "", name: "", halfDay: false });
@@ -66,7 +129,42 @@ export default function FiyatlarPage() {
     setTiers(data.settings.corporateTiers.map((t) => `${t.minDeliveries}:${t.discountPct}`).join(", "));
     setKmTiers(formatKmTiers(data.settings.kmTiers));
     setCap(data.settings.maxSurchargePct == null ? "" : String(data.settings.maxSurchargePct));
+    setMaxWeight(data.settings.maxWeightKg == null ? "" : String(data.settings.maxWeightKg));
   }, [data]);
+
+  useEffect(() => {
+    const m = loadCostModel();
+    setCost(m);
+    setCostText(Object.fromEntries(COST_FIELDS.map((f) => [f.key, toInput(m[f.key], f.kind)])));
+  }, []);
+
+  function setCostField(key: keyof CostModel, kind: "tl" | "pct", text: string) {
+    setCostText((t) => ({ ...t, [key]: text }));
+    const v = fromInput(text, kind);
+    if (v == null) return;
+    const next = { ...cost, [key]: v };
+    setCost(next);
+    try {
+      window.localStorage.setItem(COST_STORAGE, JSON.stringify(next));
+    } catch {
+      // depolama kapalıysa yalnız bu oturumda geçerli
+    }
+  }
+
+  function applyIndex() {
+    if (!draft || draft.errors.length) return;
+    const rate = Number(indexPct.replace(",", "."));
+    let next: PricingSettings;
+    try {
+      next = indexPricingSettings(draft.settings, rate);
+    } catch (e) {
+      setIndexMsg(e instanceof Error ? e.message : "Geçersiz oran");
+      return;
+    }
+    setValues((v) => ({ ...v, ...Object.fromEntries(INDEXED_MONEY_FIELDS.map((k) => [k, toInput(next[k], "tl")])) }));
+    setKmTiers(formatKmTiers(next.kmTiers));
+    setIndexMsg(`Para alanları %${rate} güncellendi (köprü hariç, yuvarlandı). Önizlemeyi kontrol edip kaydedin.`);
+  }
 
   // Formdaki değerlerden ayar nesnesi (geçersiz alan varsa hatalarla)
   const draft = useMemo(() => {
@@ -74,7 +172,7 @@ export default function FiyatlarPage() {
     const errors: string[] = [];
     const s: PricingSettings = { ...data.settings };
     for (const f of FIELDS) {
-      const v = fromInput(values[f.key] ?? "", f.kind);
+      const v = f.kind === "coord" ? fromCoord(values[f.key] ?? "") : fromInput(values[f.key] ?? "", f.kind);
       if (v == null) errors.push(f.label);
       else (s[f.key] as number) = v;
     }
@@ -91,9 +189,13 @@ export default function FiyatlarPage() {
     const c = parseCap(cap);
     if (c === undefined) errors.push("Ek ücret tavanı");
     else s.maxSurchargePct = c;
+    const w = parseCap(maxWeight);
+    if (w === undefined || w === 0) errors.push("Ağırlık sınırı");
+    else s.maxWeightKg = w;
+    if (s.economyCutoffHour <= s.nightEndHour) errors.push("Ekonomi son alış saati");
     if (s.waitingBlockMinutes <= 0) errors.push("Bekleme dilimi");
     return { settings: s, errors };
-  }, [data, values, tiers, kmTiers, cap]);
+  }, [data, values, tiers, kmTiers, cap, maxWeight]);
 
   async function save(e: FormEvent) {
     e.preventDefault();
@@ -150,12 +252,28 @@ export default function FiyatlarPage() {
               </div>
               <div>
                 <Input label="Acil + gece toplam ek ücret tavanı (%)" value={cap} inputMode="decimal" onChange={(e) => setCap(e.target.value)} />
-                <p className="mt-1 text-xs text-slate-500">Örn. 75. Boş bırakılırsa tavan yok (acil + gece = %100).</p>
+                <p className="mt-1 text-xs text-slate-500">Örn. 75. Boş bırakılırsa tavan yok (acil + gece/Pazar/tatil toplanır).</p>
+              </div>
+              <div>
+                <Input label="Motosiklet ağırlık sınırı (kg)" value={maxWeight} inputMode="decimal" onChange={(e) => setMaxWeight(e.target.value)} />
+                <p className="mt-1 text-xs text-slate-500">Üzerindeki gönderi kabul edilmez. Boş bırakılırsa sınır yok.</p>
               </div>
             </div>
             <div>
               <Input label="Kurumsal kademeler (teslimat:indirim%)" value={tiers} onChange={(e) => setTiers(e.target.value)} />
               <p className="mt-1 text-xs text-slate-500">Örn. 20:15, 50:25 → ayda 20+ teslimatta %15, 50+ teslimatta %25</p>
+            </div>
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+              <div className="flex flex-wrap items-end gap-2">
+                <Input label="Endeks / enflasyon güncellemesi (%)" value={indexPct} inputMode="decimal" onChange={(e) => setIndexPct(e.target.value)} />
+                <Button type="button" variant="secondary" onClick={applyIndex} disabled={!indexPct.trim() || !draft || !!draft.errors.length}>
+                  Para alanlarına uygula
+                </Button>
+              </div>
+              <p className="mt-1 text-xs text-slate-500">
+                Önerilen: 3 ayda bir TÜFE oranı kadar. Açılış, km kademeleri, bekleme, ağır paket ve uzak alış ücretleri artar; köprü (resmi tarife) ve yüzdeler değişmez.
+              </p>
+              {indexMsg ? <p className="mt-1 text-xs text-brand">{indexMsg}</p> : null}
             </div>
             {draft?.errors.length ? <ErrorText>Geçersiz alanlar: {draft.errors.join(", ")}</ErrorText> : null}
             <ErrorText>{saveError}</ErrorText>
@@ -181,24 +299,48 @@ export default function FiyatlarPage() {
         </Card>
 
         <div className="space-y-6 xl:col-span-2">
-          <Card title="Önizleme (kaydetmeden önce)">
-            <Table head={["Senaryo", "Mevcut", "Yeni"]}>
+          <Card title="Önizleme ve marj (kaydetmeden önce)">
+            <Table head={["Senaryo", "Mevcut", "Yeni", "Maliyet", "Marj"]}>
               {SCENARIOS.map((sc) => {
-                const { night, ...rest } = sc.input as { night?: boolean } & Parameters<typeof calculatePrice>[0];
-                const input = { ...rest, pickupAt: night ? NIGHT : DAY };
-                const cur = data ? calculatePrice(input, data.settings).subtotalKurus : 0;
-                const next = draft && !draft.errors.length ? calculatePrice(input, draft.settings).subtotalKurus : null;
+                const cur = data ? tryPrice(sc.input, data.settings) : null;
+                const nextSettings = draft && !draft.errors.length ? draft.settings : null;
+                const next = nextSettings ? tryPrice(sc.input, nextSettings) : null;
+                const c = next && nextSettings ? estimateJobCost(next, cost, { settings: nextSettings }) : null;
                 return (
                   <tr key={sc.label}>
                     <Td>{sc.label}</Td>
-                    <Td className="whitespace-nowrap">{formatTL(cur)}</Td>
-                    <Td className={`whitespace-nowrap font-semibold ${next != null && next !== cur ? "text-brand" : ""}`}>
-                      {next == null ? "—" : formatTL(next)}
+                    <Td className="whitespace-nowrap">{cur ? formatTL(cur.subtotalKurus) : "—"}</Td>
+                    <Td className={`whitespace-nowrap font-semibold ${next && cur && next.subtotalKurus !== cur.subtotalKurus ? "text-brand" : ""}`}>
+                      {next ? formatTL(next.subtotalKurus) : "—"}
+                    </Td>
+                    <Td className="whitespace-nowrap text-slate-600">{c ? formatTL(c.totalKurus) : "—"}</Td>
+                    <Td className={`whitespace-nowrap font-semibold ${c && c.marginPct < 20 ? "text-red-700" : "text-emerald-700"}`}>
+                      {c ? `%${c.marginPct.toLocaleString("tr-TR")}` : "—"}
                     </Td>
                   </tr>
                 );
               })}
             </Table>
+            <p className="mt-2 text-xs text-slate-500">
+              KDV hariç. Maliyet aşağıdaki kurye ödeme modeliyle tahmindir; %20 altı marj kırmızı. Kart komisyonu dahil değildir.
+            </p>
+          </Card>
+
+          <Card title="Maliyet modeli (yalnız tahmin için)">
+            <div className="grid gap-3 sm:grid-cols-2">
+              {COST_FIELDS.map((f) => (
+                <Input
+                  key={f.key}
+                  label={`${f.label}${f.kind === "tl" ? " (TL)" : " (%)"}`}
+                  value={costText[f.key] ?? ""}
+                  inputMode="decimal"
+                  onChange={(e) => setCostField(f.key, f.kind, e.target.value)}
+                />
+              ))}
+            </div>
+            <p className="mt-2 text-xs text-slate-500">
+              Esnaf kurye modeli (paket + km başı, yakıt kuryede). Bu tarayıcıda saklanır; fiyatları etkilemez.
+            </p>
           </Card>
 
           <Card title="Resmi tatiller">

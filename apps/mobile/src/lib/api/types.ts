@@ -4,6 +4,7 @@ import type {
   PlaceSuggestion,
   PriceQuote,
   IstanbulSide,
+  ServiceLevel,
 } from "@yazgan/shared";
 
 export type UserRole = "musteri" | "kurye" | "admin";
@@ -32,7 +33,7 @@ export interface DraftPoint {
 export interface OrderInput {
   pickup: DraftPoint;
   dropoff: DraftPoint;
-  urgent: boolean;
+  serviceLevel: ServiceLevel;
   roundTrip: boolean;
   weightKg: number | null;
   largePackage: boolean;

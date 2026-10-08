@@ -22,6 +22,8 @@ export interface AssignableOrder {
   pickupLat: number;
   pickupLng: number;
   urgent: boolean;
+  /** Yoksa urgent'tan türetilir; ekonomi işler en sona kalır */
+  serviceLevel?: "ekonomi" | "standart" | "acil";
   createdAt: string;
   scheduledPickupAt: string | null;
   /** Bu işi bırakmış (geri vermiş) kuryeler */
@@ -93,8 +95,13 @@ export interface PlannedAssignment {
   distanceKm: number;
 }
 
+const priority = (o: AssignableOrder) => {
+  const level = o.serviceLevel ?? (o.urgent ? "acil" : "standart");
+  return level === "acil" ? 2 : level === "standart" ? 1 : 0;
+};
+
 /**
- * Bekleyen siparişleri kuryelere dağıtır (açgözlü): acil olanlar önce, sonra en eski.
+ * Bekleyen siparişleri kuryelere dağıtır (açgözlü): acil → standart → ekonomi, aynı seviyede en eski önce.
  * Her atamadan sonra kuryenin yükü artırılır.
  */
 export function planAssignments(
@@ -105,7 +112,7 @@ export function planAssignments(
   const load = new Map(couriers.map((c) => [c.id, c.activeOrders]));
   const queue = orders
     .filter((o) => isDue(o, cfg.now))
-    .sort((a, b) => Number(b.urgent) - Number(a.urgent) || a.createdAt.localeCompare(b.createdAt));
+    .sort((a, b) => priority(b) - priority(a) || a.createdAt.localeCompare(b.createdAt));
   const assignments: PlannedAssignment[] = [];
   const unassigned: string[] = [];
   for (const o of queue) {

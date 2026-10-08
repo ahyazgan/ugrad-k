@@ -8,6 +8,7 @@ const base: AdminOrder = {
   status: "teslim_edildi",
   createdAt: "2026-10-05T07:00:00Z", // 10:00 İstanbul
   urgent: false,
+  serviceLevel: "standart",
   roundTrip: false,
   pickupAddress: "A",
   pickupSide: "anadolu",

@@ -1,6 +1,6 @@
 "use client";
 
-import { formatTL, type PlaceDetails, type PlaceSuggestion } from "@yazgan/shared";
+import { formatTL, type PlaceDetails, type PlaceSuggestion, type ServiceLevel } from "@yazgan/shared";
 import { useEffect, useId, useRef, useState } from "react";
 import { placeDetails, quote, searchPlaces, SiteApiError, type SiteQuote } from "@/lib/api";
 import { APP_URL, whatsappLink } from "@/lib/site";
@@ -133,11 +133,44 @@ function Toggle({ id, label, hint, checked, onChange }: { id: string; label: str
   );
 }
 
+const LEVELS: Array<{ value: ServiceLevel; label: string; hint: string }> = [
+  { value: "ekonomi", label: "Ekonomi", hint: "Gün içinde, indirimli" },
+  { value: "standart", label: "Standart", hint: "En kısa sürede" },
+  { value: "acil", label: "Acil", hint: "60 dakikada teslim" },
+];
+
+function LevelPicker({ value, onChange }: { value: ServiceLevel; onChange: (v: ServiceLevel) => void }) {
+  return (
+    <fieldset>
+      <legend className="mb-1.5 text-sm font-semibold text-slate-900">Hizmet</legend>
+      <div className="grid grid-cols-3 gap-2" role="radiogroup">
+        {LEVELS.map((l) => (
+          <label
+            key={l.value}
+            className={`cursor-pointer rounded-xl border p-2.5 text-center text-sm ${value === l.value ? "border-brand bg-brand-light" : "border-slate-200 bg-white"}`}
+          >
+            <input
+              type="radio"
+              name="service-level"
+              data-testid={`level-${l.value}`}
+              className="sr-only"
+              checked={value === l.value}
+              onChange={() => onChange(l.value)}
+            />
+            <span className="block font-semibold text-slate-900">{l.label}</span>
+            <span className="text-xs text-slate-500">{l.hint}</span>
+          </label>
+        ))}
+      </div>
+    </fieldset>
+  );
+}
+
 /** Adres → anında fiyat. Sunucuda uygulama ile aynı fiyat fonksiyonu (pricing.ts) çalışır. */
 export function PriceCalculator({ compact = false }: { compact?: boolean }) {
   const [pickup, setPickup] = useState<PlaceDetails | null>(null);
   const [dropoff, setDropoff] = useState<PlaceDetails | null>(null);
-  const [urgent, setUrgent] = useState(false);
+  const [serviceLevel, setServiceLevel] = useState<ServiceLevel>("standart");
   const [roundTrip, setRoundTrip] = useState(false);
   const [largePackage, setLargePackage] = useState(false);
   const [result, setResult] = useState<SiteQuote | null>(null);
@@ -149,7 +182,7 @@ export function PriceCalculator({ compact = false }: { compact?: boolean }) {
     let alive = true;
     // eslint-disable-next-line react-hooks/set-state-in-effect -- yükleniyor durumu istekle eşzamanlı başlar
     setLoading(true);
-    quote({ pickup, dropoff, urgent, roundTrip, largePackage }).then(
+    quote({ pickup, dropoff, serviceLevel, roundTrip, largePackage }).then(
       (q) => {
         if (!alive) return;
         setResult(q);
@@ -166,7 +199,7 @@ export function PriceCalculator({ compact = false }: { compact?: boolean }) {
     return () => {
       alive = false;
     };
-  }, [pickup, dropoff, urgent, roundTrip, largePackage]);
+  }, [pickup, dropoff, serviceLevel, roundTrip, largePackage]);
 
   const shown = pickup && dropoff ? result : null;
   const wa = shown
@@ -178,8 +211,8 @@ export function PriceCalculator({ compact = false }: { compact?: boolean }) {
       <div className="grid gap-4">
         <AddressField id="pickup" label="Nereden?" placeholder="Alış adresi, ör. Kavacık" value={pickup} onChange={setPickup} />
         <AddressField id="dropoff" label="Nereye?" placeholder="Teslim adresi, ör. Levent" value={dropoff} onChange={setDropoff} />
-        <div className={`grid gap-2 ${compact ? "" : "sm:grid-cols-3"}`}>
-          <Toggle id="opt-urgent" label="Acil" hint="60 dakikada teslim" checked={urgent} onChange={setUrgent} />
+        <LevelPicker value={serviceLevel} onChange={setServiceLevel} />
+        <div className={`grid gap-2 ${compact ? "" : "sm:grid-cols-2"}`}>
           <Toggle id="opt-roundtrip" label="Gidiş-dönüş" hint="İmzalatıp geri getir" checked={roundTrip} onChange={setRoundTrip} />
           <Toggle id="opt-large" label="Büyük paket" hint="10 kg üzeri" checked={largePackage} onChange={setLargePackage} />
         </div>
@@ -235,7 +268,7 @@ export function PriceCalculator({ compact = false }: { compact?: boolean }) {
               ) : null}
             </div>
             <p className="mt-2 text-xs text-slate-500">
-              Fiyat şu anki saate göre hesaplandı; gece ve resmi tatillerde ek ücret uygulanır. Alışta 15 dakikayı aşan bekleme teslimatta eklenir.
+              Fiyat şu anki saate göre hesaplandı; gece, Pazar ve resmi tatillerde ek ücret uygulanır. Ekonomi yalnızca Pazartesi–Cumartesi öğleden önceki alışlarda seçilebilir. Alışta 15 dakikayı aşan bekleme teslimatta eklenir.
             </p>
           </div>
         )}

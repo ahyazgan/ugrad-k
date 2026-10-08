@@ -106,7 +106,7 @@ export default function SiparisDetayPage() {
   return (
     <>
       <PageHeader
-        title={`${order.orderNo}${order.urgent ? " · ACİL" : ""}`}
+        title={`${order.orderNo}${order.urgent ? " · ACİL" : order.serviceLevel === "ekonomi" ? " · EKONOMİ" : ""}`}
         subtitle={`Oluşturma: ${fmtDateTime(order.createdAt)}`}
         actions={
           <Link href="/siparisler" className="text-sm text-brand underline">

@@ -15,6 +15,18 @@ export interface CorporateTier {
   discountPct: number;
 }
 
+/**
+ * Hizmet seviyesi: ekonomi (gün içi, indirimli), standart, acil (60 dk, ek ücretli).
+ * Eski `urgent: true` alanı "acil" demektir.
+ */
+export type ServiceLevel = "ekonomi" | "standart" | "acil";
+export const SERVICE_LEVELS: ServiceLevel[] = ["ekonomi", "standart", "acil"];
+export const SERVICE_LEVEL_LABELS: Record<ServiceLevel, string> = {
+  ekonomi: "Ekonomi (gün içi)",
+  standart: "Standart",
+  acil: "Acil (60 dk)",
+};
+
 /** Ek km kademesi: toplam mesafe `uptoKm`'ye kadar olan kilometreler bu ücretle (null = üstü) */
 export interface KmTier {
   uptoKm: number | null;
@@ -31,7 +43,18 @@ export interface PricingSettings {
   /** Acil + gece/tatil toplam ek ücret tavanı (%); null = tavan yok */
   maxSurchargePct: number | null;
   urgentSurchargePct: number;
-  /** Gece ve resmi tatil için tek ek ücret (ikisi birden olsa da bir kez uygulanır) */
+  /** Ekonomi (gün içi) indirimi, % */
+  economyDiscountPct: number;
+  /** Ekonomi seçeneği alış saati bu saatten önce olmalı (yerel saat); gece, Pazar ve tatilde yok */
+  economyCutoffHour: number;
+  /** Gece ek ücreti (nightStartHour–nightEndHour) */
+  nightSurchargePct: number;
+  /** Pazar günü ek ücreti */
+  sundaySurchargePct: number;
+  /**
+   * Resmi tatil (arifede halfDayStartHour sonrası) ek ücreti. (Alan adı tarihsel: eskiden gece ile ortaktı.)
+   * Gece, Pazar ve tatil aynı anda olursa toplanmaz; en yükseği uygulanır.
+   */
   nightHolidaySurchargePct: number;
   nightStartHour: number;
   nightEndHour: number;
@@ -43,8 +66,19 @@ export interface PricingSettings {
   returnLegDiscountPct: number;
   heavyThresholdKg: number;
   heavySurchargeKurus: number;
+  /** Motosikletle taşınabilecek en fazla ağırlık (kg); null = sınırsız */
+  maxWeightKg: number | null;
   /** Ücretli köprü/tünel geçişi başına eklenen tutar */
   bridgeFeeKurus: number;
+  /** Kurye merkezi (uzak alış ücretinin ölçüldüğü nokta) */
+  serviceCenterLat: number;
+  serviceCenterLng: number;
+  /** Merkezden bu kadar yol-km'ye kadar alış ücretsiz */
+  freePickupRadiusKm: number;
+  /** Ücretsiz yarıçapın dışındaki her yol-km için konumlanma ücreti (0 = kapalı) */
+  remotePickupPerKmKurus: number;
+  /** Uzak alış ücretinin üst sınırı */
+  remotePickupMaxKurus: number;
   corporateTiers: CorporateTier[];
   vatPct: number;
   /** Türkiye 2016'dan beri sabit UTC+3 */
@@ -62,6 +96,11 @@ export const DEFAULT_PRICING_SETTINGS: PricingSettings = {
   ],
   maxSurchargePct: 75,
   urgentSurchargePct: 50,
+  // 2026-10-10 algoritma v2 (docs/fiyat-arastirmasi.md §8)
+  economyDiscountPct: 25,
+  economyCutoffHour: 14,
+  nightSurchargePct: 50,
+  sundaySurchargePct: 50,
   nightHolidaySurchargePct: 50,
   nightStartHour: 22,
   nightEndHour: 7,
@@ -72,7 +111,14 @@ export const DEFAULT_PRICING_SETTINGS: PricingSettings = {
   returnLegDiscountPct: 50,
   heavyThresholdKg: 10,
   heavySurchargeKurus: 15_000,
+  maxWeightKg: 20,
   bridgeFeeKurus: 2_500,
+  // Merkez: Kılıçlı Mah., Beykoz
+  serviceCenterLat: 41.1295,
+  serviceCenterLng: 29.1135,
+  freePickupRadiusKm: 40,
+  remotePickupPerKmKurus: 1_000,
+  remotePickupMaxKurus: 30_000,
   corporateTiers: [
     { minDeliveries: 20, discountPct: 15 },
     { minDeliveries: 50, discountPct: 25 },
@@ -95,7 +141,12 @@ export interface PriceInput {
   /** Gidiş-dönüşte dönüş ayağı mesafesi; verilmezse gidişle aynı kabul edilir */
   returnDistanceMeters?: number;
   roundTrip?: boolean;
+  /** Hizmet seviyesi; verilmezse `urgent` alanından türetilir */
+  serviceLevel?: ServiceLevel;
+  /** Eski alan: true = acil */
   urgent?: boolean;
+  /** Alış noktası (uzak alış ücreti için) */
+  pickupPoint?: { lat: number; lng: number };
   /** Alış zamanı; verilmezse "şimdi" */
   pickupAt?: Date;
   weightKg?: number;
@@ -112,7 +163,9 @@ export type PriceLineCode =
   | "base"
   | "extra_km"
   | "urgent"
+  | "economy"
   | "night_holiday"
+  | "remote_pickup"
   | "heavy"
   | "return_leg"
   | "waiting"
@@ -138,6 +191,11 @@ export interface PriceQuote {
     nightOrHoliday: boolean;
     holidayName: string | null;
     surchargePct: number;
+    serviceLevel?: ServiceLevel;
+    /** Uygulanan zaman eki türü */
+    timeSurcharge?: "night" | "sunday" | "holiday" | null;
+    /** Merkeze tahmini yol-km (uzak alış hesabı için) */
+    pickupFromCenterKm?: number | null;
   };
 }
 
@@ -178,6 +236,57 @@ export function nightOrHolidayAt(
   return { applies: isNightHour(hour, settings), holidayName: null };
 }
 
+export type TimeSurchargeKind = "night" | "sunday" | "holiday";
+
+/**
+ * Alış anındaki zaman eki: gece, Pazar ve resmi tatil toplanmaz, en yüksek oran uygulanır
+ * (eşitlikte tatil > Pazar > gece adı gösterilir).
+ */
+export function timeSurchargeAt(at: Date, settings: PricingSettings, holidays: Holiday[] = []) {
+  const { date, hour } = toLocal(at, settings);
+  const weekday = new Date(`${date}T12:00:00Z`).getUTCDay(); // 0 = Pazar
+  const holiday = holidays.find((h) => h.date === date && (!h.halfDay || hour >= settings.halfDayStartHour));
+  const candidates: Array<{ kind: TimeSurchargeKind; pct: number }> = [];
+  if (holiday) candidates.push({ kind: "holiday", pct: settings.nightHolidaySurchargePct });
+  if (weekday === 0) candidates.push({ kind: "sunday", pct: settings.sundaySurchargePct });
+  if (isNightHour(hour, settings)) candidates.push({ kind: "night", pct: settings.nightSurchargePct });
+  const best = candidates.reduce<{ kind: TimeSurchargeKind; pct: number } | null>((b, c) => (!b || c.pct > b.pct ? c : b), null);
+  return {
+    kind: best && best.pct > 0 ? best.kind : null,
+    pct: best?.pct ?? 0,
+    holidayName: holiday?.name ?? null,
+    /** Gece, Pazar veya tatil mi (ekonomi seçeneği için) */
+    offHours: candidates.length > 0,
+    hour,
+  };
+}
+
+/** Ekonomi (gün içi) seçeneği bu alış zamanında kullanılabilir mi */
+export function economyAvailableAt(at: Date, settings: PricingSettings, holidays: Holiday[] = []): boolean {
+  const t = timeSurchargeAt(at, settings, holidays);
+  return !t.offHours && t.hour < settings.economyCutoffHour;
+}
+
+/** Hizmet seviyesinin yüzde etkisi: acil +, ekonomi − */
+export function serviceLevelPct(level: ServiceLevel, settings: PricingSettings): number {
+  return level === "acil" ? settings.urgentSurchargePct : level === "ekonomi" ? -settings.economyDiscountPct : 0;
+}
+
+/** Merkezden alış noktasına tahmini yol-km (kuş uçuşu × 1,35) ve uzak alış ücreti */
+export function remotePickupFee(point: { lat: number; lng: number } | undefined, settings: PricingSettings) {
+  if (!point) return { km: null, feeKurus: 0, billableKm: 0 };
+  const R = 6_371;
+  const toRad = (d: number) => (d * Math.PI) / 180;
+  const dLat = toRad(point.lat - settings.serviceCenterLat);
+  const dLng = toRad(point.lng - settings.serviceCenterLng);
+  const h =
+    Math.sin(dLat / 2) ** 2 + Math.cos(toRad(settings.serviceCenterLat)) * Math.cos(toRad(point.lat)) * Math.sin(dLng / 2) ** 2;
+  const km = Math.round(2 * R * Math.asin(Math.sqrt(h)) * 1.35 * 10) / 10;
+  const billableKm = Math.max(0, Math.ceil(km - settings.freePickupRadiusKm));
+  const feeKurus = settings.remotePickupPerKmKurus > 0 ? Math.min(settings.remotePickupMaxKurus, billableKm * settings.remotePickupPerKmKurus) : 0;
+  return { km, feeKurus, billableKm };
+}
+
 /** İlk ücretsiz dakikalardan sonra başlayan her dilim ücretlenir. */
 export function waitingFeeKurus(minutes: number, settings: PricingSettings): number {
   if (!Number.isFinite(minutes) || minutes < 0) {
@@ -216,10 +325,13 @@ function distanceFeeKurus(km: number, settings: PricingSettings) {
   return { base: settings.baseFeeKurus, extraKm, extra, parts };
 }
 
-/** Acil ve gece/tatil ek ücret yüzdeleri; toplam tavanı aşarsa gece/tatil payı kırpılır. */
-export function surchargePercents(urgent: boolean, nightOrHoliday: boolean, settings: PricingSettings) {
+/**
+ * Acil ve zaman eki yüzdeleri; toplam tavanı aşarsa zaman eki payı kırpılır.
+ * `nightOrHoliday` true ise zaman eki oranı `timePct` (verilmezse tatil oranı) kabul edilir.
+ */
+export function surchargePercents(urgent: boolean, nightOrHoliday: boolean, settings: PricingSettings, timePct?: number) {
   const urgentPct = urgent ? settings.urgentSurchargePct : 0;
-  const rawNightPct = nightOrHoliday ? settings.nightHolidaySurchargePct : 0;
+  const rawNightPct = nightOrHoliday ? (timePct ?? settings.nightHolidaySurchargePct) : 0;
   const cap = settings.maxSurchargePct;
   if (cap == null || urgentPct + rawNightPct <= cap) return { urgentPct, nightPct: rawNightPct, capped: false };
   const u = Math.min(urgentPct, cap);
@@ -234,15 +346,24 @@ export function calculatePrice(
 ): PriceQuote {
   const km = metersToBillableKm(input.distanceMeters);
   const lines: PriceLine[] = [];
+  const level: ServiceLevel = input.serviceLevel ?? (input.urgent ? "acil" : "standart");
+  const at = input.pickupAt ?? new Date();
 
-  const { applies: nightOrHoliday, holidayName } = nightOrHolidayAt(
-    input.pickupAt ?? new Date(),
-    settings,
-    input.holidays,
-  );
-  // Acil ve gece/tatil ek ücretleri toplanır; toplam tavanı (maxSurchargePct) aşamaz.
-  const { urgentPct, nightPct, capped } = surchargePercents(!!input.urgent, nightOrHoliday, settings);
-  const surchargePct = urgentPct + nightPct;
+  if (settings.maxWeightKg != null && (input.weightKg ?? 0) > settings.maxWeightKg) {
+    throw new PricingError(`${settings.maxWeightKg} kg üzeri gönderiler motosikletle taşınamaz`);
+  }
+  const time = timeSurchargeAt(at, settings, input.holidays);
+  if (level === "ekonomi" && !economyAvailableAt(at, settings, input.holidays)) {
+    throw new PricingError(
+      `Ekonomi gönderi yalnızca Pazartesi–Cumartesi ${String(settings.nightEndHour).padStart(2, "0")}:00–${String(settings.economyCutoffHour).padStart(2, "0")}:00 arası alışlarda kullanılabilir`,
+    );
+  }
+  const nightOrHoliday = time.kind !== null;
+  const holidayName = time.kind === "holiday" ? time.holidayName : null;
+  // Acil ve zaman eki toplanır; toplam tavanı (maxSurchargePct) aşamaz. Ekonomi indirimi eksi yüzde olarak işler.
+  const { urgentPct, nightPct, capped } = surchargePercents(level === "acil", nightOrHoliday, settings, time.pct);
+  const economyPct = level === "ekonomi" ? settings.economyDiscountPct : 0;
+  const surchargePct = urgentPct + nightPct - economyPct;
   const heavy =
     !!input.largePackage || (input.weightKg ?? 0) > settings.heavyThresholdKg;
 
@@ -263,7 +384,14 @@ export function calculatePrice(
     });
   }
   const outboundDistance = outbound.base + outbound.extra;
-  if (input.urgent) {
+  if (economyPct > 0) {
+    lines.push({
+      code: "economy",
+      label: `Ekonomi – gün içi teslim (−%${economyPct})`,
+      amountKurus: -pct(outboundDistance, economyPct),
+    });
+  }
+  if (level === "acil") {
     lines.push({
       code: "urgent",
       label: `Acil teslimat (+%${urgentPct})`,
@@ -274,9 +402,12 @@ export function calculatePrice(
     const capNote = capped ? `, toplam ek ücret en fazla %${settings.maxSurchargePct}` : "";
     lines.push({
       code: "night_holiday",
-      label: holidayName
-        ? `Resmi tatil – ${holidayName} (+%${nightPct}${capNote})`
-        : `Gece teslimatı (+%${nightPct}${capNote})`,
+      label:
+        time.kind === "holiday"
+          ? `Resmi tatil – ${holidayName} (+%${nightPct}${capNote})`
+          : time.kind === "sunday"
+            ? `Pazar teslimatı (+%${nightPct}${capNote})`
+            : `Gece teslimatı (+%${nightPct}${capNote})`,
       amountKurus: pct(outboundDistance, nightPct),
     });
   }
@@ -308,6 +439,17 @@ export function calculatePrice(
     });
   }
 
+  const remote = remotePickupFee(input.pickupPoint, settings);
+  if (remote.feeKurus > 0) {
+    lines.push({
+      code: "remote_pickup",
+      label: `Uzak alış (merkeze ~${Math.round(remote.km!)} km, ${remote.billableKm} km × ${tl(settings.remotePickupPerKmKurus)} TL${
+        remote.feeKurus === settings.remotePickupMaxKurus ? ", üst sınır" : ""
+      })`,
+      amountKurus: remote.feeKurus,
+    });
+  }
+
   const crossings = input.bridgeCrossings ?? 0;
   if (!Number.isInteger(crossings) || crossings < 0) {
     throw new PricingError("Köprü geçiş sayısı geçersiz");
@@ -327,7 +469,16 @@ export function calculatePrice(
     subtotalKurus,
     vatKurus,
     totalKurus: subtotalKurus + vatKurus,
-    meta: { distanceKm: km, returnDistanceKm: returnKm, nightOrHoliday, holidayName, surchargePct },
+    meta: {
+      distanceKm: km,
+      returnDistanceKm: returnKm,
+      nightOrHoliday,
+      holidayName,
+      surchargePct,
+      serviceLevel: level,
+      timeSurcharge: time.kind,
+      pickupFromCenterKm: remote.km,
+    },
   };
 }
 
@@ -343,6 +494,24 @@ export function corporateTierFor(
   );
 }
 
+/** Kurumsal indirime tabi kalemler (taşıma bedeli). Köprü, bekleme, ağır paket ve uzak alış indirimsizdir. */
+export const DISCOUNTABLE_LINE_CODES: PriceLineCode[] = ["base", "extra_km", "economy", "urgent", "night_holiday", "return_leg"];
+
+export function discountableKurus(quote: Pick<PriceQuote, "lines">): number {
+  return quote.lines.filter((l) => DISCOUNTABLE_LINE_CODES.includes(l.code)).reduce((s, l) => s + l.amountKurus, 0);
+}
+
+export interface MonthlyInvoiceItem {
+  subtotalKurus: number;
+  /** İndirime tabi kısım (verilmezse tamamı) */
+  discountableKurus?: number;
+}
+
+/** Siparişin kayıtlı teklifinden fatura kalemi (teklif yoksa tamamı indirime tabi sayılır) */
+export function monthlyInvoiceItem(subtotalKurus: number, quote?: Pick<PriceQuote, "lines"> | null): MonthlyInvoiceItem {
+  return quote?.lines ? { subtotalKurus, discountableKurus: discountableKurus(quote) } : { subtotalKurus };
+}
+
 export interface MonthlyInvoice {
   deliveryCount: number;
   grossSubtotalKurus: number;
@@ -354,17 +523,20 @@ export interface MonthlyInvoice {
 }
 
 /**
- * Kurumsal müşterinin ay sonu tek faturası. İndirim, ay içinde teslim edilen
- * siparişlerin KDV hariç toplamına uygulanır; kademe o ayın teslimat sayısıyla belirlenir.
+ * Kurumsal müşterinin ay sonu tek faturası. İndirim, ay içinde teslim edilen siparişlerin
+ * KDV hariç taşıma bedeline (DISCOUNTABLE_LINE_CODES) uygulanır; köprü, bekleme, ağır paket ve
+ * uzak alış indirimsizdir. Kademe o ayın teslimat sayısıyla belirlenir.
  */
 export function calculateMonthlyInvoice(
-  deliveredSubtotalsKurus: number[],
+  delivered: Array<number | MonthlyInvoiceItem>,
   settings: PricingSettings = DEFAULT_PRICING_SETTINGS,
 ): MonthlyInvoice {
-  const deliveryCount = deliveredSubtotalsKurus.length;
-  const grossSubtotalKurus = deliveredSubtotalsKurus.reduce((s, v) => s + v, 0);
+  const items = delivered.map((d) => (typeof d === "number" ? { subtotalKurus: d } : d));
+  const deliveryCount = items.length;
+  const grossSubtotalKurus = items.reduce((s, v) => s + v.subtotalKurus, 0);
+  const discountBase = items.reduce((s, v) => s + Math.min(v.subtotalKurus, v.discountableKurus ?? v.subtotalKurus), 0);
   const discountPct = corporateTierFor(deliveryCount, settings)?.discountPct ?? 0;
-  const discountKurus = pct(grossSubtotalKurus, discountPct);
+  const discountKurus = pct(discountBase, discountPct);
   const subtotalKurus = grossSubtotalKurus - discountKurus;
   const vatKurus = pct(subtotalKurus, settings.vatPct);
   return {

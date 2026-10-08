@@ -31,7 +31,8 @@ export default function FiyatlarPage() {
           </table>
           <ul className="mt-4 space-y-1 text-sm text-slate-600">
             <li>• Km, sürüş mesafesine göre yukarı yuvarlanır.</li>
-            <li>• Gece ile resmi tatil aynı anda olursa ek ücret bir kez uygulanır; arife günleri 13:00&apos;ten itibaren tatil sayılır.</li>
+            <li>• Gece, Pazar ve resmi tatil ekleri toplanmaz, yalnızca en yükseği uygulanır; arife günleri 13:00&apos;ten itibaren tatil sayılır.</li>
+            <li>• Ekonomi gönderiler aynı gün içinde, uygun kurye rotasıyla teslim edilir.</li>
             <li>• Gidiş-dönüşte dönüş ayağı, ek ücretler dahil fiyatın yarısıdır; köprü ücreti indirimsizdir.</li>
             <li>• Köprü ücreti yalnızca Anadolu yakasından Avrupa yakasına geçişte uygulanır.</li>
           </ul>
@@ -47,7 +48,7 @@ export default function FiyatlarPage() {
             </tbody>
           </table>
           <p className="mt-2 text-sm text-slate-600">
-            İndirim ay sonu faturasının KDV hariç toplamına uygulanır.{" "}
+            İndirim ay sonu faturasındaki taşıma bedeline (açılış, km, hizmet ve zaman ekleri) uygulanır; köprü, bekleme, ağır paket ve uzak alış ücretleri indirimsizdir.{" "}
             <Link href="/kurumsal" className="font-semibold text-brand underline">
               Kurumsal hesap başvurusu
             </Link>

@@ -12,6 +12,7 @@ import {
   buildQuote,
   mockMapsProvider,
   parseOrderRequest,
+  PricingError,
   ValidationError,
   type OrderStatus,
 } from "@yazgan/shared";
@@ -119,6 +120,7 @@ export function createDemoApi(): Api {
       return { req, q: await buildQuote(req, { maps, settings: DEFAULT_PRICING_SETTINGS, holidays: [] }) };
     } catch (e) {
       if (e instanceof ValidationError) throw new ApiError(e.message, e.field, 400);
+      if (e instanceof PricingError) throw new ApiError(e.message, undefined, 400);
       throw e;
     }
   };
@@ -137,7 +139,7 @@ export function createDemoApi(): Api {
       const { req, q } = await quoteFor({
         pickup: { ...pickup, contactName: "Ayşe Gönderici", contactPhone: "+905321112233" },
         dropoff: { ...dropoff, contactName: "Ali Alıcı", contactPhone: "+905334445566" },
-        urgent,
+        serviceLevel: urgent ? "acil" : "standart",
         roundTrip: false,
         weightKg: null,
         largePackage: false,

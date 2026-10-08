@@ -7,6 +7,7 @@ import type {
   PlaceSuggestion,
   PriceQuote,
   PricingSettings,
+  ServiceLevel,
 } from "@yazgan/shared";
 
 export interface AdminOrder {
@@ -15,6 +16,7 @@ export interface AdminOrder {
   status: OrderStatus;
   createdAt: string;
   urgent: boolean;
+  serviceLevel: ServiceLevel;
   roundTrip: boolean;
   pickupAddress: string;
   pickupSide: "anadolu" | "avrupa" | null;
@@ -164,7 +166,7 @@ export interface PhoneCustomer {
 export interface OrderRequestInput {
   pickup: { address: string; details?: string; lat: number; lng: number; district?: string | null; contactName?: string; contactPhone?: string };
   dropoff: { address: string; details?: string; lat: number; lng: number; district?: string | null; contactName?: string; contactPhone?: string };
-  urgent: boolean;
+  serviceLevel: ServiceLevel;
   roundTrip: boolean;
   weightKg: number | null;
   largePackage: boolean;

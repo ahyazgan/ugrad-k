@@ -78,6 +78,17 @@ describe("planAssignments", () => {
     expect(r.unassigned).toEqual(["normal"]);
   });
 
+  it("ekonomi sipariş, daha eski olsa da standarttan sonra atanır", () => {
+    const one = { ...cfg, maxActiveOrdersPerCourier: 1 };
+    const r = planAssignments(
+      [order({ id: "eko", serviceLevel: "ekonomi", createdAt: "2026-10-09T07:00:00Z" }), order({ id: "std", createdAt: "2026-10-09T08:55:00Z" })],
+      [NEAR],
+      one,
+    );
+    expect(r.assignments.map((a) => a.orderId)).toEqual(["std"]);
+    expect(r.unassigned).toEqual(["eko"]);
+  });
+
   it("yük dağılımı: iki sipariş iki yakın kuryeye", () => {
     const near2 = courier("yakin2", 41.13, 29.12);
     const r = planAssignments([order({ id: "a" }), order({ id: "b", createdAt: "2026-10-09T08:51:00Z" })], [NEAR, near2], cfg);

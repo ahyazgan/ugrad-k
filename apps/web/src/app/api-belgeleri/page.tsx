@@ -39,7 +39,7 @@ const orderExample = `{
     "address": "Levent Mah., Büyükdere Cad., Beşiktaş/İstanbul",
     "contactName": "Ali Demir", "contactPhone": "+905334445566"
   },
-  "urgent": true,
+  "serviceLevel": "acil",
   "roundTrip": false,
   "weightKg": null,
   "largePackage": false,
@@ -121,6 +121,11 @@ export default function ApiDocsPage() {
         Sipariş oluşturur (yanıt <code className="font-mono">201</code>). <code className="font-mono">externalRef</code> sizin kayıt numaranızdır: aynı referansla tekrar gönderirseniz yeni sipariş açılmaz, mevcut sipariş{" "}
         <code className="font-mono">200</code> ve <code className="font-mono">&quot;duplicate&quot;: true</code> ile döner. Ağ hatasında güvenle tekrar deneyebilirsiniz.
         <Code>{orderExample}</Code>
+        <p className="mt-3">
+          <code className="font-mono">serviceLevel</code>: <code className="font-mono">&quot;standart&quot;</code> (varsayılan), <code className="font-mono">&quot;acil&quot;</code> (60 dk, ek ücretli) veya{" "}
+          <code className="font-mono">&quot;ekonomi&quot;</code> (gün içinde, indirimli; yalnızca Pazartesi–Cumartesi öğleden önceki alışlarda). Eski{" "}
+          <code className="font-mono">&quot;urgent&quot;: true</code> alanı hâlâ kabul edilir. 20 kg üzeri gönderiler <code className="font-mono">400</code> ile reddedilir.
+        </p>
         <p className="mt-3">Yanıt:</p>
         <Code>{orderResponse}</Code>
       </Endpoint>

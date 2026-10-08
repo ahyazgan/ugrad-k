@@ -124,6 +124,55 @@ export function ToggleRow({
   );
 }
 
+/** Tek seçimli düğme grubu (ör. hizmet seviyesi) */
+export function Segmented<T extends string>({
+  label,
+  options,
+  value,
+  onChange,
+  testIDPrefix,
+}: {
+  label?: string;
+  options: { value: T; label: string; hint?: string }[];
+  value: T;
+  onChange: (v: T) => void;
+  testIDPrefix?: string;
+}) {
+  return (
+    <View style={{ gap: 6 }}>
+      {label ? <Text style={styles.toggleLabel}>{label}</Text> : null}
+      <View style={{ flexDirection: "row", gap: 8 }} accessibilityRole="radiogroup">
+        {options.map((o) => {
+          const on = o.value === value;
+          return (
+            <Pressable
+              key={o.value}
+              testID={testIDPrefix ? `${testIDPrefix}-${o.value}` : undefined}
+              onPress={() => onChange(o.value)}
+              accessibilityRole="radio"
+              accessibilityState={{ selected: on }}
+              style={{
+                flex: 1,
+                borderWidth: 1.5,
+                borderColor: on ? colors.primary : colors.border,
+                backgroundColor: on ? "#eef4fb" : "#fff",
+                borderRadius: 10,
+                paddingVertical: 8,
+                paddingHorizontal: 6,
+                alignItems: "center",
+                gap: 2,
+              }}
+            >
+              <Text style={{ fontSize: 14, fontWeight: "700", color: on ? colors.primary : colors.text }}>{o.label}</Text>
+              {o.hint ? <Text style={{ fontSize: 11, color: colors.muted, textAlign: "center" }}>{o.hint}</Text> : null}
+            </Pressable>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
 export function Checkbox({ checked, onChange, children }: { checked: boolean; onChange: (v: boolean) => void; children: ReactNode }) {
   return (
     <Pressable style={styles.checkRow} onPress={() => onChange(!checked)} accessibilityRole="checkbox" accessibilityState={{ checked }}>

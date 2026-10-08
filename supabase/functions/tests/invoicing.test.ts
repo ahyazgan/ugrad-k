@@ -135,3 +135,18 @@ Deno.test("invoice-monthly: 20 teslimatta %15 indirimle fatura", async () => {
   assertEquals(row.description, "Eylül 2026 kurye hizmetleri (20 teslimat, %15 hacim indirimi uygulanmıştır)");
   assertEquals((row.buyer as { type: string }).type, "company");
 });
+
+Deno.test("invoice-monthly: indirim yalnız taşıma bedeline (köprü indirimsiz)", async () => {
+  const price_quote = {
+    lines: [
+      { code: "base", label: "Açılış", amountKurus: 37_500 },
+      { code: "bridge", label: "Köprü", amountKurus: 2_500 },
+    ],
+  };
+  const orders = Array.from({ length: 20 }, () => ({ subtotal_kurus: 40_000, price_quote, corporate_account_id: "corp1", status: "teslim_edildi" }));
+  const { ctx, inserted } = fakeCtx({ tables: { profiles: [{ id: "u1", role: "admin" }], corporate_accounts: [corp], orders } });
+  const res = await handler((r) => handleInvoiceMonthly(r, ctx))(post({ corporateAccountId: "corp1", month: "2026-09" }));
+  assertEquals(res.status, 201);
+  // 800.000 − %15 × 750.000 = 687.500
+  assertEquals(inserted.invoices![0]!.subtotal_kurus, 687_500);
+});

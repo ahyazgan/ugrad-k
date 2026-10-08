@@ -9,6 +9,7 @@ import {
   ORDER_TRANSITIONS,
   buildQuote,
   calculateMonthlyInvoice,
+  monthlyInvoiceItem,
   mockMapsProvider,
   MOCK_PLACES,
   parseOrderRequest,
@@ -143,6 +144,7 @@ async function seed(): Promise<State> {
       {
         pickup: p,
         dropoff: d,
+        serviceLevel: urgent ? "acil" : "standart",
         urgent,
         roundTrip: false,
         weightKg: null,
@@ -162,6 +164,7 @@ async function seed(): Promise<State> {
       status,
       createdAt,
       urgent,
+      serviceLevel: urgent ? "acil" : "standart",
       roundTrip: false,
       pickupAddress: p.address,
       pickupSide: p.side,
@@ -573,7 +576,7 @@ export function createDemoRepo(): AdminRepo {
         month,
         orders,
         invoice: calculateMonthlyInvoice(
-          orders.map((o) => o.subtotalKurus),
+          orders.map((o) => monthlyInvoiceItem(o.subtotalKurus, o.priceQuote)),
           s.settings,
         ),
       });
@@ -668,6 +671,7 @@ export function createDemoRepo(): AdminRepo {
           pickupLat: o.pickupLat,
           pickupLng: o.pickupLng,
           urgent: o.urgent,
+          serviceLevel: o.serviceLevel,
           createdAt: o.createdAt,
           scheduledPickupAt: o.scheduledPickupAt,
           declinedBy: [],
@@ -767,6 +771,7 @@ export function createDemoRepo(): AdminRepo {
         status: "beklemede",
         createdAt: now,
         urgent: req.urgent,
+        serviceLevel: req.serviceLevel,
         roundTrip: req.roundTrip,
         pickupAddress: req.pickup.address,
         pickupSide: q.pickupSide,

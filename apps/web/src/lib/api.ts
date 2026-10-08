@@ -5,10 +5,12 @@ import {
   DEFAULT_PRICING_SETTINGS,
   mockMapsProvider,
   parseOrderRequest,
+  PricingError,
   ValidationError,
   type PlaceDetails,
   type PlaceSuggestion,
   type PriceQuote,
+  type ServiceLevel,
 } from "@yazgan/shared";
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
@@ -32,7 +34,7 @@ export interface SiteQuote {
 export interface OrderDraft {
   pickup: PlaceDetails;
   dropoff: PlaceDetails;
-  urgent: boolean;
+  serviceLevel: ServiceLevel;
   roundTrip: boolean;
   largePackage: boolean;
 }
@@ -88,6 +90,7 @@ export async function quote(d: OrderDraft): Promise<SiteQuote> {
     return { quote: q.quote, distanceMeters: q.distanceMeters, durationSeconds: q.durationSeconds, bridgeCrossings: q.bridgeCrossings };
   } catch (e) {
     if (e instanceof ValidationError) throw new SiteApiError(e.message, e.field);
+    if (e instanceof PricingError) throw new SiteApiError(e.message);
     throw e;
   }
 }

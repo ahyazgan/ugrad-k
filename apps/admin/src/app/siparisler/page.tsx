@@ -105,6 +105,7 @@ export default function SiparislerPage() {
                 {o.orderNo}
               </Link>
               {o.urgent ? <div className="text-xs font-bold text-amber-600">ACİL</div> : null}
+              {o.serviceLevel === "ekonomi" ? <div className="text-xs font-bold text-emerald-700">EKONOMİ</div> : null}
               {o.paymentMethod === "kart" && o.paymentStatus === "odenmedi" && o.status !== "iptal" ? (
                 <div className="text-xs font-semibold text-red-700">Ödeme bekleniyor</div>
               ) : null}

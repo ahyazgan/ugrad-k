@@ -20,7 +20,7 @@ type Row = Record<string, unknown>;
 
 export const API_RATE_LIMIT = { perKey: 120, windowSeconds: 60 };
 const ORDER_COLUMNS =
-  "id, order_no, external_ref, status, created_at, scheduled_pickup_at, picked_up_at, delivered_at, pickup_address, dropoff_address, urgent, round_trip, subtotal_kurus, vat_kurus, total_kurus, tracking_token, pod_receiver_name, cancel_reason";
+  "id, order_no, external_ref, status, created_at, scheduled_pickup_at, picked_up_at, delivered_at, pickup_address, dropoff_address, urgent, service_level, round_trip, subtotal_kurus, vat_kurus, total_kurus, tracking_token, pod_receiver_name, cancel_reason";
 
 export async function sha256Hex(s: string): Promise<string> {
   const d = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
@@ -60,6 +60,7 @@ export function apiOrder(r: Row, baseUrl = trackingBaseUrl) {
     deliveredAt: r.delivered_at ?? null,
     pickup: { address: r.pickup_address },
     dropoff: { address: r.dropoff_address },
+    serviceLevel: r.service_level ?? (r.urgent ? "acil" : "standart"),
     urgent: r.urgent,
     roundTrip: r.round_trip,
     subtotalKurus: r.subtotal_kurus,

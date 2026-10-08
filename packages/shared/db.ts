@@ -8,6 +8,10 @@ export interface PricingSettingsRow {
   km_tiers: KmTier[];
   max_surcharge_pct: number | string | null;
   urgent_surcharge_pct: number | string;
+  economy_discount_pct: number | string;
+  economy_cutoff_hour: number;
+  night_surcharge_pct: number | string;
+  sunday_surcharge_pct: number | string;
   night_holiday_surcharge_pct: number | string;
   night_start_hour: number;
   night_end_hour: number;
@@ -18,7 +22,13 @@ export interface PricingSettingsRow {
   return_leg_discount_pct: number | string;
   heavy_threshold_kg: number | string;
   heavy_surcharge_kurus: number;
+  max_weight_kg: number | string | null;
   bridge_fee_kurus: number;
+  service_center_lat: number | string;
+  service_center_lng: number | string;
+  free_pickup_radius_km: number | string;
+  remote_pickup_per_km_kurus: number;
+  remote_pickup_max_kurus: number;
   corporate_tiers: CorporateTier[];
   vat_pct: number | string;
   utc_offset_minutes: number;
@@ -32,6 +42,10 @@ export const PRICING_COLUMN_MAP = {
   kmTiers: "km_tiers",
   maxSurchargePct: "max_surcharge_pct",
   urgentSurchargePct: "urgent_surcharge_pct",
+  economyDiscountPct: "economy_discount_pct",
+  economyCutoffHour: "economy_cutoff_hour",
+  nightSurchargePct: "night_surcharge_pct",
+  sundaySurchargePct: "sunday_surcharge_pct",
   nightHolidaySurchargePct: "night_holiday_surcharge_pct",
   nightStartHour: "night_start_hour",
   nightEndHour: "night_end_hour",
@@ -42,7 +56,13 @@ export const PRICING_COLUMN_MAP = {
   returnLegDiscountPct: "return_leg_discount_pct",
   heavyThresholdKg: "heavy_threshold_kg",
   heavySurchargeKurus: "heavy_surcharge_kurus",
+  maxWeightKg: "max_weight_kg",
   bridgeFeeKurus: "bridge_fee_kurus",
+  serviceCenterLat: "service_center_lat",
+  serviceCenterLng: "service_center_lng",
+  freePickupRadiusKm: "free_pickup_radius_km",
+  remotePickupPerKmKurus: "remote_pickup_per_km_kurus",
+  remotePickupMaxKurus: "remote_pickup_max_kurus",
   corporateTiers: "corporate_tiers",
   vatPct: "vat_pct",
   utcOffsetMinutes: "utc_offset_minutes",
@@ -56,7 +76,7 @@ export function pricingSettingsFromRow(row: PricingSettingsRow): PricingSettings
   for (const [key, col] of Object.entries(PRICING_COLUMN_MAP)) {
     const v = row[col];
     if (col === "corporate_tiers" || col === "km_tiers") out[key] = v ?? [];
-    else if (col === "max_surcharge_pct") out[key] = v == null ? null : num(v as number | string);
+    else if (col === "max_surcharge_pct" || col === "max_weight_kg") out[key] = v == null ? null : num(v as number | string);
     else out[key] = num(v as number | string);
   }
   return out as unknown as PricingSettings;

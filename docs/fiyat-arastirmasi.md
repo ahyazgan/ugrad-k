@@ -315,3 +315,92 @@ Varsayımlar:
 7. **Ulaştırma Bakanlığı belgesi:** 2026 tutarı, belge türü (P1 mi?) ve SRC Kurye zorunluluğunun tarihi (15 Mayıs 2026 mı, 1 Ocak 2027 mi) doğrulanmalı.
 8. **Bordrolu kurye işveren maliyeti** (net 50 bin TL için 72-78 bin TL) kaba bir tahmin. Bir mali müşavire hesaplatılmalı.
 9. **Beykoz → Levent mesafesi** (22 km) varsayım. Gerçek değer Distance Matrix ile alınmalı.
+
+---
+
+## 8. Ekim 2026 güncellemesi: fiyat algoritması v2
+
+> Hazırlanma: 8 Ekim 2026. Yöntem §0'daki gibi: sayfalar doğrudan açılamadı, veriler arama sonucu özetlerinden geldi. **[türetilmiş]** etiketli rakamlar kaynaktan değil, hesaptan.
+
+### 8.1 Yeni bulgular (özet)
+
+**Rakipler (İstanbul):**
+
+| Firma | Yapı | Kaynak |
+|---|---|---|
+| D100 Kurye (3 Ekim 2026 güncel) | 300 TL + 11 TL/km + 3 TL/rota dk. Acil +%50, VIP ×2. 19–23 arası en az Acil, 23–06 arası ve **Pazar yalnız VIP**. Bekleme 10 dk ücretsiz, sonra 10 TL/dk | [d100kurye.com/fiyatlar](https://www.d100kurye.com/fiyatlar) |
+| Moto Kurye Merkezi | Express ×2, VIP ×4, 19:00 sonrası gece ×4. KDV hariç | [motokuryemerkezi.com](https://www.motokuryemerkezi.com/kurye-fiyatlari/) |
+| Sor Kurye | 350 TL'den başlıyor, acil ×2 | [sorkurye.com.tr](https://sorkurye.com.tr/kurye-fiyat-hesaplama/) |
+| MS Moto Kurye | Kısa 380, orta 590, Anadolu→Avrupa 980 TL. 18:00 sonrası express, 19:00 sonrası gece | [msmotokurye.com](https://msmotokurye.com/blog/moto-kurye-fiyat-hesaplama) |
+| motorkuryehizmeti.com | Kadıköy–Kozyatağı kısa 400–600, express 600–900, VIP 800–1.200 TL | [motorkuryehizmeti.com](https://motorkuryehizmeti.com/blog/moto-kurye-fiyatlari) |
+| Tem Kurye | Gece Sarıyer→Yeniköy normal 466, ekspres 825 TL | [temkurye.com](https://www.temkurye.com/motorlu/kurye-fiyatlari) |
+| Armut (İstanbul talepleri) | 450–1.500 TL | [armut.com](https://armut.com/fiyatlari/istanbul-moto-kurye_119_34) |
+
+**Platformlar:** Lalamove 99 TL'den (KDV dahil, 20 kg sınırı), Banabikurye 94,30 TL'den (gün sonu, %40 indirimli; en hızlı 136,90 TL; 15 dk ücretsiz bekleme, 20 kg sınırı), Porter 149 TL'den, Kurye Yolda 90 TL'den. Bunlar kısa mesafe ve uzun teslim süreli ürünler; klasik firmalar 300–400 TL tabanla başlıyor. Kaynaklar: [lalamove.com](https://www.lalamove.com/tr-tr/all-vehicle-pricing-detail), [banabikurye.com](https://banabikurye.com/sss/musteri), [theporter.com.tr](https://theporter.com.tr/en-TR/bike-parcel-delivery-istanbul).
+
+**Yurt dışı algoritmalar:**
+- Ekonomi kademesi: Gophr Ekonomi (21:00'e kadar geniş pencere, ucuz) ([gophr](https://uk.gophr.com/blog/surcharges)); Addison Lee Standard / Priority / Direct.
+- Boş gidiş: Uber'in uzun alış ücreti eşik süreden sonra başlıyor ve tavanlı ([help.uber.com](https://help.uber.com/h/20d33df7-7317-4f86-aa38-5db09a219c27)).
+- Yoğunluk zammı: Lalamove'un %300'e varan zammı tüketici otoritesinin tepkisini çekti ([rappler](https://www.rappler.com/business/lalamove-statement-december-fee-christmas-deliveries)). Gophr "ek ücret yok"u satış argümanı yapıyor, CitySprint yalnız sabit mesai dışı +%50 alıyor ([citysprint](https://www.citysprint.co.uk/londoncharges)).
+- Yakıt: CitySprint mazot bantlı yakıt ek ücretini yeni ürünlerinde kaldırdı; Gophr almıyor.
+- Şeffaflık: Toplam fiyat önce, kalemler açılır listede; ek ücretler TL olarak (Morwitz 2023; [Robbert ve Roth 2014](https://www.emerald.com/insight/content/doi/10.1108/JPBM-06-2014-0638)).
+
+**Maliyet tarafı:**
+
+| Gösterge | Değer | Kaynak |
+|---|---|---|
+| Benzin 95, İstanbul (7–8 Ekim 2026) | yaklaşık 84,5–84,7 TL/L. Ocak'tan bu yana yaklaşık +%59. Eşel mobil 1 Ekim'de bitti; ÖTV takvimiyle Aralık'ta yaklaşık 93 TL bekleniyor | [gzt.com](https://www.gzt.com/ekonomi/benzin-ve-motorin-fiyatlari-8-ekim-2026-istanbul-ankara-ve-izmirde-guncel-akaryakit-fiyatlari-4267885), [otopusula](https://otopusula.net/otohaber/benzin-otv-ekim-kasim-aralik-2026-kademeli-artis) |
+| TÜFE Eylül 2026 | aylık %1,84, yıllık %29,73. TCMB anketi: 2026 sonu %29,61, 2027 sonu %22,69 | [SBB](https://www.sbb.gov.tr/2026-yili-eylul-ayi-tuketici-ve-uretici-fiyat-gelismeleri-aciklandi/), [forbes.com.tr](https://www.forbes.com.tr/haberler/tcmb-anketinde-yil-sonu-enflasyon-beklentisi-eylulde-yukseldi) |
+| Asgari ücret 2026 | Net 28.075,50 TL, işverene 40.874,63 TL. Temmuz'da ara zam yok; 2027 için %20–30 bekleniyor | [alomaliye](https://www.alomaliye.com/2025/12/23/2026-yili-asgari-ucreti-2026-yili-asgari-ucret-bilgilendirme/) |
+| Honda PCX125 | 205.000 TL (1 Ekim 2026) | [honda.com.tr](https://www.honda.com.tr/motosiklet/motosiklet-fiyat-listesi-2026) |
+| Köprü (motosiklet) | 15 Temmuz / FSM 25 TL, YSS 75 TL (iki yönde) | [birgun](https://www.birgun.net/haber/yavuz-sultan-selim-koprusu-gecis-ucretleri-2026-guncel-556655) |
+| İstanbul trafiği (TomTom 2025) | Zirve saat ortalama 20,7 km/s | [tomtom](https://www.tomtom.com/traffic-index/city/istanbul/) |
+
+**Hesap [türetilmiş]:** Yakıt 2,5 L/100 km × 84,6 TL ≈ 2,1 TL/km (Aralık'ta ≈ 2,3). 5 km'lik 400 TL'lik işte boş dönüş dahil yakıt yaklaşık 20 TL, yani gelirin yaklaşık %5'i. **Ana maliyet kurye emeği**; yakıt ek ücreti yerine üç ayda bir TÜFE endekslemesi daha doğru.
+
+### 8.2 Kararlar ve gerekçeler
+
+| Konu | Karar (v2) | Gerekçe |
+|---|---|---|
+| Hizmet seviyeleri | **Ekonomi / Standart / Acil** | Gophr, Addison Lee, Banabikurye (gün sonu −%40), Sor (gün içi yaklaşık −%30). Acil olmayan B2B evrak (muhasebe, noter dönüşü) birleştirilerek marj korunur |
+| Ekonomi | **−%25**, aynı gün teslim; yalnız Pzt–Cmt 07:00–14:00 arası alış | İndirim oranı için doğrudan kaynak yok, piyasadaki %30–40'ın altında tutuldu. Saat sınırı, işlerin gün içinde rotaya katılabilmesi için. Otomatik atamada en sona kalır |
+| Gece / Pazar / resmi tatil | Ayrı oranlar: gece +%50, **Pazar +%50 (yeni)**, tatil +%50. **Toplanmazlar, en yükseği uygulanır** | D100 Pazar'ı yalnız VIP (×2) veriyor, diğerleri hafta sonu ×1,5–4. Ayrı parametre, Pazar oranının ayrıca düşürülebilmesini sağlar |
+| Acil + zaman eki | Toplanır, toplam en fazla +%75 (değişmedi) | Piyasa ×2–×4; biz bilinçli olarak ucuz ve öngörülebilir |
+| Dinamik yoğunluk zammı | **Yok** | B2B bütçe öngörülebilirliği; Lalamove tepkisi; Gophr "ek ücret yok" |
+| Dakika ücreti | **Yok** | Motosiklet trafikten az etkileniyor; sabit ön fiyat B2B için daha değerli (D100'ün 3 TL/dk'sı fiyatı öngörülemez yapıyor) |
+| Uzak alış (boş gidiş) | Merkeze (Beykoz) tahmini yol mesafesi **40 km**'yi aşan her km için **10 TL**, en fazla **300 TL**. Yol mesafesi kuş uçuşu × 1,35 | Uber uzun alış ücreti mantığı. 40 km: Kartal (Anadolu Adliyesi, yaklaşık 37 km) ücretsiz kalsın diye. Örnekler [türetilmiş]: Pendik 0–10 TL, Sabiha Gökçen yaklaşık 20 TL, Tuzla yaklaşık 120 TL, İstanbul Havalimanı yaklaşık 70 TL, Esenyurt yaklaşık 130 TL, Beylikdüzü yaklaşık 180 TL |
+| Ağırlık sınırı | **20 kg**; üstü reddedilir ("motosikletle taşınamaz") | Lalamove, Porter ve Banabikurye'de de 20 kg |
+| Kurumsal indirim kapsamı | Yalnız **taşıma bedeline** (açılış, km, hizmet seviyesi, zaman eki, dönüş ayağı). Köprü, bekleme, ağır paket ve uzak alış indirimsiz | §6.3 madde 9. Köprü resmi ücret; bekleme ve uzak alış doğrudan maliyet |
+| Endeksleme | Panel → Fiyatlar → "Endeks / enflasyon güncellemesi (%)": açılış, km kademeleri, bekleme, ağır paket ve uzak alış ücretlerini oranla artırır ve yuvarlar (100 TL üstü 5 TL'ye, altı 0,50 TL'ye). Köprü ve yüzdeler değişmez | Üç ayda bir TÜFE (Eylül'de aylık %1,84 → çeyrek yaklaşık %5,6 [türetilmiş]). Kurumsal sözleşmeye "üç ayda bir TÜFE oranında güncellenir" maddesi önerilir |
+| Maliyet / marj | Panel senaryo tablosunda her senaryo için tahmini maliyet ve marj; %20 altı kırmızı | Esnaf kurye modeli: iş başı 150 TL + km başı 12 TL (yakıt dahil), acil ve gece/Pazar/tatilde +%30 prim, ekonomide iş başı ödemenin %60'ı, iş başı 30 TL genel gider. Bunlar öneri, piyasa verisi değil (B2B iş başı ödeme için güvenilir 2026 verisi bulunamadı) |
+
+### 8.3 Senaryolar (v2 varsayılan tarife, KDV hariç)
+
+| Senaryo | Fiyat | KDV dahil | Tahmini maliyet | Marj | Piyasa |
+|---|---|---|---|---|---|
+| 5 km standart, gündüz | 400 TL | 480 TL | 240 TL | %40 | D100 355 (+süre ≈ 400) [türetilmiş], MS 380, Sor 350+ |
+| 5 km ekonomi | 300 TL | 360 TL | 180 TL | %40 | Platformlar 90–150 TL (daha yavaş, kısa); klasik firmada ekonomi kademesi yok |
+| 12 km acil | 841,50 TL | 1.009,80 TL | 412 TL | %51 | D100 formülü ≈ 648 + süre [türetilmiş], motorkuryehizmeti express 600–900 TL |
+| 8 km gece | 712,50 TL | 855 TL | 350 TL | %51 | D100 22–23 arası ≈ 582, 23 sonrası ≈ 776 [türetilmiş]; Tem gece ekspres 825 TL |
+| 8 km Pazar | 712,50 TL | 855 TL | 350 TL | %51 | D100 Pazar yalnız VIP ≈ 776 [türetilmiş] |
+| 12 km acil + gece | 981,75 TL | 1.178,10 TL | 500 TL | %49 | Gece ×4 uygulayan firmalarda 1.500 TL+ |
+| 22 km Beykoz → Levent (köprü) | 766 TL | 919,20 TL | 469 TL | %39 | MS Anadolu→Avrupa 980 TL, Gigbi Beykoz 900–1.100 TL |
+| 22 km köprü, ekonomi | 580,75 TL | 696,90 TL | 409 TL | %30 | — |
+| Tuzla'dan alış, 8 km | 595 TL | 714 TL | 420 TL | %29 | — |
+
+**Sonuç:** Kısa standart işte orta-üst bantta, uzun ve karşı yaka işlerde piyasanın altında, acil/gece/Pazar'da belirgin biçimde ucuz kalıyoruz. Ekonomi kademesi, platformlarla klasik firmalar arasındaki boşluğu dolduruyor. Tahmini marj tüm senaryolarda %29'un üzerinde.
+
+### 8.4 Kullanıcının değiştirebileceği kararlar (panel → Fiyatlar)
+
+1. **Pazar +%50**: Rakipler Pazar'ı ×2–4 fiyatlıyor; +%50 rekabetçi. Pazar'ı ucuz tutmak istenirse %25–30 yapılabilir.
+2. **Ekonomi −%25 ve 14:00 sınırı**: Talep görürse −%30'a çekilebilir. Marj en düşük uzun ekonomi işlerde (%30).
+3. **Uzak alış yarıçapı 40 km / 10 TL/km**: Pendik ve Tuzla müşterisi artarsa yarıçap 50 km'ye çıkarılabilir.
+4. **Gece +%50**: §6.3'te +%30–40 önerilmişti. Acil + gece tavanı (%75) zaten var.
+5. **Maliyet modeli**: Gerçek kurye anlaşması belli olunca panelde "Maliyet modeli" kartından girilmeli; marj sütunu buna göre güncellenir.
+
+### 8.5 Sonraki adımlar (henüz yapılmadı)
+
+- İptal ücreti: atamadan önce ücretsiz; kurye yoldaysa sabit ücret; kurye adresteyse açılışın %50'si (Stuart, Lalamove, Addison Lee uygulamaları).
+- Ek durak (çoklu teslimat): durak başına sabit ücret + gerçek rota km'si.
+- Kurumsal müşterilere sık güzergâh için sabit "rota fiyatı" ve gecikmeye karşı SLA kredisi.
+- 3–5 rakipten aynı senaryolarla gizli müşteri teklifi (§7 madde 1).

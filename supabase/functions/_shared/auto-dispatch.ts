@@ -50,7 +50,7 @@ export async function handleAutoDispatch(
     ctx.admin.from("orders").select("courier_id").in("status", ACTIVE),
     ctx.admin
       .from("orders")
-      .select("id, order_no, pickup_lat, pickup_lng, urgent, created_at, scheduled_pickup_at, payment_method, payment_status, unassigned_alerted_at")
+      .select("id, order_no, pickup_lat, pickup_lng, urgent, service_level, created_at, scheduled_pickup_at, payment_method, payment_status, unassigned_alerted_at")
       .eq("status", "onaylandi"),
   ]);
 
@@ -85,6 +85,7 @@ export async function handleAutoDispatch(
     pickupLat: o.pickup_lat,
     pickupLng: o.pickup_lng,
     urgent: o.urgent,
+    serviceLevel: o.service_level ?? undefined,
     createdAt: o.created_at,
     scheduledPickupAt: o.scheduled_pickup_at,
     declinedBy: declined.get(o.id) ?? [],

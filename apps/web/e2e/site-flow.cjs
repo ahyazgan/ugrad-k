@@ -27,7 +27,7 @@ fs.mkdirSync(out, { recursive: true });
   await t("dropoff-option-0").click();
   await t("total").waitFor();
   const normal = await t("total").innerText();
-  await t("opt-urgent").check();
+  await page.locator('label:has([data-testid="level-acil"])').click();
   await page.waitForFunction((prev) => document.querySelector('[data-testid="total"]')?.textContent !== prev, normal);
   const urgent = await t("total").innerText();
   console.log("FIYAT normal:", normal, "acil:", urgent);

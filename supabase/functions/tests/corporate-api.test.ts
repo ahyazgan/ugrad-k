@@ -77,6 +77,7 @@ Deno.test("api: sipariş cari hesapla açılır, dış referans saklanır; tekra
   assertEquals(row.api_key_id, "k1");
   assertEquals(row.corporate_account_id, "acc1");
   assertEquals(row.urgent, true);
+  assertEquals(row.service_level, "acil");
   // Aynı referans: yeni sipariş açılmaz
   tables.orders[0].external_ref = "ERP-42";
   const again = await call("POST", "/v1/orders", orderBody);

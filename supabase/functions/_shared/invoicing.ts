@@ -1,5 +1,5 @@
 // Fatura kuyruğu (invoice-dispatch) ve kurumsal aylık fatura oluşturma (invoice-monthly).
-import { calculateMonthlyInvoice } from "../../../packages/shared/index.ts";
+import { calculateMonthlyInvoice, monthlyInvoiceItem, type PriceQuote } from "../../../packages/shared/index.ts";
 import type { Env } from "./channels.ts";
 import type { Ctx } from "./context.ts";
 import { HttpError, json, readJson } from "./http.ts";
@@ -92,7 +92,7 @@ export async function handleInvoiceMonthly(req: Request, ctx: Ctx): Promise<Resp
     ctx.admin.from("corporate_accounts").select("*").eq("id", body.corporateAccountId).single(),
     ctx.admin
       .from("orders")
-      .select("subtotal_kurus")
+      .select("subtotal_kurus, price_quote")
       .eq("corporate_account_id", body.corporateAccountId)
       .eq("status", "teslim_edildi")
       .gte("delivered_at", start)
@@ -102,7 +102,10 @@ export async function handleInvoiceMonthly(req: Request, ctx: Ctx): Promise<Resp
   if (!acc.data) throw new HttpError(404, "Kurumsal hesap bulunamadı");
   const a = acc.data;
   if (!a.tax_number) throw new HttpError(400, "Kurumsal hesapta vergi numarası eksik");
-  const subtotals = ((orders.data ?? []) as Array<{ subtotal_kurus: number }>).map((o) => o.subtotal_kurus);
+  // İndirim yalnız taşıma bedeline: kalemler kayıtlı tekliften ayrılır
+  const subtotals = ((orders.data ?? []) as Array<{ subtotal_kurus: number; price_quote: PriceQuote | null }>).map((o) =>
+    monthlyInvoiceItem(o.subtotal_kurus, o.price_quote),
+  );
   if (!subtotals.length) throw new HttpError(400, "Bu ay teslim edilmiş sipariş yok");
 
   const inv = calculateMonthlyInvoice(subtotals, settingsRow.settings);
