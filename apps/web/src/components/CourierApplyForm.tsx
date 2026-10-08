@@ -132,7 +132,7 @@ export function CourierApplyForm() {
         </span>
       </label>
       {error ? <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error.message}</p> : null}
-      <button type="submit" data-testid="apply-submit" disabled={state === "sending"} className="rounded-xl bg-brand px-5 py-3 font-bold text-white hover:bg-brand-dark disabled:opacity-60">
+      <button type="submit" data-testid="apply-submit" disabled={state === "sending"} className="rounded-full bg-brand px-6 py-3.5 font-extrabold text-white hover:bg-black disabled:opacity-60">
         {state === "sending" ? "Gönderiliyor…" : "Başvuruyu gönder"}
       </button>
     </form>

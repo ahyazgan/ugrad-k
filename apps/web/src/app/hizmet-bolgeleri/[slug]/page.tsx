@@ -75,7 +75,7 @@ export default async function DistrictPage({ params }: { params: Promise<{ slug:
             </p>
           ) : null}
           <div className="mt-8 flex flex-wrap gap-3">
-            <a href={APP_URL} className="rounded-xl bg-brand px-6 py-3 font-bold text-white hover:bg-brand-dark">
+            <a href={APP_URL} className="rounded-full bg-accent px-7 py-3.5 font-extrabold text-brand hover:bg-accent-dark">
               Sipariş ver
             </a>
             <Link href="/kurumsal" className="rounded-xl border border-brand px-6 py-3 font-bold text-brand">

@@ -124,7 +124,7 @@ function AddressField({
 function Toggle({ id, label, hint, checked, onChange }: { id: string; label: string; hint: string; checked: boolean; onChange: (v: boolean) => void }) {
   return (
     <label className={`flex cursor-pointer items-start gap-3 rounded-xl border p-3 text-sm ${checked ? "border-brand bg-brand-light" : "border-slate-200 bg-white"}`}>
-      <input type="checkbox" data-testid={id} className="mt-0.5 h-4 w-4 accent-[#0f3d6e]" checked={checked} onChange={(e) => onChange(e.target.checked)} />
+      <input type="checkbox" data-testid={id} className="mt-0.5 h-4 w-4 accent-[#111114]" checked={checked} onChange={(e) => onChange(e.target.checked)} />
       <span>
         <span className="block font-semibold text-slate-900">{label}</span>
         <span className="text-slate-500">{hint}</span>
@@ -207,7 +207,7 @@ export function PriceCalculator({ compact = false }: { compact?: boolean }) {
     : null;
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xl shadow-brand/5 sm:p-6" id="fiyat-hesapla">
+    <div className="rounded-[26px] bg-white p-5 shadow-xl shadow-brand/5 sm:p-6" id="fiyat-hesapla">
       <div className="grid gap-4">
         <AddressField id="pickup" label="Nereden?" placeholder="Alış adresi, ör. Kavacık" value={pickup} onChange={setPickup} />
         <AddressField id="dropoff" label="Nereye?" placeholder="Teslim adresi, ör. Levent" value={dropoff} onChange={setDropoff} />
@@ -258,7 +258,7 @@ export function PriceCalculator({ compact = false }: { compact?: boolean }) {
               </table>
             </details>
             <div className="mt-4 flex flex-wrap gap-2">
-              <a href={APP_URL} data-testid="order-cta" className="flex-1 rounded-xl bg-brand px-5 py-3 text-center font-bold text-white hover:bg-brand-dark">
+              <a href={APP_URL} data-testid="order-cta" className="flex-1 rounded-full bg-accent px-5 py-3.5 text-center font-extrabold text-brand hover:bg-accent-dark">
                 Bu fiyatla sipariş ver
               </a>
               {wa ? (
