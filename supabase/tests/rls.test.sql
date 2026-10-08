@@ -155,6 +155,7 @@ set role authenticated;
 do $$ begin
   if (select count(*) from public.courier_locations) <> 1 then raise exception 'müşteri kurye konumunu görmeli'; end if;
   if (select count(*) from public.profiles) <> 2 then raise exception 'müşteri atanmış kuryenin profilini görmeli'; end if;
+  if (select plate from public.couriers) <> '34 ABC 01' then raise exception 'müşteri atanmış kuryenin plakasını görmeli'; end if;
   perform public.set_order_status('10000000-0000-0000-0000-000000000001', 'iptal', 'vazgeçtim');
   raise exception 'BEKLENMEDİ: yoldaki sipariş iptal edildi';
 exception when insufficient_privilege then null;
@@ -165,6 +166,7 @@ select set_config('request.jwt.claim.sub', :cust2, false);
 set role authenticated;
 do $$ begin
   if (select count(*) from public.courier_locations) <> 0 then raise exception 'başka müşteri konumu görmemeli'; end if;
+  if (select count(*) from public.couriers) <> 0 then raise exception 'başka müşteri kuryeyi görmemeli'; end if;
   if (select count(*) from storage.objects) <> 0 then raise exception 'başka müşteri teslim fotoğrafını görmemeli'; end if;
   -- kendi beklemedeki siparişini açıklama ile iptal edebilir
   if (public.set_order_status('10000000-0000-0000-0000-000000000002', 'iptal', 'yanlış adres')).status <> 'iptal' then

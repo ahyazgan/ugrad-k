@@ -63,12 +63,13 @@ Ek: `iptal`, `sorunlu`
 ## Kod yapısı ve komutlar
 - `packages/shared/` — pricing.ts (tek fiyat kaynağı), orders.ts (durumlar), geo.ts (yaka/köprü), maps.ts (Google Places New + Routes API, mock), quote.ts (istek doğrulama + teklif), db.ts (satır ↔ tip)
 - `supabase/migrations/` — şema, RLS, RPC, storage, sabit veriler; `supabase/functions/` — Edge Functions (Deno, `packages/shared`'ı doğrudan import eder; deploy `--use-api`)
+- `apps/mobile/` — Expo SDK 57 + expo-router (`src/app/`). Supabase env yoksa **DEMO modu** (sahte veri, kod 123456). `pnpm --filter @yazgan/mobile e2e:web` tarayıcıda tam akışı test eder
 - `pnpm test` (vitest), `pnpm test:functions` (Deno), `pnpm test:db` (yerel Postgres'te migration + RLS), `pnpm test:all`
 - Google'ın eski Distance Matrix/Places API'leri yeni projelerde açılamıyor → **Routes API** ve **Places API (New)** kullanılıyor
 
 ## Yol haritası
 - [x] Faz 1: Monorepo kurulumu, Supabase şeması, fiyat fonksiyonu + testleri
-- [ ] Faz 2: Müşteri akışı (adres → fiyat → sipariş) — ödeme olmadan
+- [x] Faz 2: Müşteri akışı (adres → fiyat → sipariş) — ödeme olmadan
 - [ ] Faz 3: Yönetim paneli (sipariş listesi, kurye atama)
 - [ ] Faz 4: Kurye uygulaması (iş kabul, konum, teslim fotoğrafı)
 - [ ] Faz 5: Canlı takip linki + SMS/WhatsApp bildirimleri
