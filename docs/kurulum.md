@@ -331,6 +331,7 @@ Buradaki kodlar birim/uçtan uca testlerle doğrulandı, ancak dış servislere 
 | Vercel (web sitesi) | `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `NEXT_PUBLIC_SITE_URL` (ops.), `NEXT_PUBLIC_APP_URL` (ops.), `NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION` (ops.) | §17 |
 | EAS (mobil) | `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY`, `EXPO_PUBLIC_TRACKING_BASE_URL` | |
 | | `EXPO_PUBLIC_MAP_TILE_URL`, `EXPO_PUBLIC_MAP_TILE_ATTRIBUTION` (ops.) | Harita karoları (§3) |
+| | `EXPO_PUBLIC_DISPATCH_PHONE` (ops., E.164 ör. `+905xxxxxxxxx`) | Kurye acil durum ekranındaki "Yöneticiyi ara" numarası; boşsa `BRAND.phone`, o da boşsa düğme gizlenir |
 | `app.json` | `expo.extra.eas.projectId` | Push bildirimleri |
 
 `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` Edge Function'lara Supabase tarafından otomatik verilir.
