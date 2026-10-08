@@ -476,3 +476,7 @@ verify_jwt = true
 # Cron (x-notify-secret) veya yönetici JWT'si fonksiyon içinde doğrulanır
 [functions.auto-dispatch]
 verify_jwt = false
+
+# Tanıtım sitesi: herkese açık, IP başına hız sınırı fonksiyon içinde
+[functions.site-api]
+verify_jwt = false

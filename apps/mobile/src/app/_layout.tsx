@@ -30,6 +30,7 @@ export default function RootLayout() {
             <Stack.Screen name="adres" options={{ title: "Adres seç", presentation: "modal" }} />
             <Stack.Screen name="ozet" options={{ title: "Fiyat ve onay" }} />
             <Stack.Screen name="siparis/[id]" options={{ title: "Sipariş" }} />
+            <Stack.Screen name="odeme" options={{ title: "Ödeme" }} />
             <Stack.Screen name="(kurye)" options={{ headerShown: false }} />
             <Stack.Screen name="is/[id]" options={{ title: "İş detayı" }} />
             <Stack.Screen name="teslim/[id]" options={{ title: "Teslim et" }} />

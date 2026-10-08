@@ -1,7 +1,8 @@
 import { assert, assertEquals } from "jsr:@std/assert@1";
 import { handler } from "../_shared/http.ts";
 import { authorizationHeader, buildCheckoutRequest, hmacSha256Hex, iyzicoPrice } from "../_shared/iyzico.ts";
-import { handlePaymentCallback, handlePaymentInit, handlePaymentRefund } from "../_shared/payments.ts";
+import { BRAND } from "../../../packages/shared/brand.ts";
+import { handlePaymentCallback, handlePaymentInit, handlePaymentRefund, safeReturnUrl } from "../_shared/payments.ts";
 import { fakeCtx } from "./fake.ts";
 
 const env = (vars: Record<string, string>) => (k: string) => vars[k];
@@ -148,4 +149,38 @@ Deno.test("payment-callback: iptal edilmiş siparişe gelen ödeme hemen iade ed
   assert(html.includes("iade edildi"));
   assert(calls.some((u) => u.endsWith("/payment/cancel")));
   assertEquals(updated.orders![0]!.payment_status, "iade_edildi");
+});
+
+Deno.test("ödeme: web dönüş adresi yalnız izinli kökene", () => {
+  const e = env({ APP_WEB_ORIGINS: "http://localhost:8099" });
+  assertEquals(safeReturnUrl(`${BRAND.appUrl}/odeme?x=1`, e), `${BRAND.appUrl}/odeme`);
+  assertEquals(safeReturnUrl("http://localhost:8099/odeme", e), "http://localhost:8099/odeme");
+  assertEquals(safeReturnUrl("https://kotu.example/odeme", e), null);
+  assertEquals(safeReturnUrl("javascript:alert(1)", e), null);
+});
+
+Deno.test("payment-init + callback: tarayıcıdan ödemede web adresine dönülür", async () => {
+  const { ctx } = fakeCtx({ tables: { orders: [order], profiles: [{ id: "u1", full_name: "Ayşe", phone: "905321112233", email: null }] } });
+  let sent: Record<string, unknown> = {};
+  const fetchFn = ((_u: string, init: RequestInit) => {
+    sent = JSON.parse(init.body as string);
+    return Promise.resolve(Response.json({ status: "success", token: "tok", paymentPageUrl: "https://pay" }));
+  }) as unknown as typeof fetch;
+  const ret = `${BRAND.appUrl}/odeme`;
+  await handler((r) => handlePaymentInit(r, ctx, { env: env(iyzi), fetchFn }))(post({ orderId: "o1", returnUrl: ret }));
+  assertEquals(sent.callbackUrl, `https://p.supabase.co/functions/v1/payment-callback?ret=${encodeURIComponent(ret)}`);
+  const bad = await handler((r) => handlePaymentInit(r, ctx, { env: env(iyzi), fetchFn }))(post({ orderId: "o1", returnUrl: "https://kotu.example" }));
+  assertEquals(bad.status, 400);
+
+  const cb = fakeCtx({ tables: { orders: [{ ...order, payment_token: "tok" }] } });
+  const okFetch = (() =>
+    Promise.resolve(Response.json({ status: "success", paymentStatus: "SUCCESS", paymentId: "p9", paidPrice: 410.5, basketId: "o1" }))) as unknown as typeof fetch;
+  const fd = new FormData();
+  fd.set("token", "tok");
+  const res = await handlePaymentCallback(
+    new Request(sent.callbackUrl as string, { method: "POST", body: fd }),
+    cb.ctx,
+    { env: env(iyzi), fetchFn: okFetch },
+  );
+  assert((await res.text()).includes(`${ret}?durum=basarili&siparis=o1`));
 });

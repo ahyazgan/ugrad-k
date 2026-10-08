@@ -220,8 +220,8 @@ export function createSupabaseApi(url: string, anonKey: string): Api & { client:
       // Kartla ödenmişse ödeme iptal edilir (ödeme yoksa sunucu bir şey yapmaz)
       await invoke("payment-refund", { orderId: id }).catch(() => undefined);
     },
-    async startPayment(orderId) {
-      return invoke<{ paymentPageUrl: string }>("payment-init", { orderId });
+    async startPayment(orderId, returnUrl) {
+      return invoke<{ paymentPageUrl: string }>("payment-init", { orderId, ...(returnUrl ? { returnUrl } : {}) });
     },
     subscribeOrder(id, onChange) {
       const channel = client

@@ -156,7 +156,7 @@ export interface Api {
   getOrder(id: string): Promise<OrderDetail>;
   cancelOrder(id: string, reason: string): Promise<void>;
   /** Kartla ödeme sayfasını başlatır; demo modunda ödeme anında onaylanır (null döner) */
-  startPayment(orderId: string): Promise<{ paymentPageUrl: string } | null>;
+  startPayment(orderId: string, returnUrl?: string): Promise<{ paymentPageUrl: string } | null>;
   subscribeOrder(id: string, onChange: () => void): () => void;
   /**
    * Siparişin kurye konumunu izler: hemen ve her değişimde `cb` çağrılır (konum yoksa null).

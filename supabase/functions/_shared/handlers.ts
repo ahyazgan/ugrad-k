@@ -11,7 +11,7 @@ import {
 import type { Ctx } from "./context.ts";
 import { HttpError, json, readJson } from "./http.ts";
 
-function quoteResponse(q: QuoteResult) {
+export function quoteResponse(q: QuoteResult) {
   return {
     quote: q.quote,
     distanceMeters: q.distanceMeters,
