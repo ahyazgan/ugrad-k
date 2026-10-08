@@ -12,6 +12,8 @@
     "e2e:web": "next start -p 3300 & SERVER=$!; sleep 3; node e2e/site-flow.cjs e2e/shots; CODE=$?; kill $SERVER; exit $CODE"
   },
   "dependencies": {
+    "@fontsource-variable/archivo": "^5.3.0",
+    "@fontsource/caveat-brush": "^5.3.0",
     "@yazgan/shared": "workspace:*",
     "next": "16.3.8",
     "react": "19.2.3",

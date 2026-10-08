@@ -6,6 +6,9 @@ import { Header } from "@/components/Header";
 import { JsonLd } from "@/components/JsonLd";
 import { DISTRICTS } from "@/lib/districts";
 import { SITE_URL } from "@/lib/site";
+// Neo yazı tipleri yerelden sunulur (derleme sırasında Google Fonts'a erişim gerekmez; KVKK açısından da üçüncü tarafa istek yok)
+import "@fontsource-variable/archivo/wght.css";
+import "@fontsource/caveat-brush";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -23,7 +26,7 @@ export const metadata: Metadata = {
     : undefined,
 };
 
-export const viewport: Viewport = { themeColor: BRAND.colors.primary };
+export const viewport: Viewport = { themeColor: BRAND.neo.bg };
 
 /** Yerel işletme bilgisi: Google'ın harita ve yerel aramada kullandığı yapılandırılmış veri */
 const localBusiness = {
