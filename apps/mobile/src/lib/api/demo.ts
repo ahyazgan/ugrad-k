@@ -31,6 +31,7 @@ import {
   type Shift,
   type ConsentType,
   type CourierPosition,
+  type Incident,
   type OrderDetail,
   type OrderInput,
   type Profile,
@@ -75,6 +76,7 @@ export function createDemoApi(): Api {
   const cash = new Map<string, CashCollection>();
   const codeTries = new Map<string, number>();
   const codeVerified = new Set<string>();
+  let incident: Incident | null = null;
   const notifyJobs = () => jobListeners.forEach((l) => l());
 
   const emit = () => listeners.forEach((l) => l(session));
@@ -400,6 +402,21 @@ export function createDemoApi(): Api {
       return [...orders.values()]
         .filter((o) => o.courierName === "Demo Kurye")
         .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+    },
+    async raiseSos({ kind }) {
+      if (!incident) {
+        incident = { id: "demo-sos", kind, createdAt: new Date().toISOString(), acknowledgedAt: null };
+        // Demo: yönetici birkaç saniyede görür
+        setTimeout(() => {
+          if (incident) incident.acknowledgedAt = new Date().toISOString();
+        }, 3000);
+      }
+      if (shift) shift.break ??= { startedAt: new Date().toISOString(), auto: false };
+      notifyJobs();
+      return { id: incident.id };
+    },
+    async myOpenIncident() {
+      return incident ? { ...incident } : null;
     },
     async markArrived(orderId, stop) {
       const o = orders.get(orderId);

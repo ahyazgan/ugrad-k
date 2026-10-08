@@ -36,6 +36,7 @@ Kodun tamamı yazıldı ve testlerden geçti. Bu rehber, sistemi **gerçek hesap
 29. [Kurye iş teklifi (kabul / ret)](#29-kurye-iş-teklifi)
 30. [Adrese varış ve bekleme ölçümü](#30-adrese-varış-ve-bekleme-ölçümü)
 31. [Kurye molası](#31-kurye-molası)
+32. [Acil durum (SOS)](#32-acil-durum-sos)
 
 ---
 
@@ -466,3 +467,10 @@ Kayıtlı müşteriler `siparis@<alan adı>` adresine yazar; yapay zeka asistan�
 - **Uzun mola**: *En uzun mola* (varsayılan 45 dk) aşılınca yöneticiye bir kez WhatsApp/SMS uyarısı gider.
 - **BTK raporu**: panel → Çalışma saatleri. Vardiya başına mola süresi ve **net çalışma** süresi; CSV'de *Mola (saat)* ve *Net çalışma (saat)* sütunları.
 - Panelde molada olan kurye *Molada* olarak (kurye listesi, genel bakış, canlı harita) görünür; elle atama listesinde "molada" uyarısıyla yer alır.
+
+## 32. Acil durum (SOS)
+
+- **Kurye**: vardiyadayken İşlerim ekranında *🚨 Acil durum (SOS)* → tür (kaza, tehlike/saldırı, sağlık, araç arızası, diğer) → *Yöneticiye acil durum bildir*. Ekranda önce **112 Acil Çağrı** düğmesi vardır; hayati tehlikede önce 112 aranmalıdır. Alarm verilen kurye molaya alınır (yeni iş gelmez, bekleyen teklifler geri alınır).
+- **Yönetici**: `ADMIN_ALERT_PHONES` numaralarına **hemen** WhatsApp/SMS gider (kurye adı ve telefonu, tür, not, Google Haritalar konum bağlantısı, elindeki iş). Panelin her sayfasının üstünde kırmızı bant çıkar: *Konumu aç*, *Kuryeyi ara*, *Gördüm*, *Kapat…* (ne yapıldığı yazılır). Kurye "Gördüm"ü uygulamada görür.
+- **Tekrar**: görülmeyen alarm 5 dakikada bir, en fazla 3 kez yeniden gönderilir (§6 `otomatik-dagitim`). Kayıtlar panel → Kuryeler → *Acil durum kayıtları*.
+- **Kurulum**: `sos` Edge Function'ını yükleyin (`pnpm deploy:functions`); `ADMIN_ALERT_PHONES` boşsa alarm kimseye gitmez (Canlıya hazırlık kartı "eksik" gösterir). İş kazası halinde SGK'ya 3 iş günü içinde iş kazası bildirimi yapılması gerekir; kayıt bunun için tarih ve konum sağlar.

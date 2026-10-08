@@ -28,7 +28,15 @@ fs.mkdirSync(out, { recursive: true });
   await page.getByRole("button", { name: "Giriş yap" }).click();
   await page.getByRole("heading", { name: "Genel bakış" }).waitFor();
   await page.getByText("İşlem bekleyen siparişler").waitFor();
+  // Acil durum bandı: açık alarm her sayfada; gördüm → kapat (not zorunlu)
+  await page.getByTestId("sos-banner").getByText(/ACİL DURUM — Mehmet Kaya/).waitFor();
   await shot("01-genel-bakis");
+  await page.getByTestId("sos-ack-inc-open").click();
+  await page.getByTestId("sos-banner").getByText("görüldü").waitFor();
+  await page.getByTestId("sos-close-inc-open").click();
+  await page.getByTestId("sos-resolution").fill("Kurye arandı, lastik değişti; vardiyaya döndü");
+  await page.getByRole("button", { name: "Kaydet ve kapat" }).click();
+  await page.getByTestId("sos-banner").waitFor({ state: "detached" });
 
   // Beklemedeki siparişi aç, kurye ata, alındı → yolda → teslim
   await page.getByRole("link", { name: /^YK-\d+$/ }).first().click();
@@ -96,6 +104,8 @@ fs.mkdirSync(out, { recursive: true });
   await page.getByText("Deniz Yeni").first().waitFor();
 
   await nav("Kuryeler");
+  // Acil durum kayıtları: kapatılan alarm ve çözüm notu
+  await page.getByTestId("incident-inc-open").getByText(/lastik değişti/).waitFor();
   await page.getByLabel("Ad Soyad").fill("Can Test");
   await page.getByLabel("Cep telefonu").fill("05551234567");
   await page.getByLabel("Plaka").fill("34 TST 99");

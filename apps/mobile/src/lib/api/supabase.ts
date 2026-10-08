@@ -398,6 +398,22 @@ export function createSupabaseApi(url: string, anonKey: string): Api & { client:
       });
       if (error) throw new ApiError(error.message);
     },
+    async raiseSos({ kind, note, at }) {
+      const r = await invoke<{ id: string }>("sos", { kind, note: note ?? null, lat: at?.lat ?? null, lng: at?.lng ?? null, accuracy: at?.accuracy ?? null });
+      return { id: r.id };
+    },
+    async myOpenIncident() {
+      const { data, error } = await client
+        .from("courier_incidents")
+        .select("id, kind, created_at, acknowledged_at")
+        .eq("courier_id", await uid())
+        .is("resolved_at", null)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      fail(error, "Acil durum kaydı okunamadı");
+      return data ? { id: data.id, kind: data.kind, createdAt: data.created_at, acknowledgedAt: data.acknowledged_at } : null;
+    },
     async markArrived(orderId, stop, at) {
       const { data, error } = await client.rpc("mark_arrived", { p_order_id: orderId, p_stop: stop, p_lat: at?.lat ?? null, p_lng: at?.lng ?? null });
       if (error) throw new ApiError(error.message);

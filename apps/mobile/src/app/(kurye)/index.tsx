@@ -151,6 +151,9 @@ export default function KuryeIsler() {
           </View>
         </Card>
       )}
+      {shift ? (
+        <Button title="🚨 Acil durum (SOS)" variant="danger" onPress={() => router.push("/sos")} testID="sos-open" />
+      ) : null}
       <ErrorBox message={error} />
       {offerMsg ? <Muted style={{ color: colors.danger }}>{offerMsg}</Muted> : null}
       {offers.map((j) => (

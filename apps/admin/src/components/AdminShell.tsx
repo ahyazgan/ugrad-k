@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 import { BRAND } from "@yazgan/shared";
+import { SosBanner } from "@/components/SosBanner";
 import { repo } from "@/lib/repo";
 
 const NAV = [
@@ -90,6 +91,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
             yenilenince sıfırlanır.
           </div>
         ) : null}
+        <SosBanner />
         {children}
       </main>
     </div>

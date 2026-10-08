@@ -1,5 +1,6 @@
 import type {
   CourierDocument,
+  IncidentKind,
   OrderStatus,
   PlaceDetails,
   PlaceSuggestion,
@@ -158,6 +159,15 @@ export interface CourierEarnings {
   rates: { perJobKurus: number; perKmKurus: number } | null;
 }
 
+/** Kuryenin açık acil durum kaydı */
+export interface Incident {
+  id: string;
+  kind: IncidentKind;
+  createdAt: string;
+  /** Yönetici "gördüm" dediyse */
+  acknowledgedAt: string | null;
+}
+
 export interface Session {
   userId: string;
   phone: string | null;
@@ -231,6 +241,10 @@ export interface Api {
   /** Kurye adrese vardığını bildirir (adrese 300 m içinde olmalı) */
   markArrived(orderId: string, stop: "alis" | "teslim", at: CourierLocation | null): Promise<{ arrivedAt: string }>;
   courierEarnings(): Promise<CourierEarnings>;
+  /** Acil durum: yöneticiye konumla alarm (molaya alınır) */
+  raiseSos(input: { kind: IncidentKind; note?: string; at: (CourierLocation & { accuracy?: number | null }) | null }): Promise<{ id: string }>;
+  /** Kapatılmamış son acil durum kaydı */
+  myOpenIncident(): Promise<Incident | null>;
   /** Müşterinin davet kodu (yoksa üretilir) */
   myReferralCode(): Promise<string>;
   /** Kurye alıcıdan aldığı teslim kodunu doğrular */

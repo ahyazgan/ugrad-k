@@ -35,6 +35,7 @@ import {
   type PhoneCustomer,
   type ApiKeyInfo,
   type OrderRating,
+  type Incident,
   type Readiness,
   type SystemHealth,
   type WebhookDelivery,
@@ -264,6 +265,49 @@ export function createSupabaseRepo(url: string, anonKey: string): AdminRepo & { 
       );
       // İptalde kartla alınmış ödeme iyzico'dan iptal edilir (başarısızsa "iade_bekliyor" olur)
       if (status === "iptal") await client.functions.invoke("payment-refund", { body: { orderId } });
+    },
+    async listIncidents({ openOnly, limit = 50 }) {
+      let q = client
+        .from("courier_incidents")
+        .select("*, courier:couriers(profile:profiles(full_name, phone)), order:orders(order_no)")
+        .order("created_at", { ascending: false })
+        .limit(limit);
+      if (openOnly) q = q.is("resolved_at", null);
+      return (check(await q, "Acil durum kayıtları okunamadı") ?? []).map(
+        (r: Row): Incident => ({
+          id: r.id,
+          courierId: r.courier_id,
+          courierName: r.courier?.profile?.full_name ?? null,
+          courierPhone: r.courier?.profile?.phone ?? null,
+          kind: r.kind,
+          note: r.note,
+          lat: r.lat,
+          lng: r.lng,
+          accuracyM: r.accuracy_m,
+          orderId: r.order_id,
+          orderNo: r.order?.order_no ?? null,
+          createdAt: r.created_at,
+          alertCount: r.alert_count,
+          acknowledgedAt: r.acknowledged_at,
+          resolvedAt: r.resolved_at,
+          resolutionNote: r.resolution_note,
+        }),
+      );
+    },
+    async acknowledgeIncident(id) {
+      check(await client.rpc("acknowledge_incident", { p_id: id }), "Kaydedilemedi");
+    },
+    async resolveIncident(id, note) {
+      check(await client.rpc("resolve_incident", { p_id: id, p_note: note }), "Kapatılamadı");
+    },
+    subscribeIncidents(onChange) {
+      const ch = client
+        .channel("admin-incidents")
+        .on("postgres_changes", { event: "*", schema: "public", table: "courier_incidents" }, onChange)
+        .subscribe();
+      return () => {
+        client.removeChannel(ch);
+      };
     },
     subscribeOrders(onChange) {
       const ch = client

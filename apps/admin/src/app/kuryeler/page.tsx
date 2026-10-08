@@ -1,6 +1,6 @@
 "use client";
 
-import { COURIER_DOCUMENT_TYPES } from "@yazgan/shared";
+import { COURIER_DOCUMENT_TYPES, INCIDENT_KINDS } from "@yazgan/shared";
 import { useState, type FormEvent } from "react";
 import { ComplianceBadge, complianceOf, CourierDocumentsCard } from "@/components/CourierDocuments";
 import { Button, Card, ErrorText, Input, PageHeader, Table, Td } from "@/components/ui";
@@ -13,6 +13,7 @@ export default function KuryelerPage() {
   const { data, error, reload } = useLoad(() => repo.listCouriers());
   const docsLoad = useLoad(() => repo.listCourierDocuments());
   const ops = useLoad(() => repo.getOpsSettings());
+  const incidents = useLoad(() => repo.listIncidents({ limit: 20 }));
   const warnDays = ops.data?.documentWarnDays ?? 30;
   const [selected, setSelected] = useState<string | null>(null);
   const docsOf = (id: string) => (docsLoad.data ?? []).filter((d) => d.courierId === id);
@@ -154,6 +155,28 @@ export default function KuryelerPage() {
           </form>
         </Card>
       </div>
+      <Card title="Acil durum kayıtları" className="mt-6">
+        <Table head={["Tarih", "Kurye", "Tür", "Not", "Durum"]} empty="Acil durum kaydı yok">
+          {(incidents.data ?? []).map((i) => (
+            <tr key={i.id} data-testid={`incident-${i.id}`}>
+              <Td className="whitespace-nowrap">{fmtDateTime(i.createdAt)}</Td>
+              <Td>{i.courierName}</Td>
+              <Td>{INCIDENT_KINDS[i.kind]}</Td>
+              <Td className="max-w-sm">{i.note ?? "—"}</Td>
+              <Td>
+                {i.resolvedAt ? (
+                  <>
+                    <span className="text-slate-700">Kapandı</span>
+                    <span className="block text-xs text-slate-500">{i.resolutionNote}</span>
+                  </>
+                ) : (
+                  <span className="font-semibold text-red-700">Açık</span>
+                )}
+              </Td>
+            </tr>
+          ))}
+        </Table>
+      </Card>
     </>
   );
 }

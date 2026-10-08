@@ -12,6 +12,7 @@ import type { Ctx } from "./context.ts";
 import { notificationConfig } from "./dispatch.ts";
 import { HttpError, json } from "./http.ts";
 import { checkUrgentSla } from "./sla.ts";
+import { resendUnacknowledgedSos } from "./sos.ts";
 
 const ACTIVE = ["kuryeye_atandi", "alindi", "yolda"];
 // deno-lint-ignore no-explicit-any
@@ -51,12 +52,14 @@ export async function handleAutoDispatch(
     expiredOffers: 0,
     autoBreaks: [] as string[],
     breakAlerts: [] as string[],
+    sosResent: [] as string[],
   };
   // Süresi dolan teklifler havuza döner (otomatik atama kapalı olsa da)
   const { data: expired } = await ctx.admin.rpc("expire_offers");
   summary.expiredOffers = Number(expired ?? 0);
   summary.autoBreaks = await autoBreakUnresponsive(ctx, deps, ops);
   summary.breakAlerts = await alertLongBreaks(ctx, deps, ops, now);
+  summary.sosResent = await resendUnacknowledgedSos(ctx, deps, now);
   if (!ops.auto_assign) {
     summary.slaAlerted = await checkUrgentSla(ctx, deps, now);
     return json(summary);

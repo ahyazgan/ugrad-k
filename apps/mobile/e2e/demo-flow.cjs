@@ -189,6 +189,19 @@ fs.mkdirSync(out, { recursive: true });
   await kp.getByText('Belgelerim').waitFor();
   await kp.getByText(/Süresi yaklaşıyor ·/).waitFor();
   await kp.getByRole('tab', { name: /İşlerim/ }).click();
+  // Acil durum: tür seç, bildir; yönetici görünce onay; kurye molaya alınır
+  await kt('sos-open').click();
+  await kt('call-112').waitFor();
+  if (await kt('sos-send').isEnabled()) throw new Error('tür seçilmeden SOS gönderilebiliyor');
+  await kt('sos-kind-arac_ariza').click();
+  await kt('sos-send').click();
+  await kt('sos-status').getByText(/Araç arızası/).waitFor();
+  await kt('sos-acknowledged').waitFor({ timeout: 15000 });
+  await kshot('12c-kurye-sos');
+  await kp.goBack();
+  await kp.getByText('Moladasınız').waitFor();
+  await kt('break-toggle').click();
+  await kp.getByText('Vardiyadasınız').waitFor();
   // Elde paket yokken vardiya kapatılabilir
   await kt('shift-toggle').click();
   await kp.getByText('Vardiya kapalı').waitFor();

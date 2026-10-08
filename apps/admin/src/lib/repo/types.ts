@@ -9,6 +9,7 @@ import type {
   PriceQuote,
   CostModel,
   CourierDocumentKind,
+  IncidentKind,
   PricingSettings,
   Promo,
   ServiceLevel,
@@ -394,6 +395,26 @@ export interface Readiness {
   ready: boolean;
 }
 
+/** Kurye acil durum (SOS) kaydı */
+export interface Incident {
+  id: string;
+  courierId: string;
+  courierName: string | null;
+  courierPhone: string | null;
+  kind: IncidentKind;
+  note: string | null;
+  lat: number | null;
+  lng: number | null;
+  accuracyM: number | null;
+  orderId: string | null;
+  orderNo: string | null;
+  createdAt: string;
+  alertCount: number;
+  acknowledgedAt: string | null;
+  resolvedAt: string | null;
+  resolutionNote: string | null;
+}
+
 export interface OrderRating {
   orderId: string;
   orderNo: string;
@@ -456,6 +477,11 @@ export interface AdminRepo {
   assignCourier(orderId: string, courierId: string): Promise<void>;
   setStatus(orderId: string, status: OrderStatus, note?: string): Promise<void>;
   subscribeOrders(onChange: () => void): () => void;
+  // Acil durum (SOS)
+  listIncidents(filter: { openOnly?: boolean; limit?: number }): Promise<Incident[]>;
+  acknowledgeIncident(id: string): Promise<void>;
+  resolveIncident(id: string, note: string): Promise<void>;
+  subscribeIncidents(onChange: () => void): () => void;
   podUrl(path: string): Promise<string | null>;
   // Kuryeler
   listCouriers(): Promise<Courier[]>;

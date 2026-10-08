@@ -497,6 +497,10 @@ verify_jwt = true
 [functions.winback]
 verify_jwt = false
 
+# Acil durum (kurye JWT'si)
+[functions.sos]
+verify_jwt = true
+
 # Kurye hakedişi (cron x-notify-secret veya yönetici JWT'si, fonksiyon içinde)
 [functions.courier-earnings]
 verify_jwt = false

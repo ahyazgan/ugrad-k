@@ -109,7 +109,7 @@ export async function stopTracking() {
 export async function currentPosition() {
   try {
     const p = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-    return { lat: p.coords.latitude, lng: p.coords.longitude };
+    return { lat: p.coords.latitude, lng: p.coords.longitude, accuracy: p.coords.accuracy ?? null };
   } catch {
     return null;
   }

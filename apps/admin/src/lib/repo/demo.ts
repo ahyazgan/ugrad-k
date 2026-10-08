@@ -37,6 +37,7 @@ import {
   type CourierPayout,
   type EarningRow,
   type PromoCodeRow,
+  type Incident,
   type ReadinessItem,
   type Conversation,
   type Customer,
@@ -64,6 +65,7 @@ interface State {
   corporate: CorporateAccount[];
   orders: AdminOrderDetail[];
   shifts: Shift[];
+  incidents: Incident[];
   invoices: Invoice[];
   conversations: Conversation[];
   ops: OpsSettings;
@@ -374,8 +376,47 @@ async function seed(): Promise<State> {
     endedAt: null,
     breaks: [],
   });
+  const incidents: Incident[] = [
+    {
+      id: "inc-open",
+      courierId: "kur-1",
+      courierName: "Mehmet Kaya",
+      courierPhone: "+905551110001",
+      kind: "arac_ariza",
+      note: "Arka lastik patladı, Kavacık köprü girişi",
+      lat: 41.0921,
+      lng: 29.0905,
+      accuracyM: 12,
+      orderId: null,
+      orderNo: null,
+      createdAt: hoursAgo(0.04),
+      alertCount: 1,
+      acknowledgedAt: null,
+      resolvedAt: null,
+      resolutionNote: null,
+    },
+    {
+      id: "inc-old",
+      courierId: "kur-2",
+      courierName: "Emre Şahin",
+      courierPhone: "+905551110002",
+      kind: "kaza",
+      note: "Hafif sürtünme",
+      lat: 41.02,
+      lng: 29.03,
+      accuracyM: 8,
+      orderId: null,
+      orderNo: null,
+      createdAt: hoursAgo(120),
+      alertCount: 1,
+      acknowledgedAt: hoursAgo(119.95),
+      resolvedAt: hoursAgo(119),
+      resolutionNote: "Kurye arandı, yaralanma yok; iş yeniden atandı",
+    },
+  ];
   return {
     signedIn: false,
+    incidents,
     ops: {
       unpaidCardTimeoutMinutes: 30,
       autoApprove: true,
@@ -670,6 +711,28 @@ export function createDemoRepo(): AdminRepo {
       touchOrders();
     },
     subscribeOrders(cb) {
+      orderListeners.add(cb);
+      return () => orderListeners.delete(cb);
+    },
+    async listIncidents({ openOnly, limit = 50 }) {
+      return clone((await get()).incidents.filter((i) => !openOnly || !i.resolvedAt).slice(0, limit));
+    },
+    async acknowledgeIncident(id) {
+      const i = (await get()).incidents.find((x) => x.id === id);
+      if (i) i.acknowledgedAt ??= new Date().toISOString();
+      touchOrders();
+    },
+    async resolveIncident(id, note) {
+      if (!note.trim()) throw new RepoError("Kapatmak için ne yapıldığını yazın");
+      const i = (await get()).incidents.find((x) => x.id === id && !x.resolvedAt);
+      if (!i) throw new RepoError("Kayıt bulunamadı veya zaten kapalı");
+      const now = new Date().toISOString();
+      i.acknowledgedAt ??= now;
+      i.resolvedAt = now;
+      i.resolutionNote = note.trim();
+      touchOrders();
+    },
+    subscribeIncidents(cb) {
       orderListeners.add(cb);
       return () => orderListeners.delete(cb);
     },
