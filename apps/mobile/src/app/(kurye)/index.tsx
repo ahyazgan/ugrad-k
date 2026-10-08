@@ -4,11 +4,13 @@ import { useCallback, useEffect, useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import { BusyAreas } from "@/components/BusyAreas";
 import { complianceFor, DocumentWarning } from "@/components/CourierDocs";
+import { BigTitle, InkChip, Wordmark } from "@/components/Neo";
 import { OfferCard } from "@/components/OfferCard";
 import { OutboxBanner } from "@/components/OutboxBanner";
 import { StopPlan } from "@/components/StopPlan";
 import { StatusBadge } from "@/components/StatusBadge";
-import { Button, Card, ErrorBox, Muted, Screen, Title, colors } from "@/components/ui";
+import { Sticker } from "@/components/Sticker";
+import { Button, Card, ErrorBox, Muted, Screen, Title, colors, font } from "@/components/ui";
 import { api, ApiError, type OrderSummary, type Shift } from "@/lib/api";
 import { formatTime } from "@/lib/format";
 import { currentPosition, lastKnownPosition, setActiveOrderForLocation, startTracking, stopTracking } from "@/lib/location";
@@ -116,7 +118,15 @@ export default function KuryeIsler() {
   const done = jobs.filter((j) => j.status === "teslim_edildi" || j.status === "geri_teslim");
 
   return (
-    <Screen>
+    <Screen safeTop>
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+        <Wordmark size={34} tagline={false} />
+        <InkChip>KURYE</InkChip>
+      </View>
+      <View>
+        <BigTitle size={56}>{"Kolay\ngelsin!"}</BigTitle>
+        <Sticker name="scooter" size={110} style={{ position: "absolute", right: 0, top: -6 }} />
+      </View>
       {shift?.break ? (
         <Card style={{ borderColor: colors.accent, backgroundColor: "#FEF3C7" }}>
           <Title>Moladasınız</Title>
@@ -130,7 +140,7 @@ export default function KuryeIsler() {
           <Button title="Moladan dön" onPress={toggleBreak} loading={busy} testID="break-toggle" />
         </Card>
       ) : (
-        <Card style={shift ? { borderColor: colors.success, backgroundColor: colors.successLight } : undefined}>
+        <Card style={shift ? { backgroundColor: colors.lime } : undefined}>
           <Title>{shift ? "Vardiyadasınız" : "Vardiya kapalı"}</Title>
           <Muted>
             {shift
@@ -184,9 +194,9 @@ export default function KuryeIsler() {
       {active.length === 0 ? <Muted>{shift ? "Şu an atanmış iş yok. Yeni iş atandığında burada görünür." : "—"}</Muted> : null}
       {active.map((j) => (
         <Pressable key={j.id} onPress={() => router.push({ pathname: "/is/[id]", params: { id: j.id } })} testID={`job-${j.orderNo}`}>
-          <Card style={{ gap: 6, borderColor: j.urgent ? colors.accent : colors.border, borderWidth: j.urgent ? 2 : 1 }}>
+          <Card style={{ gap: 6, borderColor: j.urgent ? colors.ink : "transparent", borderWidth: 2 }}>
             <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-              <Text style={{ fontWeight: "700", fontSize: 16 }}>
+              <Text style={{ ...font("extrabold"), fontSize: 16 }}>
                 {j.orderNo}
                 {j.urgent ? "  ⚡ ACİL" : ""}
               </Text>
@@ -203,7 +213,7 @@ export default function KuryeIsler() {
           <Title>Bugün tamamlanan ({done.length})</Title>
           {done.map((j) => (
             <Card key={j.id} style={{ gap: 4 }}>
-              <Text style={{ fontWeight: "600" }}>
+              <Text style={{ ...font("bold") }}>
                 {j.orderNo} · {ORDER_STATUS_LABELS[j.status]}
               </Text>
               <Muted>{j.dropoffAddress}</Muted>

@@ -1,7 +1,7 @@
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect } from "react";
 import { Text } from "react-native";
-import { Button, Card, Muted, Screen, colors } from "@/components/ui";
+import { Button, Card, Muted, Screen, colors, font } from "@/components/ui";
 
 /**
  * Ödeme dönüş sayfası. Uygulamada derin bağlantı (yazgankurye://odeme), tarayıcıda
@@ -21,7 +21,7 @@ export default function OdemeDonus() {
   return (
     <Screen>
       <Card>
-        <Text style={{ fontSize: 20, fontWeight: "800", color: ok ? colors.success : colors.danger }}>
+        <Text style={{ fontSize: 20, ...font("black"), color: ok ? colors.success : colors.danger }}>
           {ok ? "Ödemeniz alındı" : "Ödeme tamamlanamadı"}
         </Text>
         <Muted>{siparis ? "Siparişinize yönlendiriliyorsunuz…" : "Siparişlerim ekranından durumu görebilirsiniz."}</Muted>

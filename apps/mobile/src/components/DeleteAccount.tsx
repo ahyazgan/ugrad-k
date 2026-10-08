@@ -3,7 +3,7 @@ import { useState } from "react";
 import { Text } from "react-native";
 import { api, ApiError } from "@/lib/api";
 import { stopTracking } from "@/lib/location";
-import { Button, Card, ErrorBox, Muted, colors } from "./ui";
+import { Button, Card, ErrorBox, Muted, colors, font } from "./ui";
 
 /** App Store / Google Play gereği uygulama içinden hesap silme. */
 export function DeleteAccount() {
@@ -15,8 +15,8 @@ export function DeleteAccount() {
     return <Button title="Hesabımı sil" variant="secondary" onPress={() => setConfirming(true)} testID="delete-account" />;
   }
   return (
-    <Card style={{ borderColor: colors.danger }}>
-      <Text style={{ fontWeight: "700", color: colors.danger }}>Hesabınız silinsin mi?</Text>
+    <Card style={{ borderWidth: 2, borderColor: colors.danger }}>
+      <Text style={{ ...font("extrabold"), color: colors.danger }}>Hesabınız silinsin mi?</Text>
       <Muted>
         Adınız, telefonunuz, e-postanız ve kayıtlı adresleriniz silinir; tekrar giriş yapamazsınız. Geçmiş sipariş ve
         fatura kayıtları vergi mevzuatı gereği anonim olarak saklanır. Devam eden siparişiniz varsa önce tamamlanmalıdır.

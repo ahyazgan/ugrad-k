@@ -4,7 +4,8 @@ import { formatTL } from "@yazgan/shared";
 import { useEffect, useState } from "react";
 import { Image, Text } from "react-native";
 import { SignaturePad } from "@/components/SignaturePad";
-import { Button, Card, ErrorBox, Field, Muted, Screen, Segmented, colors } from "@/components/ui";
+import { BigTitle } from "@/components/Neo";
+import { Button, Card, ErrorBox, Field, Muted, Screen, Segmented, colors, radii, type } from "@/components/ui";
 import { api, ApiError, type CashCollection, type OrderDetail } from "@/lib/api";
 import { setActiveOrderForLocation } from "@/lib/location";
 import { outbox } from "@/lib/outbox";
@@ -83,9 +84,10 @@ export default function Teslim() {
   return (
     <Screen>
       {returning ? <Stack.Screen options={{ title: "Göndericiye teslim" }} /> : null}
+      <BigTitle size={52}>{returning ? "İade et." : "Teslim et."}</BigTitle>
       {returning ? (
         <Card style={{ borderColor: "#9A3412" }}>
-          <Text style={{ fontWeight: "700" }}>Teslim edilemeyen paket göndericiye iade ediliyor</Text>
+          <Text style={type.label}>TESLİM EDİLEMEYEN PAKET GÖNDERİCİYE İADE EDİLİYOR</Text>
           <Muted>Paketi alış adresindeki yetkiliye teslim edin; fotoğraf veya imza alın.</Muted>
         </Card>
       ) : null}
@@ -93,18 +95,18 @@ export default function Teslim() {
         <Field label={returning ? "Paketi geri alan kişi" : "Teslim alan kişi"} placeholder="Ad Soyad / unvan" value={receiver} onChangeText={setReceiver} testID="receiver" />
       </Card>
       <Card>
-        <Text style={{ fontWeight: "600" }}>Fotoğraf</Text>
+        <Text style={type.label}>1 · FOTOĞRAF</Text>
         <Muted>Paketin teslim edildiği yerin / kişinin fotoğrafı</Muted>
-        {photoUri ? <Image source={{ uri: photoUri }} style={{ width: "100%", height: 200, borderRadius: 10 }} resizeMode="cover" /> : null}
+        {photoUri ? <Image source={{ uri: photoUri }} style={{ width: "100%", height: 200, borderRadius: radii.tile }} resizeMode="cover" /> : null}
         <Button title={photoUri ? "Yeniden çek" : "Fotoğraf çek"} variant="secondary" onPress={takePhoto} />
       </Card>
       <Card>
-        <Text style={{ fontWeight: "600" }}>İmza</Text>
+        <Text style={type.label}>2 · İMZA</Text>
         <SignaturePad onChange={setSignature} />
       </Card>
       {order?.deliveryCodeRequired && !returning ? (
         <Card>
-          <Text style={{ fontWeight: "600" }}>Teslim kodu</Text>
+          <Text style={type.label}>3 · TESLİM KODU</Text>
           <Muted>Alıcıdan SMS ile gelen 4 haneli kodu isteyin.</Muted>
           <Field label="Kod" keyboardType="number-pad" maxLength={4} value={code} onChangeText={setCode} editable={!codeOk} testID="delivery-code-input" />
           {codeOk ? null : <Button title="Kodu doğrula" variant="secondary" onPress={verifyCode} disabled={code.trim().length !== 4} testID="verify-code" />}
@@ -113,7 +115,7 @@ export default function Teslim() {
       ) : null}
       {needsCash ? (
         <Card>
-          <Text style={{ fontWeight: "600" }}>Tahsilat: {formatTL(order.totalKurus)}</Text>
+          <Text style={type.label}>TAHSİLAT: {formatTL(order.totalKurus)}</Text>
           <Muted>Müşteriden ödemeyi nasıl aldınız? Nakit aldıysanız hakedişinizden düşülür.</Muted>
           <Segmented
             testIDPrefix="cash"

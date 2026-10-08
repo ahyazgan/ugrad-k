@@ -3,6 +3,7 @@ import { router, useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
 import { complianceFor, DocumentList } from "@/components/CourierDocs";
 import { DeleteAccount } from "@/components/DeleteAccount";
+import { BigTitle } from "@/components/Neo";
 import { Button, Card, Muted, Screen, Title } from "@/components/ui";
 import { api } from "@/lib/api";
 import { COMPANY } from "@/lib/kvkk";
@@ -18,7 +19,8 @@ export default function KuryeHesap() {
     }, []),
   );
   return (
-    <Screen>
+    <Screen safeTop>
+      <BigTitle size={52}>Hesabım.</BigTitle>
       <Card>
         <Title>{profile?.fullName ?? "Kurye"}</Title>
         <Muted>{profile?.phone}</Muted>
