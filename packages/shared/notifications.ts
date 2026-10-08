@@ -10,7 +10,7 @@ import type { OrderStatus } from "./orders.ts";
 export type Channel = "push" | "whatsapp" | "sms";
 
 export interface Recipient {
-  role: "customer" | "courier" | "receiver" | "admin";
+  role: "customer" | "courier" | "receiver" | "sender" | "admin";
   phone?: string | null;
   pushToken?: string | null;
 }
@@ -31,6 +31,9 @@ export interface NotificationOrder {
   trackingToken: string;
   pickupAddress: string;
   dropoffAddress: string;
+  /** Alış adresindeki yetkili (göndereni müşteriden farklı olabilir) */
+  pickupContactName?: string | null;
+  pickupContactPhone?: string | null;
   dropoffContactName: string | null;
   dropoffContactPhone: string | null;
   podReceiverName: string | null;
@@ -165,5 +168,61 @@ export function buildNotifications(event: OrderStatus, o: NotificationOrder, cfg
       break;
   }
   // Ulaşılabilir kanalı olmayan alıcıları ele
+  return out.filter((m) => (m.to.pushToken && m.channels.includes("push")) || (m.to.phone && m.channels.some((c) => c !== "push")));
+}
+
+/** Durum değişikliği dışındaki sipariş olayları (notifications.kind) */
+export type NotificationKind = "varis_alis" | "varis_teslim";
+
+const digits = (p: string | null | undefined) => (p ?? "").replace(/\D/g, "").slice(-10);
+
+/** Olay bildirimleri: kurye alış / teslim adresine vardı */
+export function buildEventNotifications(kind: NotificationKind, o: NotificationOrder, cfg: NotificationConfig): OutboundMessage[] {
+  const customer: Recipient = { role: "customer", phone: o.customer.phone, pushToken: o.customer.pushToken };
+  const courierName = firstName(o.courier?.fullName) || "Kuryemiz";
+  const out: OutboundMessage[] = [];
+  switch (kind) {
+    case "varis_alis": {
+      // Paket alındıysa artık anlamı yok
+      if (o.status !== "kuryeye_atandi") break;
+      const separateSender = !!o.pickupContactPhone && digits(o.pickupContactPhone) !== digits(o.customer.phone);
+      if (separateSender) {
+        out.push({
+          to: { role: "sender", phone: o.pickupContactPhone },
+          channels: ["whatsapp", "sms"],
+          title: "Kurye kapıda",
+          text: `${BRAND.name}: ${courierName} ${o.orderNo} için alış adresinizde. Paketi hazırlayabilirsiniz.`,
+          whatsappTemplate: { name: "kurye_alista", params: [courierName, o.orderNo] },
+        });
+      }
+      out.push({
+        to: customer,
+        channels: separateSender ? ["push"] : ["push", "sms"],
+        title: "Kurye alış adresinde",
+        text: `${BRAND.name}: ${courierName} ${o.orderNo} için alış adresinde. Paketi hazırlayabilirsiniz.`,
+      });
+      break;
+    }
+    case "varis_teslim": {
+      if (o.status === "teslim_edildi" || o.status === "iptal") break;
+      if (o.dropoffContactPhone) {
+        const name = firstName(o.dropoffContactName);
+        out.push({
+          to: { role: "receiver", phone: o.dropoffContactPhone },
+          channels: ["whatsapp", "sms"],
+          title: "Kurye kapıda",
+          text:
+            `${name ? `Merhaba ${name}, ` : ""}${BRAND.name} kuryesi ${courierName} adresinizde; paketinizi teslim almak için hazır olun.` +
+            (o.deliveryCode ? ` Teslim kodunuz: ${o.deliveryCode}.` : ""),
+          whatsappTemplate: o.deliveryCode
+            ? { name: "alici_kurye_kapida_kod", params: [name || "Sayın alıcı", courierName, o.deliveryCode] }
+            : { name: "alici_kurye_kapida", params: [name || "Sayın alıcı", courierName] },
+        });
+      }
+      out.push({ to: customer, channels: ["push"], title: "Kurye teslim adresinde", text: `${o.orderNo}: kurye teslim adresine ulaştı.` });
+      break;
+    }
+  }
+  void cfg;
   return out.filter((m) => (m.to.pushToken && m.channels.includes("push")) || (m.to.phone && m.channels.some((c) => c !== "push")));
 }

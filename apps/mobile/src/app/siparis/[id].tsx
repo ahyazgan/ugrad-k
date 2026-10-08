@@ -250,6 +250,14 @@ export default function SiparisDetay() {
       {order.courierName ? (
         <Card>
           <Text style={{ fontWeight: "700" }}>Kuryeniz: {order.courierName}</Text>
+          {order.status === "kuryeye_atandi" && order.arrivedPickupAt ? (
+            <Text testID="arrived-pickup" style={{ color: colors.success, fontWeight: "600" }}>
+              📍 Kurye alış adresinde ({formatTime(order.arrivedPickupAt)})
+            </Text>
+          ) : null}
+          {(order.status === "yolda" || order.status === "sorunlu") && order.arrivedDropoffAt ? (
+            <Text style={{ color: colors.success, fontWeight: "600" }}>📍 Kurye teslim adresinde ({formatTime(order.arrivedDropoffAt)})</Text>
+          ) : null}
           {order.courierPhone ? (
             <Button title="Kuryeyi ara" variant="secondary" onPress={() => Linking.openURL(`tel:${order.courierPhone}`)} />
           ) : null}

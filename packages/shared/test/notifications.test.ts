@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { buildNotifications, type NotificationOrder } from "../notifications.ts";
+import { BRAND } from "../brand.ts";
+import { buildEventNotifications, buildNotifications, type NotificationOrder } from "../notifications.ts";
 
 const cfg = { trackingBaseUrl: "https://panel.yazgankurye.com/takip/", adminPhones: ["+905550000001"] };
 const order: NotificationOrder = {
@@ -88,5 +89,23 @@ describe("buildNotifications", () => {
         if (msg.channels.includes("sms")) expect(msg.text.length).toBeLessThanOrEqual(268);
       }
     }
+  });
+
+  it("alışa varış: gönderen müşteriden farklıysa ona, değilse müşteriye SMS", () => {
+    const at = { ...order, status: "kuryeye_atandi" as const };
+    const sep = buildEventNotifications("varis_alis", { ...at, pickupContactPhone: "+90 532 999 88 77" }, cfg);
+    expect(sep.map((m) => m.to.role)).toEqual(["sender"]);
+    expect(sep[0]!.text).toContain("Mehmet YK-1001 için alış adresinizde");
+    const same = buildEventNotifications("varis_alis", { ...at, pickupContactPhone: "0532 111 22 33" }, cfg);
+    expect(same.map((m) => `${m.to.role}:${m.channels.join("+")}`)).toEqual(["customer:push+sms"]);
+    // Paket alındıktan sonra işlenen varış bildirimi gönderilmez
+    expect(buildEventNotifications("varis_alis", { ...order, status: "alindi" }, cfg)).toEqual([]);
+  });
+
+  it("teslime varış: alıcıya kod ile kapıda mesajı", () => {
+    const m = buildEventNotifications("varis_teslim", { ...order, status: "yolda", deliveryCode: "4821" }, cfg);
+    const r = m.find((x) => x.to.role === "receiver")!;
+    expect(r.text).toBe(`Merhaba Ali, ${BRAND.name} kuryesi Mehmet adresinizde; paketinizi teslim almak için hazır olun. Teslim kodunuz: 4821.`);
+    expect(r.whatsappTemplate).toEqual({ name: "alici_kurye_kapida_kod", params: ["Ali", "Mehmet", "4821"] });
   });
 });

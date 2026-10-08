@@ -269,6 +269,9 @@ async function seed(): Promise<State> {
       weightKg: null,
       customerNote: null,
       waitingMinutes: 0,
+      waitingSource: null,
+      arrivedPickupAt: null,
+      arrivedDropoffAt: null,
       priceQuote: q.quote,
       declaredValueKurus: null,
       deliveryCodeRequired: false,
@@ -291,6 +294,16 @@ async function seed(): Promise<State> {
         note: null,
       })),
     });
+  }
+  // Varış kayıtları: teslim edilen siparişlerde alışa ve teslime varış, ölçülen bekleme
+  for (const o of orders.filter((x) => x.status === "teslim_edildi")) {
+    const at = (s: OrderStatus) => new Date(o.history.find((h) => h.toStatus === s)?.at ?? o.createdAt).getTime();
+    // 15 dk altı: fiyata bekleme ücreti eklenmez (demo tutarları değişmesin)
+    const wait = (o.orderNo.charCodeAt(o.orderNo.length - 1) * 7) % 15;
+    o.arrivedPickupAt = new Date(at("alindi") - wait * 60_000).toISOString();
+    o.arrivedDropoffAt = new Date(at("teslim_edildi") - 3 * 60_000).toISOString();
+    o.waitingMinutes = wait;
+    o.waitingSource = "olcum";
   }
   // Teklif geçmişi örneği: uzak kurye reddetti, yakındaki kabul etti
   for (const o of orders.filter((x) => x.status === "teslim_edildi" && x.courierId === "kur-1").slice(-2)) {
@@ -377,6 +390,8 @@ async function seed(): Promise<State> {
       winbackDiscountPct: 15,
       offerEnabled: true,
       offerTimeoutSeconds: 60,
+      arrivalAutoRadiusM: 100,
+      arrivalMaxRadiusM: 300,
     },
     consented: new Set(["cus-1", "cus-2", "cus-3"]),
     apiKeys: [],
@@ -1010,6 +1025,9 @@ export function createDemoRepo(): AdminRepo {
         weightKg: req.weightKg,
         customerNote: req.customerNote ?? null,
         waitingMinutes: 0,
+        waitingSource: null,
+        arrivedPickupAt: null,
+        arrivedDropoffAt: null,
         priceQuote: q.quote,
         declaredValueKurus: req.declaredValueKurus,
         deliveryCodeRequired: req.deliveryCode,

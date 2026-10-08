@@ -121,6 +121,8 @@ export function createDemoApi(): Api {
     deliveryCode: req.deliveryCode ? "4821" : null,
     slaDueAt: req.serviceLevel === "acil" ? new Date(new Date(now).getTime() + 60 * 60_000).toISOString() : null,
     slaMissed: null,
+    arrivedPickupAt: null,
+    arrivedDropoffAt: null,
     paymentMethod: req.paymentMethod,
     paymentStatus: "odenmedi",
     paidKurus: null,
@@ -382,6 +384,18 @@ export function createDemoApi(): Api {
         .filter((o) => o.courierName === "Demo Kurye")
         .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
     },
+    async markArrived(orderId, stop) {
+      const o = orders.get(orderId);
+      if (!o) throw new ApiError("Sipariş bulunamadı", undefined, 404);
+      if (stop === "alis" && (o.status !== "kuryeye_atandi" || o.offerExpiresAt)) throw new ApiError("Alış adresine varış yalnız paket alınmadan önce bildirilir");
+      if (stop === "teslim" && o.status !== "yolda" && o.status !== "sorunlu") throw new ApiError("Teslim adresine varış paket yoldayken bildirilir");
+      const now = new Date().toISOString();
+      // Demo: konum kontrolü yok (gerçekte adrese 300 m içinde olmalı)
+      if (stop === "alis") o.arrivedPickupAt ??= now;
+      else o.arrivedDropoffAt ??= now;
+      notify(orderId);
+      return { arrivedAt: (stop === "alis" ? o.arrivedPickupAt : o.arrivedDropoffAt)! };
+    },
     async respondOffer(orderId, accept, opts = {}) {
       const o = orders.get(orderId);
       if (!o || !o.offerExpiresAt || o.status !== "kuryeye_atandi" || o.courierName !== "Demo Kurye") {
@@ -406,7 +420,10 @@ export function createDemoApi(): Api {
       switch (action.type) {
         case "pickup": {
           const o = move(orderId, "alindi");
-          o.waitingMinutes = action.waitingMinutes;
+          // Varış bildirildiyse bekleme varıştan ölçülür
+          o.waitingMinutes = o.arrivedPickupAt
+            ? Math.max(0, Math.floor((Date.now() - new Date(o.arrivedPickupAt).getTime()) / 60_000))
+            : action.waitingMinutes;
           o.priceQuote = applyWaitingFee(o.priceQuote, action.waitingMinutes, DEFAULT_PRICING_SETTINGS);
           o.totalKurus = o.priceQuote.totalKurus;
           return;

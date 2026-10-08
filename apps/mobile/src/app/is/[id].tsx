@@ -6,7 +6,8 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { TileMap, type MapMarker } from "@/components/TileMap";
 import { Button, Card, ErrorBox, Loading, Muted, Screen, Title, colors, styles } from "@/components/ui";
 import { api, ApiError, type OrderDetail } from "@/lib/api";
-import { lastKnownPosition, setActiveOrderForLocation } from "@/lib/location";
+import { formatTime } from "@/lib/format";
+import { currentPosition, lastKnownPosition, setActiveOrderForLocation } from "@/lib/location";
 import { callPhone, openDirections } from "@/lib/navigation";
 
 function Stop({
@@ -83,6 +84,13 @@ export default function IsDetay() {
   const [waiting, setWaiting] = useState("0");
   const [noteFor, setNoteFor] = useState<"problem" | "release" | null>(null);
   const [note, setNote] = useState("");
+  const [now, setNow] = useState(() => Date.now());
+
+  // Ölçülen bekleme süresi canlı güncellenir
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 30_000);
+    return () => clearInterval(t);
+  }, []);
 
   const load = useCallback(async () => {
     try {
@@ -112,6 +120,20 @@ export default function IsDetay() {
       await load();
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "İşlem başarısız");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function arrive(stop: "alis" | "teslim") {
+    setBusy(true);
+    setError(null);
+    try {
+      await api.markArrived(id, stop, await currentPosition());
+      setNow(Date.now());
+      await load();
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : "Varış bildirilemedi");
     } finally {
       setBusy(false);
     }
@@ -178,13 +200,32 @@ export default function IsDetay() {
 
       {s === "kuryeye_atandi" && !offerPending ? (
         <Card>
-          <Text style={{ fontWeight: "600" }}>Alışta bekleme süresi (dakika)</Text>
-          <Muted>İlk 15 dakika ücretsiz; sonrası müşteriye yansıtılır.</Muted>
-          <TextInput style={styles.input} keyboardType="number-pad" value={waiting} onChangeText={setWaiting} testID="waiting" />
+          {order.arrivedPickupAt ? (
+            <>
+              <Text style={{ fontWeight: "600" }}>Alış adresine vardınız · {formatTime(order.arrivedPickupAt)}</Text>
+              <Text testID="waiting-measured" style={{ fontSize: 16, fontWeight: "700" }}>
+                Bekleme: {Math.max(0, Math.floor((now - new Date(order.arrivedPickupAt).getTime()) / 60_000))} dk
+              </Text>
+              <Muted>Süre otomatik ölçülür. İlk 15 dakika ücretsiz; sonrası müşteriye yansıtılır.</Muted>
+            </>
+          ) : (
+            <>
+              <Button title="Alış adresine vardım" variant="secondary" onPress={() => arrive("alis")} loading={busy} testID="arrive-pickup" />
+              <Muted>Adrese yaklaşınca otomatik işaretlenir; gönderene &quot;kurye kapıda&quot; mesajı gider ve bekleme süresi ölçülür.</Muted>
+              <Text style={{ fontWeight: "600" }}>Alışta bekleme süresi (dakika)</Text>
+              <TextInput style={styles.input} keyboardType="number-pad" value={waiting} onChangeText={setWaiting} testID="waiting" />
+            </>
+          )}
           <Button title="Paketi aldım" onPress={() => act({ type: "pickup", waitingMinutes: waitingNum })} loading={busy} testID="pickup" />
         </Card>
       ) : null}
       {s === "alindi" ? <Button title="Yola çıktım" onPress={() => act({ type: "on_the_way" })} loading={busy} testID="on-the-way" /> : null}
+      {(s === "yolda" || s === "sorunlu") && !order.arrivedDropoffAt ? (
+        <Button title="Teslim adresine vardım" variant="secondary" onPress={() => arrive("teslim")} loading={busy} testID="arrive-dropoff" />
+      ) : null}
+      {(s === "yolda" || s === "sorunlu") && order.arrivedDropoffAt ? (
+        <Muted>Teslim adresine vardınız · {formatTime(order.arrivedDropoffAt)} (alıcıya &quot;kurye kapıda&quot; mesajı gitti)</Muted>
+      ) : null}
       {s === "yolda" || s === "sorunlu" ? (
         <Button
           title="Teslim et"

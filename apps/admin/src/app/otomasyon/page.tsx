@@ -16,6 +16,8 @@ const NUMBERS: Array<{ key: keyof OpsSettings; label: string; hint: string }> = 
   { key: "urgentSlaMinutes", label: "Acil teslim taahhüdü (dk)", hint: "Aşılırsa acil ek ücreti müşterinin sonraki siparişinden düşülür" },
   { key: "documentWarnDays", label: "Belge süresi uyarısı (gün)", hint: "Kurye belgesinin bitmesine bu kadar gün kala uyarı" },
   { key: "offerTimeoutSeconds", label: "Teklif yanıt süresi (sn)", hint: "15–600; süre dolarsa iş sıradaki kuryeye geçer" },
+  { key: "arrivalAutoRadiusM", label: "Otomatik varış mesafesi (m)", hint: "30–500; konum adrese bu kadar yaklaşınca 'kurye kapıda'" },
+  { key: "arrivalMaxRadiusM", label: "'Vardım' için en fazla uzaklık (m)", hint: "50–2000; daha uzaktan varış bildirilemez" },
 ];
 
 export default function OtomasyonPage() {
@@ -226,6 +228,10 @@ function OpsForm({ initial, onSaved }: { initial: OpsSettings; onSaved: () => vo
     }
     if (form.offerTimeoutSeconds < 15 || form.offerTimeoutSeconds > 600) {
       setSaveError("Teklif yanıt süresi 15–600 saniye olmalı");
+      return;
+    }
+    if (form.arrivalAutoRadiusM < 30 || form.arrivalAutoRadiusM > 500 || form.arrivalMaxRadiusM < 50 || form.arrivalMaxRadiusM > 2000) {
+      setSaveError("Varış mesafeleri: otomatik 30–500 m, 'Vardım' 50–2000 m");
       return;
     }
     try {

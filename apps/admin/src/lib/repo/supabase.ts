@@ -221,6 +221,9 @@ export function createSupabaseRepo(url: string, anonKey: string): AdminRepo & { 
         weightKg: r.weight_kg == null ? null : Number(r.weight_kg),
         customerNote: r.customer_note,
         waitingMinutes: r.waiting_minutes,
+        waitingSource: r.waiting_source ?? null,
+        arrivedPickupAt: r.arrived_pickup_at ?? null,
+        arrivedDropoffAt: r.arrived_dropoff_at ?? null,
         priceQuote: r.price_quote,
         declaredValueKurus: r.declared_value_kurus ?? null,
         deliveryCodeRequired: !!r.delivery_code_required,
@@ -519,6 +522,8 @@ export function createSupabaseRepo(url: string, anonKey: string): AdminRepo & { 
         winbackDiscountPct: Number(r.winback_discount_pct ?? 15),
         offerEnabled: r.offer_enabled ?? true,
         offerTimeoutSeconds: r.offer_timeout_seconds ?? 60,
+        arrivalAutoRadiusM: r.arrival_auto_radius_m ?? 100,
+        arrivalMaxRadiusM: r.arrival_max_radius_m ?? 300,
       };
     },
     async saveOpsSettings(s) {
@@ -542,6 +547,8 @@ export function createSupabaseRepo(url: string, anonKey: string): AdminRepo & { 
             winback_discount_pct: s.winbackDiscountPct,
             offer_enabled: s.offerEnabled,
             offer_timeout_seconds: s.offerTimeoutSeconds,
+            arrival_auto_radius_m: s.arrivalAutoRadiusM,
+            arrival_max_radius_m: s.arrivalMaxRadiusM,
           })
           .eq("id", 1),
         "Ayarlar kaydedilemedi",

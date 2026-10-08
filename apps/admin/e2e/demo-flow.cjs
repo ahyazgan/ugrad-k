@@ -49,6 +49,10 @@ fs.mkdirSync(out, { recursive: true });
   await page.getByRole("button", { name: "Filtrele" }).click();
   await page.getByText(/\d+ sipariş/).waitFor();
   await shot("03-siparisler");
+  // Teslim edilmiş siparişte alışa varış ve ölçülen bekleme
+  await page.locator("tr", { hasText: "Teslim edildi" }).nth(2).getByRole("link", { name: /^YK-\d+$/ }).click();
+  await page.getByTestId("arrival-pickup").getByText(/varıştan ölçüldü/).waitFor();
+  await nav("Siparişler");
 
   // ───── Telefon siparişi: kayıtlı müşteri, son adresten seçim
   await page.getByRole("link", { name: "+ Telefon siparişi" }).click();

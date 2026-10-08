@@ -34,6 +34,7 @@ Kodun tamamı yazıldı ve testlerden geçti. Bu rehber, sistemi **gerçek hesap
 27. [Kampanya, davet ve geri kazanma](#27-kampanya-davet-ve-geri-kazanma)
 28. [Canlıya alma: hazırlık denetimi, yedek, deneme ortamı](#28-canlıya-alma)
 29. [Kurye iş teklifi (kabul / ret)](#29-kurye-iş-teklifi)
+30. [Adrese varış ve bekleme ölçümü](#30-adrese-varış-ve-bekleme-ölçümü)
 
 ---
 
@@ -211,6 +212,9 @@ Panel → Otomasyon → **Sistem durumu** kartında her görevin en son ne zaman
    | `yonetici_uyari` | `Yazgan Kurye uyarı: {{1}}` |
    | `geri_kazanma` (Kategori: *Marketing*) | `Merhaba {{1}}, sizi özledik! Sonraki gönderinizde {{2}} indirim: {{3}} (14 gün geçerli). Mesaj almak istemiyorsanız RET yazın.` |
    | `acil_gecikme` | `{{1}} numaralı acil gönderiniz gecikebilir, tahmini teslim {{2}}. Taahhüt aşılırsa acil ek ücreti sonraki siparişinizden düşülür. Takip: {{3}}` |
+   | `kurye_alista` | `Kuryemiz {{1}}, {{2}} numaralı gönderi için alış adresinizde. Paketi hazırlayabilirsiniz.` |
+   | `alici_kurye_kapida` | `Merhaba {{1}}, Yazgan Kurye kuryesi {{2}} adresinizde; paketinizi teslim almak için hazır olun.` |
+   | `alici_kurye_kapida_kod` | `Merhaba {{1}}, Yazgan Kurye kuryesi {{2}} adresinizde; paketinizi teslim almak için hazır olun. Teslim kodunuz: {{3}}.` |
 
 4. Webhook: Callback URL `https://<ref>.supabase.co/functions/v1/whatsapp-webhook`, Verify token: kendi belirlediğiniz rastgele metin → **messages** alanına abone olun.
 5. ```bash
@@ -446,3 +450,10 @@ Kayıtlı müşteriler `siparis@<alan adı>` adresine yazar; yapay zeka asistan�
 - **Müşteri**: "Kurye atandı" bildirimi kurye kabul edince gider (ret/süre dolması müşteriye yansımaz).
 - **Yönetici ataması** teklif değildir, doğrudan geçerlidir (kuryeyi telefonla aradığınız durumlar için). Teklif özelliğini kapatmak için Otomasyon → *İşi kuryeye teklif olarak gönder* işaretini kaldırın.
 - **Kayıt**: her teklif ve sonucu (`courier_offers`) sipariş detayında *Kurye teklifleri* kartında; kabul oranı kurye performansında kullanılır.
+
+## 30. Adrese varış ve bekleme ölçümü
+
+- **Otomatik varış**: kuryenin konumu alış/teslim adresine *Otomatik varış mesafesi* (varsayılan 100 m) yaklaşınca varış işaretlenir. Doğruluğu 100 m'den kötü konum sayılmaz. Kurye uygulamada *Alış/Teslim adresine vardım* da diyebilir; bunun için adrese en fazla *'Vardım' için en fazla uzaklık* (300 m) mesafede olmalı. İkisi de panel → Otomasyon'dan değişir.
+- **Mesajlar**: alışa varışta gönderene (alış yetkilisi müşteriden farklıysa ona WhatsApp/SMS, değilse müşteriye) "kurye kapıda"; teslime varışta alıcıya "kurye adresinizde" (teslim kodu varsa kodla birlikte). WhatsApp şablonları: `kurye_alista`, `alici_kurye_kapida`, `alici_kurye_kapida_kod` (§8).
+- **Bekleme ücreti**: varış kaydı varsa bekleme, varıştan paketin alınmasına kadar **otomatik ölçülür** (planlı alışta planlanan saatten önce geçen süre sayılmaz) ve kuryenin elle girdiği değerin yerine geçer. Varış yoksa kuryenin girdiği süre kullanılır. Sipariş detayında "varıştan ölçüldü / kuryenin girdiği" diye görünür; itirazlarda bu kaydı kullanın.
+- **Müşteri**: uygulamada "Kurye alış adresinde / teslim adresinde" satırı görünür.

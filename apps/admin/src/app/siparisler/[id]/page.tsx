@@ -213,6 +213,15 @@ export default function SiparisDetayPage() {
               <Info label="Müşteri notu">{order.customerNote}</Info>
               <Info label="Mesafe">{(order.distanceMeters / 1000).toFixed(1)} km{order.roundTrip ? " · gidiş-dönüş" : ""}</Info>
               <Info label="Planlı alış">{order.scheduledPickupAt ? fmtDateTime(order.scheduledPickupAt) : "Hemen"}</Info>
+              {order.arrivedPickupAt || order.waitingMinutes ? (
+                <Info label="Alışa varış">
+                  <span data-testid="arrival-pickup">
+                    {order.arrivedPickupAt ? fmtTime(order.arrivedPickupAt) : "bildirilmedi"} · bekleme {order.waitingMinutes} dk
+                    {order.waitingSource ? ` (${order.waitingSource === "olcum" ? "varıştan ölçüldü" : "kuryenin girdiği"})` : ""}
+                  </span>
+                </Info>
+              ) : null}
+              {order.arrivedDropoffAt ? <Info label="Teslime varış">{fmtTime(order.arrivedDropoffAt)}</Info> : null}
               {order.cancelReason ? <Info label="İptal nedeni">{order.cancelReason}</Info> : null}
               {order.problemNote ? <Info label="Sorun">{order.problemNote}</Info> : null}
             </div>

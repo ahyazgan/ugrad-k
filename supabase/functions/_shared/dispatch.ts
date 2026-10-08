@@ -1,6 +1,8 @@
 // Bildirim kuyruğunu işler (notify-dispatch).
 import {
+  buildEventNotifications,
   buildNotifications,
+  type NotificationKind,
   type NotificationConfig,
   type NotificationOrder,
   type OrderStatus,
@@ -24,6 +26,8 @@ export function toNotificationOrder(r: Row): NotificationOrder {
     trackingToken: r.tracking_token,
     pickupAddress: r.pickup_address,
     dropoffAddress: r.dropoff_address,
+    pickupContactName: r.pickup_contact_name ?? null,
+    pickupContactPhone: r.pickup_contact_phone ?? null,
     dropoffContactName: r.dropoff_contact_name,
     dropoffContactPhone: r.dropoff_contact_phone,
     podReceiverName: r.pod_receiver_name,
@@ -77,7 +81,10 @@ export async function handleNotifyDispatch(
         .eq("id", n.order_id)
         .single();
       if (oErr || !order) throw new Error(`Sipariş okunamadı: ${oErr?.message}`);
-      const messages = buildNotifications(n.event as OrderStatus, toNotificationOrder(order), cfg);
+      const messages =
+        n.kind && n.kind !== "durum"
+          ? buildEventNotifications(n.kind as NotificationKind, toNotificationOrder(order), cfg)
+          : buildNotifications(n.event as OrderStatus, toNotificationOrder(order), cfg);
       results = await Promise.all(messages.map((m) => deliver(m, deps)));
       const failed = results.filter((r) => !r.ok);
       if (!messages.length) status = "skipped";

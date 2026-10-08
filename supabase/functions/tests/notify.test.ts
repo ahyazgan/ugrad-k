@@ -134,3 +134,21 @@ Deno.test("dispatch: SMS hatası tekrar denemeye bırakılır, 5. denemede faile
   assertEquals(await run(1), "pending");
   assertEquals(await run(5), "failed");
 });
+
+Deno.test("dispatch: varış olayı (kind) olay bildirimiyle işlenir", async () => {
+  const { ctx } = fakeCtx({
+    tables: {
+      "rpc:claim_notifications": [{ id: 7, order_id: "o1", event: "yolda", kind: "varis_teslim", attempts: 1 }],
+      orders: [{ ...orderRow, status: "yolda", dropoff_contact_name: "Ali Veli", dropoff_contact_phone: "+905334445566" }],
+      notifications: [{ id: 7 }],
+    },
+  });
+  const { fetchFn } = recorder({ netgsm: { code: "00", jobid: "9" } });
+  const res = await handler((r) => handleNotifyDispatch(r, ctx, { env: envOf({ NOTIFY_SECRET: "s", ...sms }), fetchFn }))(
+    new Request("http://x", { method: "POST", headers: { "x-notify-secret": "s" } }),
+  );
+  const data = await res.json();
+  assertEquals(data.summary[0].status, "sent");
+  // Alıcıya "kapıda" mesajı; müşterinin push token'ı yok
+  assertEquals(data.summary[0].results.map((r: { role: string }) => r.role), ["receiver"]);
+});

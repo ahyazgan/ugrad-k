@@ -194,6 +194,8 @@ export function createSupabaseApi(url: string, anonKey: string): Api & { client:
         dropoffLat: r!.dropoff_lat,
         dropoffLng: r!.dropoff_lng,
         waitingMinutes: r!.waiting_minutes ?? 0,
+        arrivedPickupAt: r!.arrived_pickup_at ?? null,
+        arrivedDropoffAt: r!.arrived_dropoff_at ?? null,
         pickupDetails: r!.pickup_details,
         dropoffDetails: r!.dropoff_details,
         pickupContactName: r!.pickup_contact_name,
@@ -338,8 +340,8 @@ export function createSupabaseApi(url: string, anonKey: string): Api & { client:
       switch (action.type) {
         case "pickup":
           await rpc({ p_status: "alindi", p_waiting_minutes: action.waitingMinutes });
-          // Bekleme ücreti sunucuda pricing.ts ile teklife eklenir
-          if (action.waitingMinutes > 0) await invoke("reprice-order", { orderId });
+          // Bekleme sunucuda varıştan ölçülür (yoksa girilen süre); ücret pricing.ts ile teklife eklenir
+          await invoke("reprice-order", { orderId });
           return;
         case "on_the_way":
           return rpc({ p_status: "yolda" });
@@ -385,6 +387,11 @@ export function createSupabaseApi(url: string, anonKey: string): Api & { client:
         speed_mps: loc.speed ?? null,
       });
       if (error) throw new ApiError(error.message);
+    },
+    async markArrived(orderId, stop, at) {
+      const { data, error } = await client.rpc("mark_arrived", { p_order_id: orderId, p_stop: stop, p_lat: at?.lat ?? null, p_lng: at?.lng ?? null });
+      if (error) throw new ApiError(error.message);
+      return { arrivedAt: (data as { arrived_at: string }).arrived_at };
     },
     async courierEarnings() {
       const id = await uid();

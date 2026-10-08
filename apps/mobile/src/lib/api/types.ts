@@ -100,6 +100,9 @@ export interface OrderDetail extends OrderSummary {
   /** Acil teslim taahhüdü ve kaçırıldı mı */
   slaDueAt: string | null;
   slaMissed: boolean | null;
+  /** Kurye alış / teslim adresine vardı (otomatik veya "Vardım") */
+  arrivedPickupAt: string | null;
+  arrivedDropoffAt: string | null;
   paymentMethod: OrderInput["paymentMethod"];
   paymentStatus: string;
   paidKurus: number | null;
@@ -220,6 +223,8 @@ export interface Api {
       | { type: "release"; note: string },
   ): Promise<void>;
   pushLocation(loc: CourierLocation, orderId: string | null): Promise<void>;
+  /** Kurye adrese vardığını bildirir (adrese 300 m içinde olmalı) */
+  markArrived(orderId: string, stop: "alis" | "teslim", at: CourierLocation | null): Promise<{ arrivedAt: string }>;
   courierEarnings(): Promise<CourierEarnings>;
   /** Müşterinin davet kodu (yoksa üretilir) */
   myReferralCode(): Promise<string>;

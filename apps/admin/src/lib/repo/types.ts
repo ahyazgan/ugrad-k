@@ -111,6 +111,10 @@ export interface AdminOrderDetail extends AdminOrder {
   weightKg: number | null;
   customerNote: string | null;
   waitingMinutes: number;
+  /** Bekleme varıştan ölçüldü mü, kurye mi girdi */
+  waitingSource: "olcum" | "elle" | null;
+  arrivedPickupAt: string | null;
+  arrivedDropoffAt: string | null;
   priceQuote: PriceQuote;
   declaredValueKurus: number | null;
   deliveryCodeRequired: boolean;
@@ -284,6 +288,10 @@ export interface OpsSettings {
   /** Otomatik atama kuryeye teklif olarak gider; kurye süre içinde kabul eder */
   offerEnabled: boolean;
   offerTimeoutSeconds: number;
+  /** Konum adrese bu kadar metre yaklaşınca varış otomatik işaretlenir */
+  arrivalAutoRadiusM: number;
+  /** Kurye "Vardım" derken adrese en fazla bu kadar metre uzakta olabilir */
+  arrivalMaxRadiusM: number;
 }
 
 export interface PromoCodeRow extends Promo {
