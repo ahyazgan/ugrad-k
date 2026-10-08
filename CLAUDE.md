@@ -61,7 +61,7 @@ Ek: `iptal`, `sorunlu`
     yapılır ve `docs/kurulum.md` içinde kullanıcıya bırakılır.
 
 ## Kod yapısı ve komutlar
-- `packages/shared/` — pricing.ts (tek fiyat kaynağı), orders.ts (durumlar), geo.ts (yaka/köprü), maps.ts (Google Places New + Routes API, mock), quote.ts (istek doğrulama + teklif), db.ts (satır ↔ tip)
+- `packages/shared/` — tiles.ts (harita karo hesabı; mobil `TileMap` yerel modülsüz OSM haritası), pricing.ts (tek fiyat kaynağı), orders.ts (durumlar), geo.ts (yaka/köprü), maps.ts (Google Places New + Routes API, mock), quote.ts (istek doğrulama + teklif), db.ts (satır ↔ tip)
 - `supabase/migrations/` — şema, RLS, RPC, storage, sabit veriler; `supabase/functions/` — Edge Functions (Deno, `packages/shared`'ı doğrudan import eder; deploy `--use-api`)
 - `apps/mobile/` — Expo SDK 57 + expo-router (`src/app/`). Supabase env yoksa **DEMO modu** (sahte veri, kod 123456). `pnpm --filter @yazgan/mobile e2e:web` tarayıcıda tam akışı test eder
 - `apps/admin/` — Next.js 16 + Tailwind 4 panel. Supabase env yoksa **DEMO modu** (admin@yazgankurye.com / demo1234). Kurye hesabı oluşturma `/api/kuryeler` (service role yalnız sunucuda). `pnpm --filter @yazgan/admin e2e:web`
@@ -69,6 +69,7 @@ Ek: `iptal`, `sorunlu`
 - Operasyon ayarları `ops_settings` (panel → Otomasyon): otomatik onay/atama, kapasite, mesafe, ödeme süresi
 - Kuyruklar (outbox): `notifications` ve `invoices` tabloları; dakikalık cron ile işlenir (docs/kurulum.md §6)
 - Yapay zeka asistanı: `supabase/functions/_shared/assistant.ts` (Claude, araçlar aynı sipariş API'sini kullanır; geçmiş yalnızca sona eklenir)
+- Panel: Raporlar (`/raporlar`, `lib/reports.ts`, CSV `;` + ondalık virgül), Canlı harita (`/harita`, Leaflet + OSM; karo URL'si env ile değişir). E2E'de harita karoları `scripts/e2e-tile-stub.cjs` ile sahte PNG'den gelir
 - Kurulum ve canlıya alma: `docs/kurulum.md`; mağaza: `docs/magaza.md`
 - `pnpm test` (vitest), `pnpm test:functions` (Deno), `pnpm test:db` (yerel Postgres'te migration + RLS), `pnpm test:all`
 - Google'ın eski Distance Matrix/Places API'leri yeni projelerde açılamıyor → **Routes API** ve **Places API (New)** kullanılıyor
@@ -82,3 +83,4 @@ Ek: `iptal`, `sorunlu`
 - [x] Faz 6: iyzico ödeme + otomatik e-arşiv fatura
 - [x] Faz 7: Yapay zeka sesli asistan ve WhatsApp botu → aynı sipariş API'sine bağlanır
 - [~] Faz 8: App Store / Google Play yayını — kod hazır (EAS, hesap silme, yasal sayfalar, `docs/magaza.md`); mağaza hesapları ve gönderim kullanıcıda
+- [x] Ek geliştirmeler (2026-10-09): panelden telefon siparişi, otomatik onay + kurye atama, ödenmemiş kart siparişi iptali, kademeli km + %75 ek ücret tavanı (panelden tek tıkla eski tarifeye dönüş), raporlar + CSV, canlı haritalar (panel, takip sayfası, müşteri ve kurye uygulaması)

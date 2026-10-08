@@ -65,6 +65,14 @@ Kodun tamamı yazıldı ve testlerden geçti. Bu rehber, sistemi **gerçek hesap
 
 Anahtar yalnızca sunucuda (Edge Function) kullanılır; uygulamaya gömülmez.
 
+### Harita görüntüsü (canlı harita, takip, mobil)
+Harita **görüntüsü** Google anahtarı gerektirmez: panel (Leaflet) ve mobil uygulama OpenStreetMap karolarını kullanır, demo modunda da çalışır.
+OSM'in ücretsiz karo sunucusu düşük trafik içindir ([kullanım politikası](https://operations.osmfoundation.org/policies/tiles/)); müşteri sayısı arttığında ticari bir karo sağlayıcısına geçin (ör. MapTiler, Stadia Maps, Thunderforest — aylık ücretsiz kotaları vardır) ve şu değişkenleri girin:
+- Panel (Vercel): `NEXT_PUBLIC_MAP_TILE_URL=https://api.maptiler.com/maps/streets-v2/256/{z}/{x}/{y}.png?key=...` ve `NEXT_PUBLIC_MAP_TILE_ATTRIBUTION=© MapTiler © OpenStreetMap katkıcıları`
+- Mobil (EAS): `EXPO_PUBLIC_MAP_TILE_URL`, `EXPO_PUBLIC_MAP_TILE_ATTRIBUTION` (aynı değerler)
+
+Karo anahtarı tarayıcıda/uygulamada görünür; sağlayıcı panelinden alan adı (`panel.yazgankurye.com`) ve uygulama kimliği kısıtlaması koyun.
+
 ## 4. SMS (Netgsm) ve telefonla giriş
 
 1. Netgsm hesabı → **SMS başlığı** (ör. YAZGANKURYE) onaylatın. API kullanıcısı oluşturun.
@@ -213,6 +221,8 @@ Buradaki kodlar birim/uçtan uca testlerle doğrulandı, ancak dış servislere 
 - [ ] Push bildirimi gerçek telefonda; kurye **arka plan konumu** (Android bildirimi, iOS "Her zaman" izni)
 - [ ] Teslim fotoğrafı/imza yüklenip panelde görüntüleniyor mu
 - [ ] Zamanlanmış görevler dakikada bir çalışıyor mu (Supabase → Edge Functions → Logs)
+- [ ] Haritalar: panel "Canlı harita"da vardiyadaki kurye görünüyor mu; müşteri uygulamasında kurye işareti teslimat boyunca ilerliyor mu (Realtime + 30 sn yedek okuma)
+- [ ] Raporlar: bir aylık gerçek veriyle ciro ve CSV (Excel'de Türkçe karakterler ve ondalık virgül doğru mu)
 
 ## 15. Tüm ortam değişkenleri
 
@@ -231,7 +241,9 @@ Buradaki kodlar birim/uçtan uca testlerle doğrulandı, ancak dış servislere 
 | | `ANTHROPIC_API_KEY`, `ASSISTANT_MODEL` (ops.), `ASSISTANT_EFFORT` (ops.) | Asistan |
 | | `VOICE_GATEWAY_SECRET` | Sesli asistan |
 | Vercel (panel) | `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` | |
+| | `NEXT_PUBLIC_MAP_TILE_URL`, `NEXT_PUBLIC_MAP_TILE_ATTRIBUTION` (ops.) | Harita karoları (§3) |
 | EAS (mobil) | `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY`, `EXPO_PUBLIC_TRACKING_BASE_URL` | |
+| | `EXPO_PUBLIC_MAP_TILE_URL`, `EXPO_PUBLIC_MAP_TILE_ATTRIBUTION` (ops.) | Harita karoları (§3) |
 | `app.json` | `expo.extra.eas.projectId` | Push bildirimleri |
 
 `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` Edge Function'lara Supabase tarafından otomatik verilir.
