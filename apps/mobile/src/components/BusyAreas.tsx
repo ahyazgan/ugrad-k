@@ -1,7 +1,7 @@
 import { upcomingHotspots, type DemandData, type LatLng } from "@yazgan/shared";
 import { useEffect, useState } from "react";
 import { Text, View } from "react-native";
-import { Button, Card, Muted, colors } from "@/components/ui";
+import { Button, Card, Muted, colors, font } from "@/components/ui";
 import { api } from "@/lib/api";
 import { openDirections } from "@/lib/navigation";
 
@@ -36,7 +36,7 @@ export function BusyAreas({ me }: { me: LatLng | null }) {
   if (!spots.length) return null;
   return (
     <Card style={{ gap: 8 }}>
-      <Text style={{ fontWeight: "700", color: colors.text }}>Yoğun bölgeler (önümüzdeki saat)</Text>
+      <Text style={{ ...font("extrabold"), color: colors.text }}>Yoğun bölgeler (önümüzdeki saat)</Text>
       {spots.map((h, i) => (
         <View
           key={`${h.lat}-${h.lng}`}
@@ -44,7 +44,7 @@ export function BusyAreas({ me }: { me: LatLng | null }) {
           style={{ flexDirection: "row", alignItems: "center", gap: 8, borderTopWidth: i ? 1 : 0, borderTopColor: colors.border, paddingTop: i ? 8 : 0 }}
         >
           <View style={{ flex: 1 }}>
-            <Text style={{ fontWeight: "600", color: colors.text }}>
+            <Text style={{ ...font("bold"), color: colors.text }}>
               {i + 1}. {h.district ?? "Bölge"}
               {h.distanceKm != null ? ` · ${h.distanceKm.toLocaleString("tr-TR")} km` : ""}
             </Text>

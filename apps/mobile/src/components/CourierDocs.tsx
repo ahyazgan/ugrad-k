@@ -1,6 +1,6 @@
 import { courierCompliance, type Compliance, type CourierDocument, type DocumentState } from "@yazgan/shared";
 import { Text, View } from "react-native";
-import { Card, Muted, colors } from "@/components/ui";
+import { Card, Muted, colors, font } from "@/components/ui";
 
 const STATE: Record<DocumentState, { label: string; color: string }> = {
   gecerli: { label: "Geçerli", color: colors.success },
@@ -21,7 +21,7 @@ export function DocumentWarning({ c }: { c: Compliance | null }) {
   return (
     <Card style={{ borderColor: blocking ? colors.danger : colors.accent, backgroundColor: blocking ? colors.dangerLight : "#FEF3C7" }}>
       <View testID="doc-warning">
-        <Text style={{ fontWeight: "700", color: blocking ? colors.danger : "#92400E" }}>
+        <Text style={{ ...font("extrabold"), color: blocking ? colors.danger : "#92400E" }}>
           {blocking ? "Belgeleriniz eksik: vardiya başlatamazsınız" : "Belge süreniz yaklaşıyor"}
         </Text>
         {list.map((i) => (
@@ -40,11 +40,11 @@ export function DocumentList({ c }: { c: Compliance }) {
   const items = c.items.filter((i) => i.required || i.state !== "eksik");
   return (
     <Card>
-      <Text style={{ fontWeight: "700", color: colors.text }}>Belgelerim</Text>
+      <Text style={{ ...font("extrabold"), color: colors.text }}>Belgelerim</Text>
       {items.map((i) => (
         <View key={i.kind} style={{ flexDirection: "row", justifyContent: "space-between", gap: 8 }}>
           <Text style={{ flex: 1, color: colors.text }}>{i.label}</Text>
-          <Text style={{ color: STATE[i.state].color, fontWeight: "600" }}>
+          <Text style={{ color: STATE[i.state].color, ...font("bold") }}>
             {STATE[i.state].label}
             {i.expiresAt ? ` · ${fmtDay(i.expiresAt)}` : ""}
           </Text>

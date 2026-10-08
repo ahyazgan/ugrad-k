@@ -2,7 +2,7 @@ import { courierPerformance, formatTL, incentiveProgress, incentiveScope, PERFOR
 import { useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
 import { Text, View } from "react-native";
-import { Card, ErrorBox, Loading, Muted, Row, Screen, Title, colors } from "@/components/ui";
+import { Card, ErrorBox, Loading, Muted, Row, Screen, Title, colors, font } from "@/components/ui";
 import { api, ApiError, type CourierEarnings, type IncentiveStatus } from "@/lib/api";
 
 const fmtDate = (iso: string) =>
@@ -32,14 +32,14 @@ export default function Kazancim() {
     <Screen>
       {incentives.length ? (
         <Card style={{ gap: 8 }}>
-          <Text style={{ fontWeight: "700", color: colors.text }}>Primler</Text>
+          <Text style={{ ...font("extrabold"), color: colors.text }}>Primler</Text>
           {incentives.map((i) => {
             const pr = incentiveProgress(i, i.jobs, i.earningKurus);
             const target = pr.next?.target ?? i.tiers.at(-1)?.target ?? 0;
             const ratio = i.kind === "hedef" && target ? Math.min(1, i.jobs / target) : null;
             return (
               <View key={i.id} testID="incentive-card" style={{ gap: 4, borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 6 }}>
-                <Text style={{ fontWeight: "600", color: colors.text }}>{i.title}</Text>
+                <Text style={{ ...font("bold"), color: colors.text }}>{i.title}</Text>
                 <Muted>{incentiveScope(i)}</Muted>
                 {ratio != null ? (
                   <View style={{ height: 8, borderRadius: 4, backgroundColor: colors.border, overflow: "hidden" }}>
@@ -59,7 +59,7 @@ export default function Kazancim() {
       {p ? (
         <Card style={{ gap: 4 }}>
           <Muted>Performansım (son 30 gün)</Muted>
-          <Text testID="my-performance" style={{ fontSize: 22, fontWeight: "800", color: colors.primary }}>
+          <Text testID="my-performance" style={{ fontSize: 22, ...font("black"), color: colors.primary }}>
             {p.score ?? "—"} · {PERFORMANCE_TIERS[p.tier]}
           </Text>
           {p.parts.map((x) => (
@@ -87,7 +87,7 @@ export default function Kazancim() {
 
       {data.incentives.length ? (
         <Card>
-          <Text style={{ fontWeight: "700", color: colors.text }}>Kazanılan primler</Text>
+          <Text style={{ ...font("extrabold"), color: colors.text }}>Kazanılan primler</Text>
           {data.incentives.map((a) => (
             <View key={a.id} testID="incentive-award" style={{ borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 6 }}>
               <Row label={`${a.title} · ${fmtDay(a.periodStart)}${a.periodEnd !== a.periodStart ? `–${fmtDay(a.periodEnd)}` : ""}`} value={formatTL(a.amountKurus)} />
@@ -98,7 +98,7 @@ export default function Kazancim() {
       ) : null}
 
       <Card>
-        <Text style={{ fontWeight: "700", color: colors.text }}>Teslimatlar</Text>
+        <Text style={{ ...font("extrabold"), color: colors.text }}>Teslimatlar</Text>
         {data.items.length === 0 ? <Muted>Hesaplaşılmamış teslimat yok.</Muted> : null}
         {data.items.slice(0, 50).map((i) => (
           <View key={i.orderId} style={{ borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 6 }}>
@@ -110,7 +110,7 @@ export default function Kazancim() {
 
       {data.payouts.length ? (
         <Card>
-          <Text style={{ fontWeight: "700", color: colors.text }}>Son hesaplaşmalar</Text>
+          <Text style={{ ...font("extrabold"), color: colors.text }}>Son hesaplaşmalar</Text>
           {data.payouts.map((p) => (
             <Row
               key={p.id}

@@ -2,7 +2,7 @@ import { FAILED_DELIVERY_REASONS, FAILED_REASONS_REQUIRING_WAIT, type FailedDeli
 import * as ImagePicker from "expo-image-picker";
 import { useState } from "react";
 import { Image, Pressable, Text, TextInput, View } from "react-native";
-import { Button, Card, ErrorBox, Muted, colors, styles } from "@/components/ui";
+import { Button, Card, ErrorBox, Muted, colors, styles, font } from "@/components/ui";
 import { ApiError, type OrderDetail } from "@/lib/api";
 import { callPhone } from "@/lib/navigation";
 import { outbox } from "@/lib/outbox";
@@ -63,7 +63,7 @@ export function FailedDeliveryForm({
 
   return (
     <Card style={{ gap: 10, borderColor: colors.danger }}>
-      <Text style={{ fontWeight: "700", fontSize: 16 }}>Teslim edilemedi</Text>
+      <Text style={{ ...font("extrabold"), fontSize: 16 }}>Teslim edilemedi</Text>
       <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
         {(Object.keys(FAILED_DELIVERY_REASONS) as FailedDeliveryReason[]).map((r) => (
           <Pressable
@@ -103,7 +103,7 @@ export function FailedDeliveryForm({
           />
         </View>
         <Pressable onPress={() => setCalls((c) => c + 1)} testID="failed-call-plus" style={{ padding: 10 }}>
-          <Text testID="failed-calls" style={{ fontWeight: "700" }}>
+          <Text testID="failed-calls" style={{ ...font("extrabold") }}>
             Arama: {calls} (+)
           </Text>
         </Pressable>

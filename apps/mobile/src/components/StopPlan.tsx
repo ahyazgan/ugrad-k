@@ -1,7 +1,7 @@
 import { planStops, STOP_LABELS, stopsDirectionsUrl } from "@yazgan/shared";
 import { router } from "expo-router";
 import { Linking, Pressable, Text, View } from "react-native";
-import { Button, Card, Muted, colors } from "@/components/ui";
+import { Button, Card, Muted, colors, font } from "@/components/ui";
 import type { OrderSummary } from "@/lib/api";
 import { openDirections } from "@/lib/navigation";
 
@@ -26,7 +26,7 @@ export function StopPlan({ jobs, me }: { jobs: OrderSummary[]; me: { lat: number
   const all = stopsDirectionsUrl(stops);
   return (
     <Card style={{ gap: 6 }}>
-      <Text style={{ fontWeight: "700", fontSize: 16 }}>Durak sırası</Text>
+      <Text style={{ ...font("extrabold"), fontSize: 16 }}>Durak sırası</Text>
       {stops.map((s, i) => (
         <Pressable
           key={`${s.jobId}-${s.kind}`}
@@ -34,9 +34,9 @@ export function StopPlan({ jobs, me }: { jobs: OrderSummary[]; me: { lat: number
           testID={`stop-${i}`}
           style={{ flexDirection: "row", gap: 8, paddingVertical: 4 }}
         >
-          <Text style={{ fontWeight: "800", width: 18, color: i === 0 ? colors.accent : colors.primary }}>{i + 1}</Text>
+          <Text style={{ ...font("black"), width: 18, color: i === 0 ? colors.accent : colors.primary }}>{i + 1}</Text>
           <View style={{ flex: 1 }}>
-            <Text style={{ fontWeight: "600" }}>
+            <Text style={{ ...font("bold") }}>
               {STOP_LABELS[s.kind]} · {s.orderNo}
               {s.urgent && s.kind === "teslim" ? " ⚡" : ""}
             </Text>

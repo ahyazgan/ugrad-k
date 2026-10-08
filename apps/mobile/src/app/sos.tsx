@@ -1,7 +1,7 @@
 import { INCIDENT_KINDS, type IncidentKind } from "@yazgan/shared";
 import { useCallback, useEffect, useState } from "react";
 import { Linking, Pressable, Text, TextInput, View } from "react-native";
-import { Button, Card, ErrorBox, Muted, Screen, Title, colors, styles } from "@/components/ui";
+import { Button, Card, ErrorBox, Muted, Screen, Title, colors, styles, font } from "@/components/ui";
 import { api, ApiError, type Incident } from "@/lib/api";
 import { formatTime } from "@/lib/format";
 import { currentPosition, lastKnownPosition } from "@/lib/location";
@@ -48,13 +48,13 @@ export default function Sos() {
   return (
     <Screen>
       <Card style={{ borderColor: colors.danger, backgroundColor: colors.dangerLight, gap: 8 }}>
-        <Text style={{ fontWeight: "800", fontSize: 16, color: colors.danger }}>Hayati tehlike varsa önce 112&apos;yi arayın</Text>
+        <Text style={{ ...font("black"), fontSize: 16, color: colors.danger }}>Hayati tehlike varsa önce 112&apos;yi arayın</Text>
         <Button title="112 Acil Çağrı" variant="danger" onPress={() => Linking.openURL("tel:112")} testID="call-112" />
       </Card>
 
       {offline ? (
         <Card style={{ borderColor: colors.danger }}>
-          <Text testID="sos-offline" style={{ color: colors.danger, fontWeight: "800" }}>
+          <Text testID="sos-offline" style={{ color: colors.danger, ...font("black") }}>
             İnternet yok! Alarm telefonda bekliyor, bağlantı gelir gelmez gönderilecek. Şimdi 112&apos;yi veya yöneticinizi telefonla arayın.
           </Text>
         </Card>
@@ -66,7 +66,7 @@ export default function Sos() {
             {INCIDENT_KINDS[incident.kind]} · {formatTime(incident.createdAt)} · konumunuz yöneticiye gönderildi.
           </Text>
           {incident.acknowledgedAt ? (
-            <Text testID="sos-acknowledged" style={{ color: colors.success, fontWeight: "700" }}>
+            <Text testID="sos-acknowledged" style={{ color: colors.success, ...font("extrabold") }}>
               ✓ Yönetici gördü ({formatTime(incident.acknowledgedAt)}); sizi arayacak.
             </Text>
           ) : (
@@ -93,7 +93,7 @@ export default function Sos() {
                   paddingVertical: 10,
                 }}
               >
-                <Text style={{ fontWeight: kind === k ? "700" : "400" }}>{INCIDENT_KINDS[k]}</Text>
+                <Text style={font(kind === k ? "extrabold" : "medium")}>{INCIDENT_KINDS[k]}</Text>
               </Pressable>
             ))}
           </View>

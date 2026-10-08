@@ -2,7 +2,7 @@ import { slotLabel, WEEKDAY_LABELS } from "@yazgan/shared";
 import { useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
 import { Text, View } from "react-native";
-import { Button, Card, ErrorBox, Muted, Screen, Title, colors } from "@/components/ui";
+import { Button, Card, ErrorBox, Muted, Screen, Title, colors, font } from "@/components/ui";
 import { api, ApiError, type ShiftSlot } from "@/lib/api";
 
 const todayIst = () => new Date(Date.now() + 3 * 3_600_000).toISOString().slice(0, 10);
@@ -72,7 +72,7 @@ export default function Vardiyam() {
       {msg ? <Muted style={{ color: colors.success }}>{msg}</Muted> : null}
       {days.map((day) => (
         <Card key={day} style={{ gap: 6 }}>
-          <Text style={{ fontWeight: "700" }}>{dayTitle(day)}</Text>
+          <Text style={{ ...font("extrabold") }}>{dayTitle(day)}</Text>
           {upcoming
             .filter((s) => s.day === day)
             .map((s) => {
@@ -81,7 +81,7 @@ export default function Vardiyam() {
               return (
                 <View key={s.startsAt} style={{ flexDirection: "row", alignItems: "center", gap: 8 }} testID={`slot-${day}-${slotLabel(s.startsAt, s.endsAt)}`}>
                   <View style={{ flex: 1 }}>
-                    <Text style={{ fontWeight: s.mine ? "700" : "400", color: s.mine ? colors.primary : colors.text }}>
+                    <Text style={{ ...font(s.mine ? "extrabold" : "medium"), color: s.mine ? colors.primary : colors.text }}>
                       {slotLabel(s.startsAt, s.endsAt)}
                       {s.mine ? "  ✓ sizin" : ""}
                     </Text>

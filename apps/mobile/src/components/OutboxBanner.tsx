@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Text, View } from "react-native";
-import { Button, Card, Muted, colors } from "@/components/ui";
+import { Button, Card, Muted, colors, font } from "@/components/ui";
 import { formatTime } from "@/lib/format";
 import { outbox, useOutbox } from "@/lib/outbox";
 import { taskLabel } from "@/lib/outbox-core";
@@ -25,7 +25,7 @@ export function OutboxBanner({ onSent }: { onSent?: () => void }) {
     <Card style={{ gap: 6, borderColor: failed.length ? colors.danger : colors.accent, backgroundColor: failed.length ? colors.dangerLight : "#FEF3C7" }}>
       {pending.length ? (
         <>
-          <Text style={{ fontWeight: "700" }} testID="outbox-pending">
+          <Text style={{ ...font("extrabold") }} testID="outbox-pending">
             📶 Bağlantı yok: {pending.length} işlem bekliyor
           </Text>
           {pending.map((i) => (
@@ -40,7 +40,7 @@ export function OutboxBanner({ onSent }: { onSent?: () => void }) {
       ) : null}
       {failed.map((i) => (
         <View key={i.id} style={{ gap: 4 }}>
-          <Text style={{ color: colors.danger, fontWeight: "700" }}>
+          <Text style={{ color: colors.danger, ...font("extrabold") }}>
             Gönderilemedi: {taskLabel(i.task)} ({formatTime(i.at)})
           </Text>
           <Muted>{i.error}</Muted>

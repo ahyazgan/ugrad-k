@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { Image, Text } from "react-native";
 import { SignaturePad } from "@/components/SignaturePad";
 import { BigTitle } from "@/components/Neo";
-import { Button, Card, ErrorBox, Field, Muted, Screen, Segmented, colors, radii, type } from "@/components/ui";
+import { Button, Card, ErrorBox, Field, Muted, Screen, Segmented, colors, font, radii, type } from "@/components/ui";
 import { api, ApiError, type CashCollection, type OrderDetail } from "@/lib/api";
 import { setActiveOrderForLocation } from "@/lib/location";
 import { outbox } from "@/lib/outbox";
@@ -87,7 +87,7 @@ export default function Teslim() {
       <BigTitle size={52}>{returning ? "İade et." : "Teslim et."}</BigTitle>
       {returning ? (
         <Card style={{ borderColor: "#9A3412" }}>
-          <Text style={type.label}>TESLİM EDİLEMEYEN PAKET GÖNDERİCİYE İADE EDİLİYOR</Text>
+          <Text style={{ ...font("extrabold") }}>Teslim edilemeyen paket göndericiye iade ediliyor</Text>
           <Muted>Paketi alış adresindeki yetkiliye teslim edin; fotoğraf veya imza alın.</Muted>
         </Card>
       ) : null}
@@ -115,7 +115,7 @@ export default function Teslim() {
       ) : null}
       {needsCash ? (
         <Card>
-          <Text style={type.label}>TAHSİLAT: {formatTL(order.totalKurus)}</Text>
+          <Text style={{ ...font("extrabold"), fontSize: 16 }}>Tahsilat: {formatTL(order.totalKurus)}</Text>
           <Muted>Müşteriden ödemeyi nasıl aldınız? Nakit aldıysanız hakedişinizden düşülür.</Muted>
           <Segmented
             testIDPrefix="cash"

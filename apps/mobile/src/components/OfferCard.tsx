@@ -1,7 +1,7 @@
 import { OFFER_DECLINE_REASONS, offerSecondsLeft, roadKm } from "@yazgan/shared";
 import { useEffect, useRef, useState } from "react";
 import { Pressable, Text, Vibration, View } from "react-native";
-import { Button, Card, ErrorBox, Muted, colors } from "@/components/ui";
+import { Button, Card, ErrorBox, Muted, colors, font } from "@/components/ui";
 import { api, ApiError, type OrderSummary } from "@/lib/api";
 
 /**
@@ -62,15 +62,15 @@ export function OfferCard({
   return (
     <Card style={{ gap: 8, borderColor: urgentColor, borderWidth: 2 }}>
       <View testID={`offer-${job.orderNo}`} style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-        <Text style={{ fontWeight: "800", fontSize: 16, color: urgentColor }}>{job.urgent ? "⚡ ACİL iş teklifi" : "🔔 Yeni iş teklifi"}</Text>
+        <Text style={{ ...font("black"), fontSize: 16, color: urgentColor }}>{job.urgent ? "⚡ ACİL iş teklifi" : "🔔 Yeni iş teklifi"}</Text>
         <Text
           testID="offer-countdown"
-          style={{ fontWeight: "800", fontSize: 18, color: left <= 15 ? colors.danger : colors.text, fontVariant: ["tabular-nums"] }}
+          style={{ ...font("black"), fontSize: 18, color: left <= 15 ? colors.danger : colors.text, fontVariant: ["tabular-nums"] }}
         >
           {Math.floor(left / 60)}:{String(left % 60).padStart(2, "0")}
         </Text>
       </View>
-      <Text style={{ fontWeight: "700" }}>{job.orderNo}</Text>
+      <Text style={{ ...font("extrabold") }}>{job.orderNo}</Text>
       <Text numberOfLines={2}>↑ {job.pickupAddress}</Text>
       <Text numberOfLines={2}>↓ {job.dropoffAddress}</Text>
       <Muted>
@@ -81,7 +81,7 @@ export function OfferCard({
       <ErrorBox message={error} />
       {declining ? (
         <View style={{ gap: 6 }}>
-          <Text style={{ fontWeight: "600" }}>Neden reddediyorsunuz?</Text>
+          <Text style={{ ...font("bold") }}>Neden reddediyorsunuz?</Text>
           <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
             {OFFER_DECLINE_REASONS.map((r) => (
               <Pressable
