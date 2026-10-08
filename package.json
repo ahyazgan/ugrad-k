@@ -6,9 +6,17 @@
     "test": "pnpm -r --if-present test",
     "typecheck": "pnpm -r --if-present typecheck",
     "lint": "pnpm -r --if-present lint",
-    "test:db": "bash supabase/tests/run.sh"
+    "test:db": "bash supabase/tests/run.sh",
+    "test:functions": "deno test --node-modules-dir=none --allow-env --allow-read supabase/functions/tests/",
+    "check:functions": "deno check --node-modules-dir=none supabase/functions/*/index.ts",
+    "test:all": "pnpm test && pnpm test:functions && pnpm test:db",
+    "deploy:functions": "supabase functions deploy --use-api"
   },
   "engines": {
     "node": ">=20"
+  },
+  "devDependencies": {
+    "deno": "2.9.6",
+    "supabase": "2.120.0"
   }
 }

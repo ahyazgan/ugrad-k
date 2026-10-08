@@ -35,6 +35,15 @@ Bu dosya Claude Code için proje hafızasıdır. Her oturumda önce bunu oku.
 - Kurumsal: ayda 20+ teslimat %15, 50+ teslimat %25 indirim, ay sonu tek fatura
 - Tüm fiyat parametreleri panelden değiştirilebilir olmalı (veritabanında `pricing_settings`)
 
+### Netleşen kurallar (2026-10-08, kullanıcı kararı)
+- Acil ve gece/tatil ek ücretleri **toplanır** (+%50 + %50 = +%100); gece ile tatil aynı anda olursa tek kez uygulanır
+- Kurumsal indirim **ay sonu faturanın** KDV hariç toplamına uygulanır; kademe o ayın teslimat sayısıyla belirlenir
+- Bekleme: 15 dk'dan sonra **başlayan** her 10 dk ücretlenir (yukarı yuvarlama)
+- Gidiş-dönüş: dönüş ayağı **ek ücretler dahil** fiyatın %50'si; köprü ücreti indirimsiz
+- Köprü: alış veya teslimden biri Avrupa yakasındaysa 1 geçiş (15 Temmuz/FSM motosiklet 25 TL, yalnız Anadolu→Avrupa yönü ücretli)
+- Arife günleri 13:00'ten itibaren tatil sayılır; tatil listesi `holidays` tablosunda
+- Tutarlar kuruş (tam sayı) tutulur; fiyat her zaman sunucuda yeniden hesaplanır
+
 ## Sipariş durumları
 `beklemede → onaylandi → kuryeye_atandi → alindi → yolda → teslim_edildi`
 Ek: `iptal`, `sorunlu`
@@ -47,9 +56,18 @@ Ek: `iptal`, `sorunlu`
 - Kurye çalışma saatleri kaydedilir (BTK bildirimi için rapor alınabilmeli)
 - Fiyat hesabı tek fonksiyonda; mobil, panel ve yapay zeka asistanı aynı fonksiyonu kullanır
 - Değişiklik yapmadan önce planı kısaca anlat, onay al
+  - **İstisna (2026-10-08):** Kullanıcı tüm fazları otomatik yürütme izni verdi. Claude fazları sırayla kendisi
+    tamamlar, sorun çıkarsa çözer ve devam eder. API anahtarı / hesap gerektiren adımlar sahte (mock) sağlayıcıyla
+    yapılır ve `docs/kurulum.md` içinde kullanıcıya bırakılır.
+
+## Kod yapısı ve komutlar
+- `packages/shared/` — pricing.ts (tek fiyat kaynağı), orders.ts (durumlar), geo.ts (yaka/köprü), maps.ts (Google Places New + Routes API, mock), quote.ts (istek doğrulama + teklif), db.ts (satır ↔ tip)
+- `supabase/migrations/` — şema, RLS, RPC, storage, sabit veriler; `supabase/functions/` — Edge Functions (Deno, `packages/shared`'ı doğrudan import eder; deploy `--use-api`)
+- `pnpm test` (vitest), `pnpm test:functions` (Deno), `pnpm test:db` (yerel Postgres'te migration + RLS), `pnpm test:all`
+- Google'ın eski Distance Matrix/Places API'leri yeni projelerde açılamıyor → **Routes API** ve **Places API (New)** kullanılıyor
 
 ## Yol haritası
-- [ ] Faz 1: Monorepo kurulumu, Supabase şeması, fiyat fonksiyonu + testleri
+- [x] Faz 1: Monorepo kurulumu, Supabase şeması, fiyat fonksiyonu + testleri
 - [ ] Faz 2: Müşteri akışı (adres → fiyat → sipariş) — ödeme olmadan
 - [ ] Faz 3: Yönetim paneli (sipariş listesi, kurye atama)
 - [ ] Faz 4: Kurye uygulaması (iş kabul, konum, teslim fotoğrafı)

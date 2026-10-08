@@ -55,7 +55,7 @@ export const DEFAULT_PRICING_SETTINGS: PricingSettings = {
   returnLegDiscountPct: 50,
   heavyThresholdKg: 10,
   heavySurchargeKurus: 15_000,
-  bridgeFeeKurus: 0,
+  bridgeFeeKurus: 2_500,
   corporateTiers: [
     { minDeliveries: 20, discountPct: 15 },
     { minDeliveries: 50, discountPct: 25 },
