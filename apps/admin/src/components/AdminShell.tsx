@@ -8,6 +8,7 @@ import { repo } from "@/lib/repo";
 const NAV = [
   { href: "/", label: "Genel bakış" },
   { href: "/siparisler", label: "Siparişler" },
+  { href: "/harita", label: "Canlı harita" },
   { href: "/raporlar", label: "Raporlar" },
   { href: "/kuryeler", label: "Kuryeler" },
   { href: "/vardiyalar", label: "Çalışma saatleri (BTK)" },

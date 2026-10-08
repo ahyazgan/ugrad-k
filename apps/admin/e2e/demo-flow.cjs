@@ -2,13 +2,16 @@
 // Kullanım: pnpm --filter @yazgan/admin build && pnpm --filter @yazgan/admin e2e:web
 const { chromium } = require("playwright");
 const fs = require("fs");
+const { stubTiles } = require("../../../scripts/e2e-tile-stub.cjs");
 const out = process.argv[2] || "e2e/shots";
 const base = `http://localhost:${process.env.PORT || 3100}`;
 fs.mkdirSync(out, { recursive: true });
 
 (async () => {
   const browser = await chromium.launch(process.env.CHROME_PATH ? { executablePath: process.env.CHROME_PATH } : {});
-  const page = await browser.newPage({ viewport: { width: 1360, height: 900 } });
+  const context = await browser.newContext({ viewport: { width: 1360, height: 900 } });
+  const tiles = await stubTiles(context);
+  const page = await context.newPage();
   const errors = [];
   page.on("pageerror", (e) => errors.push(e.message));
   page.on("console", (m) => m.type() === "error" && errors.push(m.text()));
@@ -132,6 +135,18 @@ fs.mkdirSync(out, { recursive: true });
   if (!/\d+ sipariş kuryeye atandı/.test(res) || /^0 sipariş onaylandı · 0 sipariş kuryeye/.test(res)) throw new Error("dağıtım bir şey yapmadı: " + res);
   await shot("06d-otomasyon");
 
+  // ───── Canlı harita: kurye ve sipariş işaretleri, açılır kutu, odaklama
+  await nav("Canlı harita");
+  await page.locator('[data-pin="kurye:kur-1"]').waitFor();
+  const pinCount = await page.locator("[data-pin]").count();
+  console.log("HARITA isaret:", pinCount, "karo:", tiles.count);
+  if (pinCount < 4 || !tiles.count) throw new Error("harita eksik çizildi");
+  await page.locator('[data-pin="kurye:kur-1"]').click();
+  await page.locator(".leaflet-popup-content").getByText("Mehmet Kaya").waitFor();
+  await page.getByTestId("map-couriers").getByRole("button", { name: "Göster" }).first().click();
+  await page.waitForTimeout(800); // flyTo animasyonu
+  await shot("06d2-harita");
+
   // ───── Raporlar: özet kutuları, grafik ipucu, tablo görünümü, CSV
   await nav("Raporlar");
   const totals = page.getByTestId("report-totals");
@@ -174,11 +189,15 @@ fs.mkdirSync(out, { recursive: true });
   if ((await kmTiers.inputValue()) !== "") throw new Error("ilk tarife yüklenmedi");
 
   // Herkese açık takip sayfası: oturum gerekmez
-  const pub = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  const pubCtx = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  await stubTiles(pubCtx);
+  const pub = await pubCtx.newPage();
   pub.on("pageerror", (e) => errors.push(e.message));
   await pub.goto(base + "/takip/demo0000000000000000000000000000");
   await pub.getByText("Gönderi takibi · YK-1001").waitFor();
   await pub.getByText("Kuryemiz Mehmet gönderinizi getiriyor.").waitFor();
+  await pub.locator('[data-pin="kurye"]').waitFor();
+  await pub.locator('[data-pin="teslim"]').waitFor();
   await pub.screenshot({ path: `${out}/08-takip.png`, fullPage: true });
   await pub.goto(base + "/takip/gecersiz");
   await pub.getByText("Gönderi bulunamadı").waitFor();

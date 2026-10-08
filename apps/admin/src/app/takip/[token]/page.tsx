@@ -2,18 +2,14 @@
 
 import { ORDER_STATUS_LABELS, type OrderStatus } from "@yazgan/shared";
 import { useParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { LeafletMap, type MapPin } from "@/components/LeafletMap";
 import { fmtTime } from "@/lib/dates";
 import { fetchTracking, type Tracking } from "@/lib/tracking";
 
 const STEPS: OrderStatus[] = ["beklemede", "onaylandi", "kuryeye_atandi", "alindi", "yolda", "teslim_edildi"];
 const POLL_MS = 15_000;
 
-function osmEmbed(lat: number, lng: number) {
-  const d = 0.012;
-  const bbox = [lng - d, lat - d, lng + d, lat + d].join(",");
-  return `https://www.openstreetmap.org/export/embed.html?bbox=${bbox}&layer=mapnik&marker=${lat},${lng}`;
-}
 
 const district = (a: string) => a.split(",").slice(-1)[0]!.trim().replace(/\/İstanbul$/i, "");
 
@@ -37,6 +33,18 @@ export default function TakipPage() {
     };
   }, [token]);
 
+  const loc = data?.courier_location ?? null;
+  const pins = useMemo<MapPin[]>(
+    () =>
+      data
+        ? [
+            { id: "teslim", lat: data.dropoff_lat, lng: data.dropoff_lng, label: "T", color: "#047857" },
+            ...(loc ? [{ id: "kurye", lat: loc.lat, lng: loc.lng, label: "🛵", color: "#f59e0b", size: 32, front: true }] : []),
+          ]
+        : [],
+    [data, loc],
+  );
+
   if (data === undefined && !error) {
     return <div className="flex min-h-screen items-center justify-center text-slate-500">Yükleniyor…</div>;
   }
@@ -53,7 +61,6 @@ export default function TakipPage() {
 
   const reached = new Map(data.history.map((h) => [h.status, h.at]));
   const closed = data.status === "teslim_edildi" || data.status === "iptal";
-  const loc = data.courier_location;
 
   return (
     <div className="mx-auto min-h-screen max-w-xl bg-slate-50">
@@ -78,13 +85,10 @@ export default function TakipPage() {
 
         {!closed ? (
           <section className="overflow-hidden rounded-xl border border-slate-200 bg-white">
-            <iframe
-              title="Harita"
-              className="h-72 w-full"
-              src={loc ? osmEmbed(loc.lat, loc.lng) : osmEmbed(data.dropoff_lat, data.dropoff_lng)}
-            />
+            {/* Kurye ilk kez görününce görünüm ikisini de kapsayacak şekilde yeniden sığdırılır */}
+            <LeafletMap className="h-72 w-full" pins={pins} fitKey={loc ? "kurye" : "teslim"} />
             <p className="px-4 py-2 text-xs text-slate-500">
-              {loc ? `Kurye konumu · son güncelleme ${fmtTime(loc.recorded_at)}` : "Teslim noktası"} · sayfa 15 sn&apos;de bir yenilenir
+              {loc ? `🛵 Kurye konumu · son güncelleme ${fmtTime(loc.recorded_at)}` : "T: teslim noktası"} · sayfa 15 sn&apos;de bir yenilenir
             </p>
           </section>
         ) : null}
