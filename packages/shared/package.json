@@ -1,0 +1,23 @@
+{
+  "name": "@yazgan/shared",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./index.ts",
+  "types": "./index.ts",
+  "exports": {
+    ".": "./index.ts",
+    "./pricing": "./pricing.ts",
+    "./orders": "./orders.ts",
+    "./legal": "./legal.ts"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5",
+    "typescript": "5.9.3",
+    "vitest": "3.2.4"
+  }
+}

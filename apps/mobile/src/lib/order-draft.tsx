@@ -1,0 +1,80 @@
+import { createContext, useContext, useState, type ReactNode } from "react";
+import type { DraftPoint, OrderInput } from "./api";
+
+export interface Draft {
+  pickup: DraftPoint | null;
+  dropoff: DraftPoint | null;
+  urgent: boolean;
+  roundTrip: boolean;
+  weightKg: string;
+  largePackage: boolean;
+  packageDescription: string;
+  customerNote: string;
+  pickupContactName: string;
+  pickupContactPhone: string;
+  dropoffContactName: string;
+  dropoffContactPhone: string;
+  paymentMethod: OrderInput["paymentMethod"];
+}
+
+const EMPTY: Draft = {
+  pickup: null,
+  dropoff: null,
+  urgent: false,
+  roundTrip: false,
+  weightKg: "",
+  largePackage: false,
+  packageDescription: "",
+  customerNote: "",
+  pickupContactName: "",
+  pickupContactPhone: "",
+  dropoffContactName: "",
+  dropoffContactPhone: "",
+  // Faz 6'da kartla online ödeme gelene kadar varsayılan: kuryeye ödeme
+  paymentMethod: "nakit",
+};
+
+/** Form → Edge Function gövdesi. Eksik adres varsa null. */
+export function draftToInput(d: Draft): OrderInput | null {
+  if (!d.pickup || !d.dropoff) return null;
+  const weight = d.weightKg.replace(",", ".").trim();
+  return {
+    pickup: { ...d.pickup, contactName: d.pickupContactName || undefined, contactPhone: d.pickupContactPhone || undefined },
+    dropoff: { ...d.dropoff, contactName: d.dropoffContactName || undefined, contactPhone: d.dropoffContactPhone || undefined },
+    urgent: d.urgent,
+    roundTrip: d.roundTrip,
+    weightKg: weight ? Number(weight) : null,
+    largePackage: d.largePackage,
+    packageDescription: d.packageDescription || undefined,
+    customerNote: d.customerNote || undefined,
+    scheduledPickupAt: null,
+    paymentMethod: d.paymentMethod,
+  };
+}
+
+const Ctx = createContext<{
+  draft: Draft;
+  update(patch: Partial<Draft>): void;
+  reset(): void;
+} | null>(null);
+
+export function OrderDraftProvider({ children }: { children: ReactNode }) {
+  const [draft, setDraft] = useState<Draft>(EMPTY);
+  return (
+    <Ctx.Provider
+      value={{
+        draft,
+        update: (patch) => setDraft((d) => ({ ...d, ...patch })),
+        reset: () => setDraft(EMPTY),
+      }}
+    >
+      {children}
+    </Ctx.Provider>
+  );
+}
+
+export function useOrderDraft() {
+  const v = useContext(Ctx);
+  if (!v) throw new Error("OrderDraftProvider eksik");
+  return v;
+}

@@ -1,0 +1,85 @@
+{
+  "expo": {
+    "name": "Yazgan Kurye",
+    "slug": "yazgan-kurye",
+    "scheme": "yazgankurye",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.yazgankurye.app",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      },
+      "usesAppleSignIn": false
+    },
+    "android": {
+      "package": "com.yazgankurye.app",
+      "adaptiveIcon": {
+        "backgroundColor": "#0F3D6E",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION",
+        "FOREGROUND_SERVICE",
+        "FOREGROUND_SERVICE_LOCATION",
+        "CAMERA",
+        "POST_NOTIFICATIONS"
+      ],
+      "blockedPermissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.READ_MEDIA_VIDEO"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "output": "single",
+      "bundler": "metro"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Teslimat adreslerini ve kurye vardiyası sırasında konumunuzu göstermek için konumunuz kullanılır.",
+          "locationAlwaysAndWhenInUsePermission": "Kurye vardiyanız açıkken, uygulama arka plandayken de konumunuz müşteriyle paylaşılır. Vardiya kapanınca paylaşım durur.",
+          "isIosBackgroundLocationEnabled": true,
+          "isAndroidBackgroundLocationEnabled": true,
+          "isAndroidForegroundServiceEnabled": true
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "Teslimat kanıtı fotoğrafı çekmek için kamera kullanılır.",
+          "photosPermission": false,
+          "microphonePermission": false
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "color": "#0F3D6E"
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": false
+    },
+    "extra": {
+      "eas": {
+        "projectId": ""
+      }
+    },
+    "description": "Acil evrak ve paketleriniz için İstanbul moto kurye: anında fiyat, canlı takip, teslim kanıtı.",
+    "primaryColor": "#0F3D6E"
+  }
+}

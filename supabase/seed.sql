@@ -1,0 +1,2 @@
+-- Yerel geliştirme verileri (yalnızca `supabase db reset` ile çalışır, canlıya gitmez).
+-- Fiyat ayarları ve tatiller migration 20261008000004_reference_data.sql içinde.

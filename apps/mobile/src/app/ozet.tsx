@@ -1,0 +1,135 @@
+import { formatTL } from "@yazgan/shared";
+import { router } from "expo-router";
+import { useEffect, useState } from "react";
+import { Pressable, Text, View } from "react-native";
+import { Button, Card, ErrorBox, Loading, Muted, Row, Screen, Title, colors } from "@/components/ui";
+import { api, ApiError, type OrderInput, type QuoteResponse } from "@/lib/api";
+import { draftToInput, useOrderDraft } from "@/lib/order-draft";
+import { payOrder } from "@/lib/payment";
+import { useSession } from "@/lib/session";
+
+const PAYMENT_OPTIONS: { value: OrderInput["paymentMethod"]; label: string; hint: string; corporateOnly?: boolean; disabled?: boolean }[] = [
+  { value: "nakit", label: "Kuryeye ödeme", hint: "Nakit veya IBAN ile teslimatta" },
+  { value: "cari", label: "Cari hesap", hint: "Ay sonu tek fatura", corporateOnly: true },
+  { value: "kart", label: "Kartla online ödeme", hint: "iyzico güvenli ödeme sayfası" },
+];
+
+export default function Ozet() {
+  const { draft, update, reset } = useOrderDraft();
+  const { profile } = useSession();
+  const input = draftToInput(draft);
+  // Teklif, hesaplandığı girdinin anahtarıyla saklanır; girdi değişince eski teklif gösterilmez
+  const key = JSON.stringify({ ...input, paymentMethod: undefined });
+  const [result, setResult] = useState<{ key: string; quote?: QuoteResponse; error?: string } | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const current = result?.key === key ? result : null;
+  const quote = current?.quote ?? null;
+  const error = submitError ?? current?.error ?? null;
+
+  useEffect(() => {
+    if (!input) return;
+    let alive = true;
+    api.quote(input).then(
+      (q) => alive && setResult({ key, quote: q }),
+      (e) => alive && setResult({ key, error: e instanceof ApiError ? e.message : "Fiyat hesaplanamadı" }),
+    );
+    return () => {
+      alive = false;
+    };
+    // Ödeme yöntemi fiyatı etkilemez; yalnızca anahtar değişince yeniden hesapla
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]);
+
+  async function confirm() {
+    if (!input) return;
+    setSubmitting(true);
+    setSubmitError(null);
+    try {
+      const order = await api.createOrder(input);
+      reset();
+      if (input.paymentMethod === "kart") await payOrder(order.id);
+      // Özet ekranının yerine sipariş detayı: geri tuşu sekmelere döner
+      router.replace({ pathname: "/siparis/[id]", params: { id: order.id, yeni: "1" } });
+    } catch (e) {
+      setSubmitError(e instanceof ApiError ? e.message : "Sipariş oluşturulamadı");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  if (!input) {
+    return (
+      <Screen>
+        <Muted>Önce adresleri seçin.</Muted>
+      </Screen>
+    );
+  }
+
+  const km = quote ? (quote.distanceMeters / 1000).toLocaleString("tr-TR", { maximumFractionDigits: 1 }) : "";
+  const min = quote ? Math.round(quote.durationSeconds / 60) : 0;
+
+  return (
+    <Screen>
+      <Card>
+        <Muted>Nereden</Muted>
+        <Text style={{ fontWeight: "600" }}>{input.pickup.address}</Text>
+        <Muted>Nereye</Muted>
+        <Text style={{ fontWeight: "600" }}>{input.dropoff.address}</Text>
+        {quote ? (
+          <Muted>
+            Sürüş mesafesi {km} km · yaklaşık {min} dk{quote.bridgeCrossings ? " · köprü geçişi" : ""}
+          </Muted>
+        ) : null}
+      </Card>
+
+      {error ? <ErrorBox message={error} /> : null}
+      {!quote && !error ? <Loading /> : null}
+
+      {quote ? (
+        <Card>
+          <Title>Fiyat</Title>
+          {quote.quote.lines.map((l) => (
+            <Row key={l.code} label={l.label} value={formatTL(l.amountKurus)} />
+          ))}
+          <View style={{ height: 1, backgroundColor: colors.border }} />
+          <Row label="Ara toplam (KDV hariç)" value={formatTL(quote.quote.subtotalKurus)} />
+          <Row label="KDV %20" value={formatTL(quote.quote.vatKurus)} />
+          <Row label="Toplam" value={formatTL(quote.quote.totalKurus)} bold />
+          {draft.paymentMethod === "cari" ? (
+            <Muted>Kurumsal indiriminiz ay sonu faturanızda uygulanır.</Muted>
+          ) : null}
+        </Card>
+      ) : null}
+
+      <Card>
+        <Title>Ödeme</Title>
+        {PAYMENT_OPTIONS.filter((o) => !o.corporateOnly || profile?.corporateAccountId).map((o) => {
+          const on = draft.paymentMethod === o.value;
+          return (
+            <Pressable
+              key={o.value}
+              disabled={o.disabled}
+              onPress={() => update({ paymentMethod: o.value })}
+              style={{
+                borderWidth: 2,
+                borderColor: on ? colors.primary : colors.border,
+                borderRadius: 10,
+                padding: 12,
+                opacity: o.disabled ? 0.5 : 1,
+              }}
+            >
+              <Text style={{ fontWeight: "600" }}>{o.label}</Text>
+              <Muted>{o.hint}</Muted>
+            </Pressable>
+          );
+        })}
+      </Card>
+
+      <Button title="Siparişi onayla" onPress={confirm} loading={submitting} disabled={!quote} testID="confirm-order" />
+      <Muted style={{ textAlign: "center" }}>
+        Bekleme süresi 15 dakikayı aşarsa her 10 dakika için 50 TL + KDV eklenir.
+      </Muted>
+    </Screen>
+  );
+}
