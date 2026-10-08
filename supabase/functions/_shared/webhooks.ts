@@ -50,6 +50,7 @@ interface Delivery {
 export async function handleWebhookDispatch(req: Request, ctx: Ctx, deps: { env: Env; fetchFn?: typeof fetch; now?: () => Date }) {
   const secret = deps.env("NOTIFY_SECRET");
   if (!secret || req.headers.get("x-notify-secret") !== secret) throw new HttpError(401, "Yetkisiz");
+  await ctx.admin.rpc("record_heartbeat", { p_name: "webhook-dispatch" });
   const fetchFn = deps.fetchFn ?? fetch;
   const now = deps.now ?? (() => new Date());
 

@@ -19,6 +19,7 @@ const istDate = (d = new Date()) => new Date(d.getTime() + 3 * 3600_000).toISOSt
 export async function handleInvoiceDispatch(req: Request, ctx: Ctx, deps: InvoiceDeps): Promise<Response> {
   const secret = deps.env("NOTIFY_SECRET");
   if (!secret || req.headers.get("x-notify-secret") !== secret) throw new HttpError(401, "Yetkisiz");
+  await ctx.admin.rpc("record_heartbeat", { p_name: "invoice-dispatch" });
   const cfg = parasutFromEnv(deps.env);
   // Entegratör yapılandırılmadıysa kuyruğa dokunma (deneme hakları boşa gitmesin)
   if (!cfg) return json({ processed: 0, skipped: "Paraşüt yapılandırılmamış" });

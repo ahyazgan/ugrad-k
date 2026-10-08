@@ -236,6 +236,21 @@ export interface WebhookDelivery {
   deliveredAt: string | null;
 }
 
+export interface SystemHealth {
+  snapshot: {
+    checked_at: string;
+    orders_waiting: number;
+    orders_problem: number;
+    notifications_stuck: number;
+    invoices_failed: number;
+    webhooks_failed_24h: number;
+    couriers_on_shift: number;
+    couriers_stale: number;
+    heartbeats: Record<string, string>;
+  };
+  issues: Array<{ key: string; severity: "critical" | "warning"; message: string }>;
+}
+
 export interface OrderRating {
   orderId: string;
   orderNo: string;
@@ -318,6 +333,7 @@ export interface AdminRepo {
   getOpsSettings(): Promise<OpsSettings>;
   saveOpsSettings(s: OpsSettings): Promise<void>;
   runDispatch(): Promise<DispatchResult>;
+  getSystemHealth(): Promise<SystemHealth>;
   // Telefon siparişi
   searchPlaces(input: string, sessionToken: string): Promise<PlaceSuggestion[]>;
   placeDetails(placeId: string, sessionToken: string): Promise<PlaceDetails>;

@@ -85,7 +85,7 @@ export function LeadForm({ kind, sourcePage }: { kind: LeadInput["kind"]; source
         <input type="checkbox" data-testid="lead-consent" className="mt-1 h-4 w-4" checked={consent} onChange={(e) => setConsent(e.target.checked)} />
         <span>
           Bilgilerimin başvurumun değerlendirilmesi ve benimle iletişime geçilmesi amacıyla işlenmesine ilişkin{" "}
-          <Link href="/kvkk" className="text-brand underline" target="_blank">
+          <Link href="/kvkk#basvuru" className="text-brand underline" target="_blank">
             aydınlatma metnini
           </Link>{" "}
           okudum.

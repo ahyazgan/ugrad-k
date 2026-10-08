@@ -61,10 +61,13 @@ Ek: `iptal`, `sorunlu`
     yapılır ve `docs/kurulum.md` içinde kullanıcıya bırakılır.
 
 ## Kod yapısı ve komutlar
+- **Marka/alan adı tek kaynak: `packages/shared/brand.ts`** (kullanıcı yeni marka adı alacak; kodda marka adı veya alan adı sabit yazılmaz, `BRAND`/`trackingBaseUrl`/`kvkkUrl` kullanılır)
+- `apps/web/` — Next.js tanıtım sitesi: fiyat hesaplayıcı, ilçe SEO sayfaları (`lib/districts.ts`, Türkçe ekler `lib/tr.ts`), kurumsal başvuru, kurye başvurusu (belge yükleme), API belgeleri, sitemap/robots/JSON-LD. Supabase env yoksa demo. `/api/v1/*` → Edge Function `api` (rewrite). `pnpm --filter @yazgan/web e2e:web`
 - `packages/shared/` — tiles.ts (harita karo hesabı; mobil `TileMap` yerel modülsüz OSM haritası), pricing.ts (tek fiyat kaynağı), orders.ts (durumlar), geo.ts (yaka/köprü), maps.ts (Google Places New + Routes API, mock), quote.ts (istek doğrulama + teklif), db.ts (satır ↔ tip)
 - `supabase/migrations/` — şema, RLS, RPC, storage, sabit veriler; `supabase/functions/` — Edge Functions (Deno, `packages/shared`'ı doğrudan import eder; deploy `--use-api`)
 - `apps/mobile/` — Expo SDK 57 + expo-router (`src/app/`). Supabase env yoksa **DEMO modu** (sahte veri, kod 123456). `pnpm --filter @yazgan/mobile e2e:web` tarayıcıda tam akışı test eder
 - `apps/admin/` — Next.js 16 + Tailwind 4 panel. Supabase env yoksa **DEMO modu** (admin@yazgankurye.com / demo1234). Kurye hesabı oluşturma `/api/kuryeler` (service role yalnız sunucuda). `pnpm --filter @yazgan/admin e2e:web`
+- Herkese açık Edge Functions: `site-api` (fiyat/adres/başvuru/kurye başvurusu/değerlendirme; IP hız sınırı `hit_rate_limit`), `api` (kurumsal REST, `yk_live_` anahtar SHA-256), `email-inbound` (Postmark → asistan, SPF/DKIM + kayıtlı müşteri), `health` (GET ayrıntısız; cron uyarı), `webhook-dispatch` (HMAC imzalı kurumsal webhook kuyruğu)
 - Edge Functions: auto-dispatch (otomatik onay + kurye atama, `packages/shared/assignment.ts`), admin-order (telefon siparişi), quote, create-order, places, send-sms, reprice-order, notify-dispatch, payment-init/callback/refund, invoice-dispatch/monthly, whatsapp-webhook, assistant-voice, account-delete
 - Operasyon ayarları `ops_settings` (panel → Otomasyon): otomatik onay/atama, kapasite, mesafe, ödeme süresi
 - Kuyruklar (outbox): `notifications` ve `invoices` tabloları; dakikalık cron ile işlenir (docs/kurulum.md §6)
@@ -83,4 +86,5 @@ Ek: `iptal`, `sorunlu`
 - [x] Faz 6: iyzico ödeme + otomatik e-arşiv fatura
 - [x] Faz 7: Yapay zeka sesli asistan ve WhatsApp botu → aynı sipariş API'sine bağlanır
 - [~] Faz 8: App Store / Google Play yayını — kod hazır (EAS, hesap silme, yasal sayfalar, `docs/magaza.md`); mağaza hesapları ve gönderim kullanıcıda
+- [x] Dış kanallar (2026-10-10): marka tek dosyada, web sitesi + SEO, tarayıcıdan sipariş (Expo web, ödeme dönüşü), kurumsal başvuru ve kurye başvurusu (panel → Başvurular), e-postayla sipariş, kurumsal API + webhook, teslim sonrası puan + Google yorum, sistem izleme (panel → Otomasyon → Sistem durumu). Kurulum: docs/kurulum.md §16–22
 - [x] Ek geliştirmeler (2026-10-09): panelden telefon siparişi, otomatik onay + kurye atama, ödenmemiş kart siparişi iptali, kademeli km + %75 ek ücret tavanı (panelden tek tıkla eski tarifeye dönüş), raporlar + CSV, canlı haritalar (panel, takip sayfası, müşteri ve kurye uygulaması)

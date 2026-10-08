@@ -1,5 +1,6 @@
 "use client";
 
+import { ageLabel } from "@yazgan/shared";
 import Link from "next/link";
 import { useState, type FormEvent } from "react";
 import { Button, Card, ErrorText, Input, PageHeader } from "@/components/ui";
@@ -63,8 +64,69 @@ export default function OtomasyonPage() {
           ) : null}
         </Card>
       ) : null}
+      <SystemHealthCard />
       {data ? <OpsForm key={JSON.stringify(data)} initial={data} onSaved={reload} /> : null}
     </>
+  );
+}
+
+const JOB_LABELS: Record<string, string> = {
+  "notify-dispatch": "Bildirim gönderimi",
+  "auto-dispatch": "Otomatik dağıtım",
+  "webhook-dispatch": "Kurumsal webhook",
+  "invoice-dispatch": "Fatura kesimi",
+  health: "Sistem denetimi",
+};
+
+/** Zamanlanmış görevlerin son çalışması ve açık sorunlar (health fonksiyonu) */
+function SystemHealthCard() {
+  const { data, error, reload } = useLoad(() => repo.getSystemHealth());
+  return (
+    <Card
+      className="mb-6"
+      title="Sistem durumu"
+      actions={
+        <Button variant="ghost" onClick={reload}>
+          Yenile
+        </Button>
+      }
+    >
+      <ErrorText>{error}</ErrorText>
+      {data ? (
+        <div className="grid gap-4 md:grid-cols-2" data-testid="system-health">
+          <div>
+            {data.issues.length === 0 ? (
+              <p className="font-semibold text-emerald-700">✓ Her şey yolunda</p>
+            ) : (
+              <ul className="space-y-1.5 text-sm">
+                {data.issues.map((i) => (
+                  <li key={i.key} className={i.severity === "critical" ? "font-semibold text-red-700" : "text-amber-700"}>
+                    {i.severity === "critical" ? "● Kritik: " : "● Uyarı: "}
+                    {i.message}
+                  </li>
+                ))}
+              </ul>
+            )}
+            <p className="mt-2 text-xs text-slate-500">
+              Vardiyada {data.snapshot.couriers_on_shift} kurye · sorunlar yöneticiye WhatsApp/SMS ile bildirilir (5 dakikada bir denetim).
+            </p>
+          </div>
+          <table className="text-sm">
+            <tbody>
+              {Object.entries(JOB_LABELS).map(([job, label]) => {
+                const at = data.snapshot.heartbeats[job];
+                return (
+                  <tr key={job}>
+                    <td className="py-0.5 pr-3 text-slate-600">{label}</td>
+                    <td className="py-0.5 text-slate-900">{at ? ageLabel(at) : <span className="text-red-700">hiç çalışmadı</span>}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      ) : null}
+    </Card>
   );
 }
 

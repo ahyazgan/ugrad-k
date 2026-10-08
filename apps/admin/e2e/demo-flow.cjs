@@ -160,6 +160,7 @@ fs.mkdirSync(out, { recursive: true });
   const res = await page.getByTestId("dispatch-result").innerText();
   console.log("DAGITIM", res);
   if (!/\d+ sipariş kuryeye atandı/.test(res) || /^0 sipariş onaylandı · 0 sipariş kuryeye/.test(res)) throw new Error("dağıtım bir şey yapmadı: " + res);
+  await page.getByTestId("system-health").getByText("Fatura kesimi").waitFor();
   await shot("06d-otomasyon");
 
   // ───── Canlı harita: kurye ve sipariş işaretleri, açılır kutu, odaklama

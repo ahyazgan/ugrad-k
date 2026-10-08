@@ -492,3 +492,7 @@ verify_jwt = false
 # Postmark Inbound (Basic Auth parolası = EMAIL_INBOUND_SECRET)
 [functions.email-inbound]
 verify_jwt = false
+
+# Sağlık: GET herkese açık (ayrıntısız), cron x-notify-secret, panel yönetici JWT
+[functions.health]
+verify_jwt = false

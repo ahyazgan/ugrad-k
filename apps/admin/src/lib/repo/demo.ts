@@ -619,6 +619,35 @@ export function createDemoRepo(): AdminRepo {
     async saveOpsSettings(o) {
       (await get()).ops = clone(o);
     },
+    async getSystemHealth() {
+      const s = await get();
+      const now = Date.now();
+      const fresh = new Date(now - 60_000).toISOString();
+      const waiting = s.orders.filter(
+        (o) => (o.status === "beklemede" || o.status === "onaylandi") && now - new Date(o.createdAt).getTime() > 30 * 60_000,
+      ).length;
+      const onShift = s.couriers.filter((c) => c.isOnShift && c.active);
+      const stale = onShift.filter((c) => !c.lastLocationAt || now - new Date(c.lastLocationAt).getTime() > 15 * 60_000).length;
+      const failedInvoices = s.invoices.filter((i) => i.status === "failed").length;
+      const issues: Awaited<ReturnType<AdminRepo["getSystemHealth"]>>["issues"] = [];
+      if (waiting) issues.push({ key: "orders_waiting", severity: "critical", message: `${waiting} sipariş 30 dakikadan uzun süredir kurye bekliyor` });
+      if (failedInvoices) issues.push({ key: "invoices_failed", severity: "warning", message: `${failedInvoices} fatura kesilemedi` });
+      if (stale) issues.push({ key: "couriers_stale", severity: "warning", message: `Vardiyadaki ${stale} kuryenin konumu 15 dakikadır gelmiyor` });
+      return {
+        snapshot: {
+          checked_at: new Date().toISOString(),
+          orders_waiting: waiting,
+          orders_problem: s.orders.filter((o) => o.status === "sorunlu").length,
+          notifications_stuck: 0,
+          invoices_failed: failedInvoices,
+          webhooks_failed_24h: 0,
+          couriers_on_shift: onShift.length,
+          couriers_stale: stale,
+          heartbeats: { "notify-dispatch": fresh, "auto-dispatch": fresh, "webhook-dispatch": fresh, "invoice-dispatch": fresh, health: fresh },
+        },
+        issues,
+      };
+    },
     async runDispatch() {
       const s = await get();
       let approved = 0;

@@ -27,6 +27,7 @@ import {
   type PhoneCustomer,
   type ApiKeyInfo,
   type OrderRating,
+  type SystemHealth,
   type WebhookDelivery,
 } from "./types";
 import { toTranscript } from "./transcript";
@@ -418,6 +419,7 @@ export function createSupabaseRepo(url: string, anonKey: string): AdminRepo & { 
       );
     },
     runDispatch: () => invoke<DispatchResult>("auto-dispatch", {}),
+    getSystemHealth: () => invoke<SystemHealth>("health", {}),
 
     async searchPlaces(input, sessionToken) {
       return (await invoke<{ suggestions: PlaceSuggestion[] }>("places", { input, sessionToken })).suggestions;

@@ -125,7 +125,7 @@ export function CourierApplyForm() {
         <input type="checkbox" data-testid="apply-consent" className="mt-1 h-4 w-4" checked={f.kvkkConsent} onChange={(e) => setF({ ...f, kvkkConsent: e.target.checked })} />
         <span>
           Başvuru bilgilerimin ve belgelerimin işe alım değerlendirmesi amacıyla işlenmesine ve en fazla 1 yıl saklanmasına ilişkin{" "}
-          <Link href="/kvkk" className="text-brand underline" target="_blank">
+          <Link href="/kvkk#basvuru" className="text-brand underline" target="_blank">
             aydınlatma metnini
           </Link>{" "}
           okudum.

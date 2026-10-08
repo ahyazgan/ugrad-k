@@ -31,6 +31,7 @@ export async function handleAutoDispatch(
   deps: { env: Env; fetchFn?: typeof fetch; now?: Date },
 ): Promise<Response> {
   const trigger = await authorize(req, ctx, deps.env);
+  if (trigger === "cron") await ctx.admin.rpc("record_heartbeat", { p_name: "auto-dispatch" });
   const now = deps.now ?? new Date();
 
   const { data: ops } = await ctx.admin.from("ops_settings").select("*").eq("id", 1).single();

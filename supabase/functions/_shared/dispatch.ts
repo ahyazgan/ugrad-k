@@ -55,6 +55,7 @@ export async function handleNotifyDispatch(
 ): Promise<Response> {
   const secret = deps.env("NOTIFY_SECRET");
   if (!secret || req.headers.get("x-notify-secret") !== secret) throw new HttpError(401, "Yetkisiz");
+  await ctx.admin.rpc("record_heartbeat", { p_name: "notify-dispatch" });
 
   const { data: claimed, error } = await ctx.admin.rpc("claim_notifications", { p_limit: 20 });
   if (error) throw new Error(`Kuyruk okunamadı: ${error.message}`);
