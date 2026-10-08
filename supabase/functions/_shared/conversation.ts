@@ -20,26 +20,8 @@ export interface ConversationDeps {
   findOrCreateCustomer?: (phone: string) => Promise<{ profileId: string; fullName: string | null; isNew: boolean }>;
 }
 
-/** "905321234567" / "+90 532..." → "905321234567" */
-export const phoneKey = (phone: string) => {
-  const d = phone.replace(/\D/g, "").replace(/^0/, "");
-  return d.startsWith("90") ? d : `90${d}`;
-};
-
-export async function findOrCreateCustomerDefault(ctx: Ctx, phone: string) {
-  const key = phoneKey(phone);
-  const { data: existing } = await ctx.admin
-    .from("profiles")
-    .select("id, full_name")
-    .in("phone", [key, `+${key}`])
-    .limit(1)
-    .maybeSingle();
-  if (existing) return { profileId: existing.id as string, fullName: existing.full_name as string | null, isNew: false };
-  // WhatsApp numarası Meta tarafından doğrulanmıştır; telefonla müşteri hesabı açılır
-  const { data, error } = await ctx.admin.auth.admin.createUser({ phone: key, phone_confirm: true });
-  if (error || !data.user) throw new Error(`Müşteri oluşturulamadı: ${error?.message}`);
-  return { profileId: data.user.id, fullName: null, isNew: true };
-}
+export { findOrCreateCustomerDefault, phoneKey } from "./customers.ts";
+import { findOrCreateCustomerDefault } from "./customers.ts";
 
 async function customerContext(ctx: Ctx, profileId: string, fullName: string | null, isNew: boolean) {
   const [{ data: consents }, { data: profile }] = await Promise.all([

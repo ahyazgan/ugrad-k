@@ -11,6 +11,8 @@ import {
   calculateMonthlyInvoice,
   mockMapsProvider,
   MOCK_PLACES,
+  parseOrderRequest,
+  ValidationError,
   type Holiday,
   type OrderStatus,
   type PricingSettings,
@@ -27,6 +29,7 @@ import {
   type Conversation,
   type Customer,
   type Invoice,
+  type PhoneCustomer,
   type Shift,
 } from "./types";
 
@@ -44,8 +47,11 @@ interface State {
   shifts: Shift[];
   invoices: Invoice[];
   conversations: Conversation[];
+  /** KVKK onayı verilmiş müşteri kimlikleri */
+  consented: Set<string>;
 }
 
+const phoneDigits = (p: string) => p.replace(/\D/g, "").replace(/^(90|0)/, "");
 const hoursAgo = (h: number) => new Date(Date.now() - h * 3_600_000).toISOString();
 
 async function seed(): Promise<State> {
@@ -185,6 +191,7 @@ async function seed(): Promise<State> {
   });
   return {
     signedIn: false,
+    consented: new Set(["cus-1", "cus-2"]),
     settings: { ...DEFAULT_PRICING_SETTINGS },
     holidays: (holidaysJson as Array<{ date: string; name: string; half_day: boolean }>).map((h) => ({
       date: h.date,
@@ -470,6 +477,125 @@ export function createDemoRepo(): AdminRepo {
     async retryInvoice(id) {
       const inv = (await get()).invoices.find((i) => i.id === id);
       if (inv) Object.assign(inv, { status: "pending", attempts: 0, lastError: null });
+    },
+
+    async searchPlaces(input) {
+      return mockMapsProvider().autocomplete(input);
+    },
+    async placeDetails(placeId) {
+      return mockMapsProvider().placeDetails(placeId);
+    },
+    async quote(order) {
+      const s = await get();
+      try {
+        return await buildQuote(parseOrderRequest(order), { maps: mockMapsProvider(), settings: s.settings, holidays: s.holidays });
+      } catch (e) {
+        if (e instanceof ValidationError) throw new RepoError(e.message);
+        throw e;
+      }
+    },
+    async lookupPhoneCustomer(phone) {
+      const s = await get();
+      const key = phoneDigits(phone);
+      const c = s.customers.find((x) => x.phone && phoneDigits(x.phone) === key);
+      if (!c) return null;
+      const seen = new Set<string>();
+      const recent: PhoneCustomer["recentAddresses"] = [];
+      for (const o of s.orders.filter((x) => x.customerId === c.id).sort((a, b) => b.createdAt.localeCompare(a.createdAt))) {
+        for (const side of ["pickup", "dropoff"] as const) {
+          const address = side === "pickup" ? o.pickupAddress : o.dropoffAddress;
+          if (seen.has(address)) continue;
+          seen.add(address);
+          const p = MOCK_PLACES.find((m) => m.address === address);
+          if (!p) continue;
+          recent.push({
+            address,
+            details: side === "pickup" ? o.pickupDetails : o.dropoffDetails,
+            lat: p.lat,
+            lng: p.lng,
+            contactName: side === "pickup" ? o.pickupContactName : o.dropoffContactName,
+            contactPhone: side === "pickup" ? o.pickupContactPhone : o.dropoffContactPhone,
+          });
+        }
+      }
+      return {
+        id: c.id,
+        fullName: c.fullName,
+        email: c.email,
+        corporateAccountId: c.corporateAccountId,
+        hasConsent: s.consented.has(c.id),
+        recentAddresses: recent.slice(0, 6),
+      };
+    },
+    async createPhoneOrder({ phone, fullName, verbalConsent, order }) {
+      const s = await get();
+      const key = phoneDigits(phone);
+      if (!/^5\d{9}$/.test(key)) throw new RepoError("Geçerli bir cep telefonu numarası girin");
+      if (order.paymentMethod === "kart") throw new RepoError("Telefon siparişinde ödeme kuryeye veya cari hesaba yapılır");
+      let c = s.customers.find((x) => x.phone && phoneDigits(x.phone) === key);
+      if (!c) {
+        c = { id: `cus-${s.customers.length + 1}`, fullName: fullName || null, phone: `+90${key}`, email: null, corporateAccountId: null, createdAt: new Date().toISOString(), orderCount: 0 };
+        s.customers.push(c);
+      }
+      if (!s.consented.has(c.id)) {
+        if (!verbalConsent) throw new RepoError("Müşteriden KVKK onayı alınmalı (aydınlatma metnini okuyup sözlü onayını işaretleyin)");
+        s.consented.add(c.id);
+      }
+      if (order.paymentMethod === "cari" && !c.corporateAccountId) throw new RepoError("Cari hesap ile ödeme yalnızca kurumsal müşteriler içindir");
+      const req = parseOrderRequest(order);
+      const q = await buildQuote(req, { maps: mockMapsProvider(), settings: s.settings, holidays: s.holidays });
+      const n = 1000 + s.orders.length + 1;
+      const now = new Date().toISOString();
+      const o: AdminOrderDetail = {
+        id: `ord-${n}`,
+        orderNo: `YK-${n}`,
+        status: "beklemede",
+        createdAt: now,
+        urgent: req.urgent,
+        roundTrip: req.roundTrip,
+        pickupAddress: req.pickup.address,
+        pickupSide: q.pickupSide,
+        dropoffAddress: req.dropoff.address,
+        dropoffSide: q.dropoffSide,
+        customerId: c.id,
+        customerName: c.fullName,
+        customerPhone: c.phone,
+        corporateAccountId: c.corporateAccountId,
+        courierId: null,
+        courierName: null,
+        totalKurus: q.quote.totalKurus,
+        subtotalKurus: q.quote.subtotalKurus,
+        paymentMethod: req.paymentMethod,
+        paymentStatus: req.paymentMethod === "cari" ? "cari_hesap" : "odenmedi",
+        paidKurus: null,
+        distanceMeters: q.distanceMeters,
+        scheduledPickupAt: req.scheduledPickupAt,
+        deliveredAt: null,
+        pickupDetails: req.pickup.details ?? null,
+        pickupContactName: req.pickup.contactName ?? null,
+        pickupContactPhone: req.pickup.contactPhone ?? null,
+        dropoffDetails: req.dropoff.details ?? null,
+        dropoffContactName: req.dropoff.contactName ?? null,
+        dropoffContactPhone: req.dropoff.contactPhone ?? null,
+        packageDescription: req.packageDescription ?? null,
+        weightKg: req.weightKg,
+        customerNote: req.customerNote ?? null,
+        waitingMinutes: 0,
+        priceQuote: q.quote,
+        trackingToken: `demo${n}`.padEnd(32, "0"),
+        cancelReason: null,
+        problemNote: null,
+        paymentRef: null,
+        paymentError: null,
+        podPhotoPath: null,
+        podSignaturePath: null,
+        podReceiverName: null,
+        history: [{ fromStatus: null, toStatus: "beklemede", at: now, note: "Telefon siparişi" }],
+      };
+      s.orders.push(o);
+      c.orderCount++;
+      touchOrders();
+      return { id: o.id, orderNo: o.orderNo };
     },
 
     async listConversations() {

@@ -47,6 +47,43 @@ fs.mkdirSync(out, { recursive: true });
   await page.getByText(/\d+ sipariş/).waitFor();
   await shot("03-siparisler");
 
+  // ───── Telefon siparişi: kayıtlı müşteri, son adresten seçim
+  await page.getByRole("link", { name: "+ Telefon siparişi" }).click();
+  const t = (id) => page.getByTestId(id);
+  await t("phone").fill("0532 111 22 33");
+  await t("lookup").click();
+  await page.getByText("Kayıtlı müşteri").waitFor();
+  if ((await t("full-name").inputValue()) !== "Ayşe Yılmaz") throw new Error("müşteri adı gelmedi");
+  await page.getByRole("button", { name: /↺ .*Kadıköy/ }).first().click(); // alış: son adres
+  await t("dropoff-search").fill("levent");
+  await t("dropoff-suggestion-0").click();
+  await t("dropoff-details").fill("Kanyon B Blok");
+  await t("opt-urgent").check();
+  await t("total").waitFor();
+  console.log("TELEFON FIYAT", await t("total").innerText());
+  await shot("03b-telefon-siparisi");
+  await t("submit").click();
+  await page.getByText("Telefon siparişi", { exact: true }).waitFor(); // geçmiş notu
+  await page.getByText("Kanyon B Blok").waitFor();
+
+  // Yeni müşteri: sözlü KVKK onayı olmadan gönderilemez
+  await nav("Siparişler");
+  await page.getByRole("link", { name: "+ Telefon siparişi" }).click();
+  await t("phone").fill("0533 999 88 77");
+  await t("lookup").click();
+  await page.getByText("Yeni müşteri", { exact: false }).waitFor();
+  await t("full-name").fill("Deniz Yeni");
+  await t("pickup-search").fill("üsküdar");
+  await t("pickup-suggestion-0").click();
+  await t("dropoff-search").fill("ataşehir");
+  await t("dropoff-suggestion-0").click();
+  await t("total").waitFor();
+  if (await t("submit").isEnabled()) throw new Error("onaysız gönderim engellenmeli");
+  await t("consent").check();
+  await t("submit").click();
+  await page.getByText("Telefon siparişi", { exact: true }).waitFor();
+  await page.getByText("Deniz Yeni").first().waitFor();
+
   await nav("Kuryeler");
   await page.getByLabel("Ad Soyad").fill("Can Test");
   await page.getByLabel("Cep telefonu").fill("05551234567");

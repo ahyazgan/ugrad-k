@@ -469,3 +469,6 @@ verify_jwt = false
 
 [functions.account-delete]
 verify_jwt = true
+
+[functions.admin-order]
+verify_jwt = true

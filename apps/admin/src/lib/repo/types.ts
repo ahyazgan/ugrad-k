@@ -1,4 +1,13 @@
-import type { Holiday, MonthlyInvoice, OrderStatus, PriceQuote, PricingSettings } from "@yazgan/shared";
+import type {
+  Holiday,
+  IstanbulSide,
+  MonthlyInvoice,
+  OrderStatus,
+  PlaceDetails,
+  PlaceSuggestion,
+  PriceQuote,
+  PricingSettings,
+} from "@yazgan/shared";
 
 export interface AdminOrder {
   id: string;
@@ -131,6 +140,45 @@ export interface Conversation {
   transcript: Array<{ role: "user" | "assistant"; text: string }>;
 }
 
+export interface PhoneCustomer {
+  id: string;
+  fullName: string | null;
+  email: string | null;
+  corporateAccountId: string | null;
+  hasConsent: boolean;
+  recentAddresses: Array<{
+    address: string;
+    details: string | null;
+    lat: number;
+    lng: number;
+    contactName: string | null;
+    contactPhone: string | null;
+  }>;
+}
+
+/** quote / create-order gövdesi (packages/shared/quote.ts parseOrderRequest) */
+export interface OrderRequestInput {
+  pickup: { address: string; details?: string; lat: number; lng: number; district?: string | null; contactName?: string; contactPhone?: string };
+  dropoff: { address: string; details?: string; lat: number; lng: number; district?: string | null; contactName?: string; contactPhone?: string };
+  urgent: boolean;
+  roundTrip: boolean;
+  weightKg: number | null;
+  largePackage: boolean;
+  packageDescription?: string;
+  customerNote?: string;
+  scheduledPickupAt: string | null;
+  paymentMethod: "nakit" | "cari" | "kart";
+}
+
+export interface AdminQuote {
+  quote: PriceQuote;
+  distanceMeters: number;
+  durationSeconds: number;
+  bridgeCrossings: number;
+  pickupSide: IstanbulSide;
+  dropoffSide: IstanbulSide;
+}
+
 export interface OrderFilter {
   statuses?: OrderStatus[];
   search?: string;
@@ -168,6 +216,12 @@ export interface AdminRepo {
   listInvoices(): Promise<Invoice[]>;
   createMonthlyInvoice(corporateAccountId: string, month: string): Promise<void>;
   retryInvoice(id: string): Promise<void>;
+  // Telefon siparişi
+  searchPlaces(input: string, sessionToken: string): Promise<PlaceSuggestion[]>;
+  placeDetails(placeId: string, sessionToken: string): Promise<PlaceDetails>;
+  quote(order: OrderRequestInput): Promise<AdminQuote>;
+  lookupPhoneCustomer(phone: string): Promise<PhoneCustomer | null>;
+  createPhoneOrder(input: { phone: string; fullName: string; verbalConsent: boolean; order: OrderRequestInput }): Promise<{ id: string; orderNo: string }>;
   // Asistan
   listConversations(): Promise<Conversation[]>;
   closeConversation(id: string): Promise<void>;

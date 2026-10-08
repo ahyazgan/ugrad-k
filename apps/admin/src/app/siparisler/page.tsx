@@ -52,9 +52,14 @@ export default function SiparislerPage() {
         title="Siparişler"
         subtitle={loading ? "Yükleniyor…" : `${data?.length ?? 0} sipariş`}
         actions={
-          <Button variant="secondary" onClick={exportCsv} disabled={!data?.length}>
-            CSV indir
-          </Button>
+          <>
+            <Link href="/siparisler/yeni" className="inline-flex items-center rounded-lg bg-brand px-3.5 py-2 text-sm font-semibold text-white hover:bg-brand-dark">
+              + Telefon siparişi
+            </Link>
+            <Button variant="secondary" onClick={exportCsv} disabled={!data?.length}>
+              CSV indir
+            </Button>
+          </>
         }
       />
       <div className="mb-4 space-y-3 rounded-xl border border-slate-200 bg-white p-4">

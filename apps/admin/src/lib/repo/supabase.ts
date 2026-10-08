@@ -7,6 +7,8 @@ import {
   pricingSettingsFromRow,
   pricingSettingsToRow,
   type OrderStatus,
+  type PlaceDetails,
+  type PlaceSuggestion,
 } from "@yazgan/shared";
 import { istDayEndUtc, istDayStartUtc, istMonthRangeUtc } from "../dates";
 import {
@@ -15,9 +17,11 @@ import {
   type AdminOrderDetail,
   type AdminRepo,
   type CorporateAccount,
+  type AdminQuote,
   type Conversation,
   type Courier,
   type Invoice,
+  type PhoneCustomer,
 } from "./types";
 import { toTranscript } from "./transcript";
 
@@ -72,6 +76,16 @@ function check<T>(res: { data: T; error: { message: string } | null }, msg: stri
 
 export function createSupabaseRepo(url: string, anonKey: string): AdminRepo & { client: SupabaseClient } {
   const client = createClient(url, anonKey);
+
+  async function invoke<T>(name: string, body: object): Promise<T> {
+    const { data, error } = await client.functions.invoke(name, { body: body as Record<string, unknown> });
+    if (error) {
+      const ctx = (error as { context?: Response }).context;
+      const payload = ctx ? await ctx.json().catch(() => ({})) : {};
+      throw new RepoError(payload.error ?? "İşlem başarısız");
+    }
+    return data as T;
+  }
 
   async function accessToken() {
     const { data } = await client.auth.getSession();
@@ -346,6 +360,21 @@ export function createSupabaseRepo(url: string, anonKey: string): AdminRepo & { 
         await client.from("invoices").update({ status: "pending", attempts: 0, last_error: null }).eq("id", id),
         "Fatura yeniden kuyruğa alınamadı",
       );
+    },
+
+    async searchPlaces(input, sessionToken) {
+      return (await invoke<{ suggestions: PlaceSuggestion[] }>("places", { input, sessionToken })).suggestions;
+    },
+    async placeDetails(placeId, sessionToken) {
+      return (await invoke<{ place: PlaceDetails }>("places", { placeId, sessionToken })).place;
+    },
+    quote: (order) => invoke<AdminQuote>("quote", order),
+    async lookupPhoneCustomer(phone) {
+      return (await invoke<{ customer: PhoneCustomer | null }>("admin-order", { action: "lookup", phone })).customer;
+    },
+    async createPhoneOrder(input) {
+      const r = await invoke<{ order: { id: string; order_no: string } }>("admin-order", { action: "create", ...input });
+      return { id: r.order.id, orderNo: r.order.order_no };
     },
 
     async listConversations() {
