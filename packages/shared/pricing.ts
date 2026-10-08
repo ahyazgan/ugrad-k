@@ -169,7 +169,9 @@ export type PriceLineCode =
   | "heavy"
   | "return_leg"
   | "waiting"
-  | "bridge";
+  | "bridge"
+  /** Önceki gecikmeli acil teslimin telafisi (eksi tutar) */
+  | "credit";
 
 export interface PriceLine {
   code: PriceLineCode;
@@ -506,6 +508,24 @@ export interface MonthlyInvoiceItem {
   /** İndirime tabi kısım (verilmezse tamamı) */
   discountableKurus?: number;
 }
+
+/**
+ * Müşteri kredisini (ör. acil taahhüt telafisi) teklife eksi satır olarak ekler; ara toplamı sıfırın altına indirmez.
+ * Dönen `usedKurus` kullanılan kredi tutarıdır.
+ */
+export function applyCredit(quote: PriceQuote, creditKurus: number, label: string): { quote: PriceQuote; usedKurus: number } {
+  const used = Math.max(0, Math.min(Math.round(creditKurus), quote.subtotalKurus));
+  if (used === 0) return { quote, usedKurus: 0 };
+  const lines = [...quote.lines, { code: "credit" as const, label, amountKurus: -used }];
+  const subtotalKurus = quote.subtotalKurus - used;
+  const vatPct = quote.subtotalKurus > 0 ? Math.round((quote.vatKurus / quote.subtotalKurus) * 10_000) / 100 : DEFAULT_PRICING_SETTINGS.vatPct;
+  const vatKurus = pct(subtotalKurus, vatPct);
+  return { quote: { ...quote, lines, subtotalKurus, vatKurus, totalKurus: subtotalKurus + vatKurus }, usedKurus: used };
+}
+
+/** Acil teslim ek ücreti (taahhüt kaçarsa telafi edilen tutar) */
+export const urgentSurchargeKurus = (quote: Pick<PriceQuote, "lines">) =>
+  quote.lines.filter((l) => l.code === "urgent").reduce((s, l) => s + l.amountKurus, 0);
 
 /** Siparişin kayıtlı teklifinden fatura kalemi (teklif yoksa tamamı indirime tabi sayılır) */
 export function monthlyInvoiceItem(subtotalKurus: number, quote?: Pick<PriceQuote, "lines"> | null): MonthlyInvoiceItem {

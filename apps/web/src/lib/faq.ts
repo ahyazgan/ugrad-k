@@ -7,7 +7,7 @@ export const FAQ: Array<{ q: string; a: string }> = [
   },
   {
     q: "Kurye ne kadar sürede gelir?",
-    a: "Siparişiniz onaylanır onaylanmaz alış noktasına en yakın uygun kuryeye otomatik olarak atanır. Acil seçeneğinde 60 dakika içinde teslim hedeflenir; gönderiniz alındıktan sonra başka iş yapılmadan doğrudan teslim edilir.",
+    a: "Siparişiniz onaylanır onaylanmaz alış noktasına en yakın uygun kuryeye otomatik olarak atanır. Acil seçeneğinde 60 dakika içinde teslim taahhüt edilir; gönderiniz alındıktan sonra başka iş yapılmadan doğrudan teslim edilir. Taahhüdü kaçırırsak acil ek ücreti sonraki siparişinizden otomatik düşülür. Takip bağlantısında tahmini teslim saati görünür.",
   },
   {
     q: "Ekonomi gönderi nedir?",

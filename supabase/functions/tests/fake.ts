@@ -75,7 +75,15 @@ export function fakeDb(tables: Record<string, any>) {
               ? { data: rows[0], error: null }
               : { data: null, error: { message: "not found" } },
         ),
-      then: (resolve: (v: unknown) => void) => resolve({ data: rows, error: null }),
+      then: (resolve: (v: unknown) => void) => {
+        // update().in()/is() zinciri: yama await anında uygulanır
+        if (updatePatch) {
+          for (const r of rows) Object.assign(r, updatePatch);
+          (updated[table] ??= []).push(...rows);
+          return resolve({ data: null, error: null });
+        }
+        resolve({ data: rows, error: null });
+      },
     };
     return q;
   };

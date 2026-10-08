@@ -11,6 +11,13 @@ export interface Tracking {
   dropoff_address: string;
   dropoff_lat: number;
   dropoff_lng: number;
+  /** Tahmini varış için (eski yanıtlarda olmayabilir) */
+  pickup_lat?: number;
+  pickup_lng?: number;
+  duration_seconds?: number | null;
+  /** Acil teslim taahhüdü (yalnız acil siparişte) */
+  sla_due_at?: string | null;
+  sla_missed?: boolean | null;
   created_at: string;
   picked_up_at: string | null;
   delivered_at: string | null;
@@ -64,6 +71,10 @@ export async function fetchTracking(token: string): Promise<Tracking | null> {
     dropoff_address: "Levent Mah., Büyükdere Cad., Beşiktaş/İstanbul",
     dropoff_lat: 41.0819,
     dropoff_lng: 29.0106,
+    pickup_lat: 41.1295,
+    pickup_lng: 29.1135,
+    duration_seconds: 33 * 60,
+    sla_due_at: at(60),
     created_at: at(0),
     picked_up_at: at(12),
     delivered_at: null,

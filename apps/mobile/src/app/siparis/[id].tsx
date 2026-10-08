@@ -1,4 +1,4 @@
-import { ORDER_STATUS_LABELS, ageLabel, formatTL, trackingBaseUrl, type OrderStatus } from "@yazgan/shared";
+import { ORDER_STATUS_LABELS, ageLabel, etaAt, formatTL, istanbulTime, slaState, trackingBaseUrl, type OrderStatus } from "@yazgan/shared";
 import { useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import { Linking, Pressable, Share, Text, TextInput, View } from "react-native";
@@ -64,8 +64,32 @@ function OrderMap({ order }: { order: OrderDetail }) {
     { kind: "dropoff", lat: order.dropoffLat, lng: order.dropoffLng },
     ...(courier ? [{ kind: "courier" as const, lat: courier.lat, lng: courier.lng }] : []),
   ];
+  const active = !["teslim_edildi", "iptal", "sorunlu"].includes(order.status);
+  const eta = active
+    ? etaAt(
+        {
+          status: order.status,
+          pickup: { lat: order.pickupLat, lng: order.pickupLng },
+          dropoff: { lat: order.dropoffLat, lng: order.dropoffLng },
+          durationSeconds: order.durationSeconds,
+        },
+        courier,
+      )
+    : null;
+  const sla = slaState({ slaDueAt: order.slaDueAt, deliveredAt: null, status: order.status }, eta);
   return (
     <Card>
+      {eta ? (
+        <Text style={{ fontWeight: "700", fontSize: 16, color: colors.text }} testID="eta">
+          Tahmini teslim: {istanbulTime(eta)}
+        </Text>
+      ) : null}
+      {order.slaDueAt && active ? (
+        <Muted style={sla === "riskli" || sla === "gecikti" ? { color: "#B45309", fontWeight: "600" } : undefined}>
+          Acil teslim taahhüdü: {istanbulTime(order.slaDueAt)}
+          {sla === "riskli" || sla === "gecikti" ? " · gecikme olursa acil ek ücreti sonraki siparişinizden düşülür" : ""}
+        </Muted>
+      ) : null}
       <TileMap markers={markers} route={!courier} />
       <Muted>
         {courier
@@ -197,6 +221,11 @@ export default function SiparisDetay() {
       </Card>
 
       {!["teslim_edildi", "iptal"].includes(order.status) ? <OrderMap order={order} /> : null}
+      {order.slaMissed ? (
+        <Card>
+          <Muted>Acil teslim taahhüdü aşıldı; acil ek ücreti sonraki siparişinizden otomatik düşülecek. Özür dileriz.</Muted>
+        </Card>
+      ) : null}
 
       {!["teslim_edildi", "iptal"].includes(order.status) ? (
         <Button

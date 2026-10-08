@@ -9,6 +9,7 @@ import {
   type QuoteResult,
 } from "../../../packages/shared/index.ts";
 import type { Ctx } from "./context.ts";
+import { markCreditsUsed, openCredits, withCredits } from "./credits.ts";
 import { HttpError, json, readJson } from "./http.ts";
 
 export function quoteResponse(q: QuoteResult) {
@@ -24,11 +25,13 @@ export function quoteResponse(q: QuoteResult) {
 }
 
 export async function handleQuote(req: Request, ctx: Ctx): Promise<Response> {
-  await ctx.getUser(req);
+  const user = await ctx.getUser(req);
   const order = parseOrderRequest(await readJson(req));
   const pricing = await ctx.loadPricing();
   const q = await buildQuote(order, { maps: ctx.maps, ...pricing });
-  return json(quoteResponse(q));
+  // Müşterinin telafi kredisi teklifte de görünür (sipariş verince düşülür)
+  const { quote } = withCredits(q.quote, await openCredits(ctx, user.id));
+  return json(quoteResponse({ ...q, quote }));
 }
 
 /**
@@ -58,7 +61,9 @@ export async function createOrderForCustomer(ctx: Ctx, userId: string, order: Or
   }
 
   const pricing = await ctx.loadPricing();
-  const q = await buildQuote(order, { maps: ctx.maps, ...pricing });
+  const built = await buildQuote(order, { maps: ctx.maps, ...pricing });
+  const credit = withCredits(built.quote, await openCredits(ctx, userId));
+  const q = { ...built, quote: credit.quote };
 
   const { data, error } = await ctx.admin
     .from("orders")
@@ -75,6 +80,7 @@ export async function createOrderForCustomer(ctx: Ctx, userId: string, order: Or
     if ((error as { code?: string }).code === "23505") throw new HttpError(409, "Bu dış referansla bir sipariş zaten var", "externalRef");
     throw new Error(`Sipariş kaydedilemedi: ${error.message}`);
   }
+  await markCreditsUsed(ctx, credit.used, data.id);
   return { order: data, quote: q };
 }
 

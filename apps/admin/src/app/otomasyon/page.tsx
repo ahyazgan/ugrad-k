@@ -13,6 +13,7 @@ const NUMBERS: Array<{ key: keyof OpsSettings; label: string; hint: string }> = 
   { key: "locationMaxAgeMinutes", label: "Konum en fazla kaç dakikalık olsun", hint: "Daha eski konumdaki kuryeye atanmaz" },
   { key: "unassignedAlertMinutes", label: "Atanamayan sipariş uyarısı (dk)", hint: "Bu süre sonunda size WhatsApp/SMS gelir" },
   { key: "unpaidCardTimeoutMinutes", label: "Kartla ödeme süresi (dk)", hint: "Ödenmeyen kart siparişi bu süre sonunda iptal edilir" },
+  { key: "urgentSlaMinutes", label: "Acil teslim taahhüdü (dk)", hint: "Aşılırsa acil ek ücreti müşterinin sonraki siparişinden düşülür" },
   { key: "documentWarnDays", label: "Belge süresi uyarısı (gün)", hint: "Kurye belgesinin bitmesine bu kadar gün kala uyarı" },
 ];
 

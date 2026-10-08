@@ -264,7 +264,15 @@ fs.mkdirSync(out, { recursive: true });
   await stubTiles(pubCtx);
   const pub = await pubCtx.newPage();
   pub.on("pageerror", (e) => errors.push(e.message));
+  // Acil siparişin taahhüdü detayda
+  await nav("Siparişler");
+  await page.getByRole("button", { name: "Tümü" }).click();
+  await page.getByRole("button", { name: "Filtrele" }).click();
+  await page.getByRole("link", { name: "YK-1001", exact: true }).click();
+  await page.getByText(/Acil teslim taahhüdü: \d{2}:\d{2}/).waitFor();
   await pub.goto(base + "/takip/demo0000000000000000000000000000");
+  await pub.getByTestId("eta").waitFor();
+  await pub.getByText(/Acil teslim taahhüdü: \d{2}:\d{2}/).waitFor();
   await pub.getByText("Gönderi takibi · YK-1001").waitFor();
   await pub.getByText("Kuryemiz Mehmet gönderinizi getiriyor.").waitFor();
   await pub.locator('[data-pin="kurye"]').waitFor();

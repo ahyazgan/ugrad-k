@@ -83,6 +83,11 @@ export interface OrderDetail extends OrderSummary {
   weightKg: number | null;
   scheduledPickupAt: string | null;
   priceQuote: PriceQuote;
+  /** Rota süresi (saniye); tahmini teslim için */
+  durationSeconds: number | null;
+  /** Acil teslim taahhüdü ve kaçırıldı mı */
+  slaDueAt: string | null;
+  slaMissed: boolean | null;
   paymentMethod: OrderInput["paymentMethod"];
   paymentStatus: string;
   paidKurus: number | null;

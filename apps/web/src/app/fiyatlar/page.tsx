@@ -33,6 +33,7 @@ export default function FiyatlarPage() {
             <li>• Km, sürüş mesafesine göre yukarı yuvarlanır.</li>
             <li>• Gece, Pazar ve resmi tatil ekleri toplanmaz, yalnızca en yükseği uygulanır; arife günleri 13:00&apos;ten itibaren tatil sayılır.</li>
             <li>• Ekonomi gönderiler aynı gün içinde, uygun kurye rotasıyla teslim edilir.</li>
+            <li>• Acil teslimde 60 dakika taahhüdü: kaçırırsak acil ek ücreti sonraki siparişinizden düşülür.</li>
             <li>• Gidiş-dönüşte dönüş ayağı, ek ücretler dahil fiyatın yarısıdır; köprü ücreti indirimsizdir.</li>
             <li>• Köprü ücreti yalnızca Anadolu yakasından Avrupa yakasına geçişte uygulanır.</li>
           </ul>

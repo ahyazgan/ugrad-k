@@ -77,6 +77,13 @@ interface State {
   payouts: CourierPayout[];
 }
 
+/** Acil siparişte 60 dk taahhüt (veritabanındaki orders_sla tetikleyicisiyle aynı kural, demo) */
+function demoSla(urgent: boolean, createdAt: string, deliveredAt: string | null) {
+  if (!urgent) return { slaDueAt: null, slaMissed: null };
+  const due = new Date(new Date(createdAt).getTime() + 60 * 60_000).toISOString();
+  return { slaDueAt: due, slaMissed: deliveredAt ? deliveredAt > due : null };
+}
+
 const dayOffset = (days: number) => istanbulDay(new Date(Date.now() + days * 86_400_000));
 /** Mehmet'in belgeleri tam (sigortası 12 gün içinde bitiyor); Emre'nin kurye faaliyet belgesi eksik */
 function demoDocuments(): CourierDocumentRecord[] {
@@ -243,6 +250,7 @@ async function seed(): Promise<State> {
       paymentStatus: cust.corporateAccountId ? "cari_hesap" : "odenmedi",
       paidKurus: null,
       cashCollection: null,
+      ...demoSla(urgent, createdAt, status === "teslim_edildi" ? hoursAgo(ago - (deliveryMin.get(idx) ?? 60) / 60) : null),
       distanceMeters: q.distanceMeters,
       scheduledPickupAt: null,
       deliveredAt: status === "teslim_edildi" ? hoursAgo(ago - (deliveryMin.get(idx) ?? 60) / 60) : null,
@@ -342,6 +350,7 @@ async function seed(): Promise<State> {
       unassignedAlertMinutes: 10,
       enforceCourierDocuments: true,
       documentWarnDays: 30,
+      urgentSlaMinutes: 60,
     },
     consented: new Set(["cus-1", "cus-2", "cus-3"]),
     apiKeys: [],
@@ -508,7 +517,10 @@ export function createDemoRepo(): AdminRepo {
     }
     o.history.push({ fromStatus: o.status, toStatus: to, at: new Date().toISOString(), note });
     o.status = to;
-    if (to === "teslim_edildi") o.deliveredAt = new Date().toISOString();
+    if (to === "teslim_edildi") {
+      o.deliveredAt = new Date().toISOString();
+      if (o.slaDueAt) o.slaMissed = o.deliveredAt > o.slaDueAt;
+    }
     if (to === "iptal") {
       o.cancelReason = note;
       if (o.paymentStatus === "odendi") o.paymentStatus = "iade_edildi";
@@ -892,6 +904,7 @@ export function createDemoRepo(): AdminRepo {
         paymentStatus: req.paymentMethod === "cari" ? "cari_hesap" : "odenmedi",
         paidKurus: null,
         cashCollection: null,
+        ...demoSla(req.serviceLevel === "acil", now, null),
         distanceMeters: q.distanceMeters,
         scheduledPickupAt: req.scheduledPickupAt,
         deliveredAt: null,

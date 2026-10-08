@@ -41,6 +41,9 @@ export interface AdminOrder {
   paidKurus: number | null;
   /** Kuryeye ödemeli siparişte teslimde bildirilen tahsilat */
   cashCollection: CashCollection | null;
+  /** Acil teslim taahhüdü (yalnız acil) ve kaçırıldı mı */
+  slaDueAt: string | null;
+  slaMissed: boolean | null;
   distanceMeters: number;
   scheduledPickupAt: string | null;
   deliveredAt: string | null;
@@ -248,6 +251,8 @@ export interface OpsSettings {
   enforceCourierDocuments: boolean;
   /** Belge süresi bu kadar gün kala uyarı */
   documentWarnDays: number;
+  /** Acil teslim taahhüdü (dakika) */
+  urgentSlaMinutes: number;
 }
 
 export interface CourierDocumentRecord {

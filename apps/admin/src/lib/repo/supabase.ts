@@ -75,6 +75,8 @@ export const toAdminOrder = (r: Row): AdminOrder => ({
   paymentStatus: r.payment_status,
   paidKurus: r.paid_kurus ?? null,
   cashCollection: r.cash_collection ?? null,
+  slaDueAt: r.sla_due_at ?? null,
+  slaMissed: r.sla_missed ?? null,
   distanceMeters: r.distance_meters,
   scheduledPickupAt: r.scheduled_pickup_at,
   deliveredAt: r.delivered_at,
@@ -493,6 +495,7 @@ export function createSupabaseRepo(url: string, anonKey: string): AdminRepo & { 
         unassignedAlertMinutes: r.unassigned_alert_minutes,
         enforceCourierDocuments: r.enforce_courier_documents ?? true,
         documentWarnDays: r.document_warn_days ?? 30,
+        urgentSlaMinutes: r.urgent_sla_minutes ?? 60,
       };
     },
     async saveOpsSettings(s) {
@@ -509,6 +512,7 @@ export function createSupabaseRepo(url: string, anonKey: string): AdminRepo & { 
             unassigned_alert_minutes: s.unassignedAlertMinutes,
             enforce_courier_documents: s.enforceCourierDocuments,
             document_warn_days: s.documentWarnDays,
+            urgent_sla_minutes: s.urgentSlaMinutes,
           })
           .eq("id", 1),
         "Ayarlar kaydedilemedi",

@@ -104,3 +104,33 @@ Deno.test("auto-dispatch: zorunlu belgesi süresi dolan kuryeye iş verilmez", a
   await handler((r) => handleAutoDispatch(r, valid.ctx, { env, now: NOW }))(cron());
   assertEquals(valid.assigned[0].p_courier_id, "k1");
 });
+
+Deno.test("auto-dispatch: acil siparişte taahhüt riski bir kez bildirilir", async () => {
+  const urgent = {
+    id: "u9",
+    order_no: "YK-9",
+    status: "yolda",
+    sla_due_at: new Date(NOW.getTime() + 5 * 60_000).toISOString(),
+    sla_alerted_at: null,
+    pickup_lat: 41.1295,
+    pickup_lng: 29.1135,
+    dropoff_lat: 41.0821,
+    dropoff_lng: 29.0106,
+    duration_seconds: 1800,
+    tracking_token: "t".repeat(32),
+    price_quote: { lines: [{ code: "urgent", label: "Acil", amountKurus: 20_000 }] },
+    payment_method: "nakit",
+    payment_status: "odenmedi",
+    customer: { phone: "+905321112233", push_token: null },
+    // Kurye hâlâ Beykoz'da: 5 dakikada Levent'e yetişemez
+    courier: { last_lat: 41.1295, last_lng: 29.1135, last_location_at: fresh },
+  };
+  const onTime = { ...urgent, id: "u10", order_no: "YK-10", sla_due_at: new Date(NOW.getTime() + 90 * 60_000).toISOString() };
+  const { ctx, updated } = setup({ ops_settings: [{ ...ops, auto_assign: false }], orders: [urgent, onTime] });
+  const data = await (await handler((r) => handleAutoDispatch(r, ctx, { env, now: NOW }))(cron())).json();
+  assertEquals(data.slaAlerted, ["u9"]);
+  assertEquals(updated.orders!.find((o: Json) => o.id === "u9")!.sla_alerted_at, NOW.toISOString());
+  // İkinci çalıştırmada tekrar bildirilmez
+  const again = await (await handler((r) => handleAutoDispatch(r, ctx, { env, now: NOW }))(cron())).json();
+  assertEquals(again.slaAlerted, []);
+});

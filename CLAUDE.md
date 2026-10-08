@@ -45,6 +45,7 @@ Bu dosya Claude Code için proje hafızasıdır. Her oturumda önce bunu oku.
 - Köprü: alış veya teslimden biri Avrupa yakasındaysa 1 geçiş (15 Temmuz/FSM motosiklet 25 TL, yalnız Anadolu→Avrupa yönü ücretli)
 - Arife günleri 13:00'ten itibaren tatil sayılır; tatil listesi `holidays` tablosunda
 - Tutarlar kuruş (tam sayı) tutulur; fiyat her zaman sunucuda yeniden hesaplanır
+- Acil taahhüt kaçarsa acil ek ücreti kadar kredi, müşterinin sonraki siparişinden düşülür (fiyat satırı `credit`, indirim dışı)
 - Dinamik yoğunluk zammı ve dakika ücreti yok (B2B öngörülebilirlik). Enflasyon: panel → Fiyatlar → endeks aracı (üç ayda bir TÜFE; köprü hariç). Maliyet/marj tahmini `packages/shared/cost.ts`. Gerekçeler: `docs/fiyat-arastirmasi.md` §8
 
 ## Sipariş durumları
@@ -95,5 +96,5 @@ Ek: `iptal`, `sorunlu`
 - [x] Fiyat algoritması v2 (2026-10-08): hizmet seviyeleri (ekonomi/standart/acil), Pazar eki, uzak alış, 20 kg sınırı, kurumsal indirim kapsamı, endeks aracı, maliyet/marj simülasyonu (`docs/fiyat-arastirmasi.md` §8)
 - [x] Kurye hakedişi ve nakit mutabakatı (2026-10-08)
 - [x] Kurye belge ve uyum takibi (2026-10-08)
-- [ ] ETA ve 60 dk acil taahhüdü takibi
+- [x] ETA ve 60 dk acil taahhüdü (2026-10-08): `packages/shared/eta.ts`, `orders.sla_due_at` (tetikleyici), auto-dispatch erken uyarı (`_shared/sla.ts`), kaçan taahhütte `customer_credits` → sonraki siparişte "credit" satırı (`_shared/credits.ts`). docs/kurulum.md §25
 - [x] Ek geliştirmeler (2026-10-09): panelden telefon siparişi, otomatik onay + kurye atama, ödenmemiş kart siparişi iptali, kademeli km + %75 ek ücret tavanı (panelden tek tıkla eski tarifeye dönüş), raporlar + CSV, canlı haritalar (panel, takip sayfası, müşteri ve kurye uygulaması)

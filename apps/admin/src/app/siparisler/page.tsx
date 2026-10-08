@@ -2,6 +2,7 @@
 
 import { ORDER_STATUSES, ORDER_STATUS_LABELS, formatTL, type OrderStatus } from "@yazgan/shared";
 import Link from "next/link";
+import { SlaBadge } from "@/components/SlaBadge";
 import { useEffect, useState } from "react";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Button, ErrorText, Input, PageHeader, Table, Td } from "@/components/ui";
@@ -24,6 +25,12 @@ export default function SiparislerPage() {
     [statuses.join(), from, to, query],
   );
   useEffect(() => repo.subscribeOrders(reload), [reload]);
+  // Acil taahhüt geri sayımı dakikada bir yenilenir
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 30_000);
+    return () => clearInterval(t);
+  }, []);
 
   const toggle = (s: OrderStatus) => setStatuses((cur) => (cur.includes(s) ? cur.filter((x) => x !== s) : [...cur, s]));
 
@@ -105,6 +112,7 @@ export default function SiparislerPage() {
                 {o.orderNo}
               </Link>
               {o.urgent ? <div className="text-xs font-bold text-amber-600">ACİL</div> : null}
+              <SlaBadge o={o} now={now} />
               {o.serviceLevel === "ekonomi" ? <div className="text-xs font-bold text-emerald-700">EKONOMİ</div> : null}
               {o.paymentMethod === "kart" && o.paymentStatus === "odenmedi" && o.status !== "iptal" ? (
                 <div className="text-xs font-semibold text-red-700">Ödeme bekleniyor</div>

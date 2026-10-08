@@ -52,6 +52,9 @@ fs.mkdirSync(out, { recursive: true });
   await page.getByText('Ödendi (kart)').waitFor();
   await shot('08-siparis-yeni');
   await page.getByText('Kuryeniz:', { exact: false }).waitFor({ timeout: 20000 });
+  // Tahmini teslim ve acil taahhüdü
+  await tid('eta').waitFor();
+  await page.getByText(/Acil teslim taahhüdü: \d{2}:\d{2}/).waitFor();
   // Canlı harita: kurye işareti ve konum yaşı görünür, karolar yüklenir
   await tid('marker-courier').waitFor();
   await page.getByText(/Kurye konumu · az önce/).waitFor();

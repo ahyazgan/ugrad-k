@@ -5,6 +5,7 @@ import {
   ORDER_STATUS_LABELS,
   ORDER_TRANSITIONS,
   formatTL,
+  istanbulTime,
   rankCouriers,
   type OrderStatus,
 } from "@yazgan/shared";
@@ -107,7 +108,13 @@ export default function SiparisDetayPage() {
     <>
       <PageHeader
         title={`${order.orderNo}${order.urgent ? " · ACİL" : order.serviceLevel === "ekonomi" ? " · EKONOMİ" : ""}`}
-        subtitle={`Oluşturma: ${fmtDateTime(order.createdAt)}`}
+        subtitle={`Oluşturma: ${fmtDateTime(order.createdAt)}${
+          order.slaDueAt
+            ? ` · Acil teslim taahhüdü: ${istanbulTime(order.slaDueAt)}${
+                order.slaMissed ? " (kaçırıldı: müşteriye acil ek ücreti kadar telafi kredisi yazıldı)" : order.deliveredAt ? " (karşılandı)" : ""
+              }`
+            : ""
+        }`}
         actions={
           <Link href="/siparisler" className="text-sm text-brand underline">
             ← Siparişler

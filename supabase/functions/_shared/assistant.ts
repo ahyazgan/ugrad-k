@@ -16,6 +16,7 @@ import {
   type PlaceDetails,
 } from "../../../packages/shared/index.ts";
 import type { Ctx } from "./context.ts";
+import { openCredits, withCredits } from "./credits.ts";
 import { createOrderForCustomer } from "./handlers.ts";
 import { HttpError } from "./http.ts";
 
@@ -41,7 +42,7 @@ Kurallar:
 - KVKK: Müşterinin onayı yoksa sipariş almadan önce aydınlatma metni bağlantısını paylaş ({KVKK_URL}) ve kişisel verilerinin (adres, konum, telefon) sipariş için işlenmesine onay verip vermediğini sor. Yalnızca açıkça onaylarsa record_kvkk_consent çağır.
 - Şikâyet, hasar, kayıp, ödeme sorunu veya müşteri insanla görüşmek isterse handoff_to_human çağır ve bir temsilcinin döneceğini söyle.
 - Kısa, sıcak ve net yaz; WhatsApp için başlık veya tablo kullanma, gerekirse kısa madde işaretleri kullan. Kişisel verileri gereğinden fazla tekrarlama.
-- Hizmet seviyeleri: "standart" (varsayılan, aynı gün en kısa sürede), "acil" (60 dk içinde, ek ücretli) ve "ekonomi" (gün içinde teslim, indirimli; yalnızca Pazartesi–Cumartesi sabah 07:00 ile öğleden sonra arası alışlarda). Müşteri acele etmediğini söylerse ekonomiyi önerebilirsin.
+- Hizmet seviyeleri: "standart" (varsayılan, aynı gün en kısa sürede), "acil" (60 dk içinde teslim taahhüdü, ek ücretli; taahhüt kaçarsa acil ek ücreti sonraki siparişten otomatik düşülür) ve "ekonomi" (gün içinde teslim, indirimli; yalnızca Pazartesi–Cumartesi sabah 07:00 ile öğleden sonra arası alışlarda). Müşteri acele etmediğini söylerse ekonomiyi önerebilirsin.
 - Gece 22:00–07:00, Pazar ve resmi tatil ek ücretlerini, uzak alış ücretini fiyat aracı zaten hesaplar; sorulursa açıkla. 20 kg üzeri gönderi motosikletle taşınamaz.`;
 
 const str = { type: "string" } as const;
@@ -207,7 +208,9 @@ export async function executeTool(name: string, input: Record<string, unknown>, 
     }
     case "get_price_quote": {
       const { req, p, d } = await quoteFor(tc, input);
-      const q = await buildQuote(req, { maps: ctx.maps, ...(await ctx.loadPricing()) });
+      const built = await buildQuote(req, { maps: ctx.maps, ...(await ctx.loadPricing()) });
+      // Müşterinin gecikme telafisi kredisi varsa siparişte düşülecek; teklifte de gösterilir
+      const q = { ...built, quote: withCredits(built.quote, await openCredits(ctx, customer.profileId)).quote };
       return {
         from: p.address,
         to: d.address,

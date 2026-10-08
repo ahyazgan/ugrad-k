@@ -30,6 +30,8 @@ const base: AdminOrder = {
   paymentStatus: "odenmedi",
   paidKurus: null,
   cashCollection: null,
+  slaDueAt: null,
+  slaMissed: null,
   distanceMeters: 5000,
   scheduledPickupAt: null,
   deliveredAt: "2026-10-05T07:45:00Z",

@@ -10,6 +10,7 @@ import { deliver, type Env } from "./channels.ts";
 import type { Ctx } from "./context.ts";
 import { notificationConfig } from "./dispatch.ts";
 import { HttpError, json } from "./http.ts";
+import { checkUrgentSla } from "./sla.ts";
 
 const ACTIVE = ["kuryeye_atandi", "alindi", "yolda"];
 // deno-lint-ignore no-explicit-any
@@ -39,8 +40,18 @@ export async function handleAutoDispatch(
   if (!ops) throw new Error("Operasyon ayarları okunamadı");
 
   const { data: approved } = await ctx.admin.rpc("auto_approve_orders");
-  const summary = { trigger, approved: Number(approved ?? 0), assigned: [] as Row[], unassigned: [] as string[], alerted: [] as string[] };
-  if (!ops.auto_assign) return json(summary);
+  const summary = {
+    trigger,
+    approved: Number(approved ?? 0),
+    assigned: [] as Row[],
+    unassigned: [] as string[],
+    alerted: [] as string[],
+    slaAlerted: [] as string[],
+  };
+  if (!ops.auto_assign) {
+    summary.slaAlerted = await checkUrgentSla(ctx, deps, now);
+    return json(summary);
+  }
 
   const [couriersRes, activeRes, ordersRes] = await Promise.all([
     ctx.admin
@@ -143,5 +154,6 @@ export async function handleAutoDispatch(
     await ctx.admin.from("orders").update({ unassigned_alerted_at: now.toISOString() }).eq("id", id);
     summary.alerted.push(id);
   }
+  summary.slaAlerted = await checkUrgentSla(ctx, deps, now);
   return json(summary);
 }

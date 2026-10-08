@@ -1,6 +1,6 @@
 "use client";
 
-import { BRAND, COMPANY, ORDER_STATUS_LABELS, type OrderStatus } from "@yazgan/shared";
+import { BRAND, COMPANY, etaAt, istanbulTime, ORDER_STATUS_LABELS, slaState, type OrderStatus } from "@yazgan/shared";
 import { useParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { LeafletMap, type MapPin } from "@/components/LeafletMap";
@@ -62,6 +62,19 @@ export default function TakipPage() {
 
   const reached = new Map(data.history.map((h) => [h.status, h.at]));
   const closed = data.status === "teslim_edildi" || data.status === "iptal";
+  const eta =
+    !closed && data.pickup_lat != null && data.pickup_lng != null
+      ? etaAt(
+          {
+            status: data.status,
+            pickup: { lat: data.pickup_lat, lng: data.pickup_lng! },
+            dropoff: { lat: data.dropoff_lat, lng: data.dropoff_lng },
+            durationSeconds: data.duration_seconds,
+          },
+          loc ? { lat: loc.lat, lng: loc.lng } : null,
+        )
+      : null;
+  const sla = slaState({ slaDueAt: data.sla_due_at ?? null, deliveredAt: data.delivered_at, status: data.status }, eta);
 
   return (
     <div className="mx-auto min-h-screen max-w-xl bg-slate-50">
@@ -78,6 +91,18 @@ export default function TakipPage() {
           {data.status === "teslim_edildi" ? (
             <p className="mt-1 text-emerald-700">Teslim saati: {fmtTime(data.delivered_at)}</p>
           ) : null}
+          {eta ? (
+            <p className="mt-1 text-lg font-semibold text-slate-900" data-testid="eta">
+              Tahmini teslim: {istanbulTime(eta)}
+            </p>
+          ) : null}
+          {data.sla_due_at && !closed ? (
+            <p className={`mt-1 text-sm ${sla === "riskli" || sla === "gecikti" ? "font-semibold text-amber-700" : "text-slate-600"}`}>
+              Acil teslim taahhüdü: {istanbulTime(data.sla_due_at)}
+              {sla === "riskli" || sla === "gecikti" ? " · gecikme olursa acil ek ücreti sonraki siparişten düşülür" : ""}
+            </p>
+          ) : null}
+          {data.sla_missed ? <p className="mt-1 text-sm text-amber-700">Taahhüt aşıldı; acil ek ücreti sonraki siparişinizden düşülecek.</p> : null}
           <p className="mt-2 text-sm text-slate-500">
             {district(data.pickup_address)} → {district(data.dropoff_address)}
             {data.urgent ? " · Acil" : ""}

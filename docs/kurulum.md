@@ -192,6 +192,7 @@ Panel → Otomasyon → **Sistem durumu** kartında her görevin en son ne zaman
    | `alici_gonderi_yolda` | `Merhaba {{1}}, size gönderilen paket Yazgan Kurye ile yola çıktı. Canlı takip: {{2}}` |
    | `teslim_edildi` | `{{1}} numaralı gönderi teslim edildi. Teslim alan: {{2}}` |
    | `yonetici_uyari` | `Yazgan Kurye uyarı: {{1}}` |
+   | `acil_gecikme` | `{{1}} numaralı acil gönderiniz gecikebilir, tahmini teslim {{2}}. Taahhüt aşılırsa acil ek ücreti sonraki siparişinizden düşülür. Takip: {{3}}` |
 
 4. Webhook: Callback URL `https://<ref>.supabase.co/functions/v1/whatsapp-webhook`, Verify token: kendi belirlediğiniz rastgele metin → **messages** alanına abone olun.
 5. ```bash
@@ -381,3 +382,10 @@ Kayıtlı müşteriler `siparis@<alan adı>` adresine yazar; yapay zeka asistan�
 - **Zorunluluk**: panel → Otomasyon → *Belgesi eksik kuryeyi çalıştırma* (varsayılan açık). Açıkken zorunlu belgesi eksik veya süresi dolmuş kurye vardiya başlatamaz, vardiyadayken belgesi dolarsa otomatik iş almaz. Belge bitiş günü dahil geçerlidir (İstanbul saati).
 - **Uyarılar**: Süresi dolan ve *Belge süresi uyarısı (gün)* içinde dolacak belgeler sistem denetiminde (§22) yöneticiye bildirilir; kurye de uygulamada uyarı görür (İşlerim, Hesabım → Belgelerim).
 - **Bildirim listesi**: Kuryeler → *Kurye listesi (CSV)* belge numaraları ve bitiş tarihleriyle; Ulaştırma Bakanlığı kurye bildirimi ve sigorta için kullanılabilir. Şirketin **P1 yetki belgesi** şirket düzeyindedir, burada tutulmaz.
+
+## 25. Acil teslim taahhüdü (60 dk) ve tahmini varış
+
+- **Taahhüt**: acil siparişte `sla_due_at` = sipariş zamanı (planlıysa alış zamanı, kartla ödemede ödeme zamanı) + panel → Otomasyon → *Acil teslim taahhüdü (dk)* (varsayılan 60).
+- **Erken uyarı**: §6 `otomatik-dagitim` görevi her dakika açık acil siparişlerin tahmini teslimini (kurye konumu, rota süresi, ortalama 25 km/s) hesaplar. Taahhüt aşılacaksa yöneticiye ve müşteriye **bir kez** haber verir (WhatsApp şablonu `acil_gecikme`, yoksa SMS/push).
+- **Telafi**: teslim taahhütten sonra olursa acil ek ücreti kadar `customer_credits` kaydı açılır ve müşterinin **sonraki siparişinden otomatik düşülür** (teklifte "Telafi" satırı). İade işlemi gerekmez; kart ödemesi değişmez.
+- **Görünürlük**: takip sayfası ve müşteri uygulaması tahmini teslim saatini ve taahhüdü gösterir; panelde acil siparişlerde kalan süre / "GECİKTİ" / "Taahhüt kaçtı" rozeti vardır.
