@@ -105,6 +105,13 @@ export interface CourierLocation {
   speed?: number | null;
 }
 
+/** Müşteriye gösterilen kurye konumu (yalnız teslimat sürerken) */
+export interface CourierPosition {
+  lat: number;
+  lng: number;
+  recordedAt: string;
+}
+
 /** Kuryenin teslim kanıtı: fotoğraf (cihazdaki dosya URI'si) ve/veya imza (SVG) */
 export interface ProofOfDelivery {
   photoUri?: string | null;
@@ -151,6 +158,11 @@ export interface Api {
   /** Kartla ödeme sayfasını başlatır; demo modunda ödeme anında onaylanır (null döner) */
   startPayment(orderId: string): Promise<{ paymentPageUrl: string } | null>;
   subscribeOrder(id: string, onChange: () => void): () => void;
+  /**
+   * Siparişin kurye konumunu izler: hemen ve her değişimde `cb` çağrılır (konum yoksa null).
+   * Konum yalnız kurye atandıktan teslime kadar görülebilir (RLS).
+   */
+  watchCourierLocation(orderId: string, cb: (pos: CourierPosition | null) => void): () => void;
   // Kurye
   getOpenShift(): Promise<Shift | null>;
   startShift(at?: CourierLocation | null): Promise<Shift>;

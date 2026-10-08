@@ -1,10 +1,11 @@
-import { ORDER_STATUS_LABELS, formatTL, type OrderStatus } from "@yazgan/shared";
+import { ORDER_STATUS_LABELS, ageLabel, formatTL, type OrderStatus } from "@yazgan/shared";
 import { useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import { Linking, Share, Text, TextInput, View } from "react-native";
 import { StatusBadge } from "@/components/StatusBadge";
+import { TileMap, type MapMarker } from "@/components/TileMap";
 import { Button, Card, ErrorBox, Loading, Muted, Row, Screen, Title, colors, styles } from "@/components/ui";
-import { api, ApiError, type OrderDetail } from "@/lib/api";
+import { api, ApiError, type CourierPosition, type OrderDetail } from "@/lib/api";
 import { formatDateTime, formatTime } from "@/lib/format";
 import { payOrder } from "@/lib/payment";
 
@@ -47,6 +48,33 @@ function Timeline({ order }: { order: OrderDetail }) {
         );
       })}
     </View>
+  );
+}
+
+const LIVE: OrderStatus[] = ["kuryeye_atandi", "alindi", "yolda"];
+
+/** Alış/teslim noktaları ve (teslimat sürerken) kuryenin canlı konumu */
+function OrderMap({ order }: { order: OrderDetail }) {
+  const live = LIVE.includes(order.status);
+  const [pos, setPos] = useState<CourierPosition | null>(null);
+  useEffect(() => (live ? api.watchCourierLocation(order.id, setPos) : undefined), [order.id, live]);
+  const courier = live ? pos : null;
+  const markers: MapMarker[] = [
+    ...(order.status === "yolda" ? [] : [{ kind: "pickup" as const, lat: order.pickupLat, lng: order.pickupLng }]),
+    { kind: "dropoff", lat: order.dropoffLat, lng: order.dropoffLng },
+    ...(courier ? [{ kind: "courier" as const, lat: courier.lat, lng: courier.lng }] : []),
+  ];
+  return (
+    <Card>
+      <TileMap markers={markers} route={!courier} />
+      <Muted>
+        {courier
+          ? `🛵 Kurye konumu · ${ageLabel(courier.recordedAt)}`
+          : live
+            ? "Kurye konumu bekleniyor…"
+            : "A: alış · T: teslim noktası"}
+      </Muted>
+    </Card>
   );
 }
 
@@ -103,6 +131,8 @@ export default function SiparisDetay() {
         <Muted>{formatDateTime(order.createdAt)}</Muted>
         <Timeline order={order} />
       </Card>
+
+      {!["teslim_edildi", "iptal"].includes(order.status) ? <OrderMap order={order} /> : null}
 
       {!["teslim_edildi", "iptal"].includes(order.status) ? (
         <Button

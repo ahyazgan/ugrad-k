@@ -22,8 +22,10 @@ export default function KuryeIsler() {
       const [s, j] = await Promise.all([api.getOpenShift(), api.listCourierJobs()]);
       setShift(s);
       setJobs(j);
-      // Konumu öncelikle yoldaki, yoksa alınmış işe bağla
-      const live = j.find((x) => x.status === "yolda") ?? j.find((x) => x.status === "alindi");
+      // Konumu öncelikle yoldaki, sonra alınmış, yoksa atanmış (alışa gidilen) işe bağla:
+      // müşteri yalnız kendi siparişine bağlı konumu görür (RLS)
+      const live =
+        j.find((x) => x.status === "yolda") ?? j.find((x) => x.status === "alindi") ?? j.find((x) => x.status === "kuryeye_atandi");
       setActiveOrderForLocation(live?.id ?? null);
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "Yüklenemedi");

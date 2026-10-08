@@ -113,3 +113,15 @@ export async function currentPosition() {
     return null;
   }
 }
+
+/** İzin istemeden son bilinen konum (vardiyada izin zaten verilmiştir); yoksa null */
+export async function lastKnownPosition() {
+  try {
+    const perm = await Location.getForegroundPermissionsAsync();
+    if (perm.status !== "granted") return null;
+    const p = await Location.getLastKnownPositionAsync({ maxAge: 5 * 60_000 });
+    return p ? { lat: p.coords.latitude, lng: p.coords.longitude } : null;
+  } catch {
+    return null;
+  }
+}

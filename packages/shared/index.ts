@@ -7,3 +7,4 @@ export * from "./quote.ts";
 export * from "./notifications.ts";
 export * from "./legal.ts";
 export * from "./assignment.ts";
+export * from "./tiles.ts";

@@ -23,6 +23,8 @@ export function toE164(phone: string): string {
 
 type Row = Record<string, any>;
 
+const LOCATION_POLL_MS = 30_000;
+
 const toProfile = (r: Row): Profile => ({
   id: r.id,
   role: r.role,
@@ -227,6 +229,39 @@ export function createSupabaseApi(url: string, anonKey: string): Api & { client:
         .on("postgres_changes", { event: "UPDATE", schema: "public", table: "orders", filter: `id=eq.${id}` }, onChange)
         .subscribe();
       return () => {
+        client.removeChannel(channel);
+      };
+    },
+
+    watchCourierLocation(orderId, cb) {
+      let closed = false;
+      const fetchLatest = async () => {
+        const { data } = await client
+          .from("courier_locations")
+          .select("lat, lng, recorded_at")
+          .eq("order_id", orderId)
+          .order("recorded_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (!closed) cb(data ? { lat: data.lat, lng: data.lng, recordedAt: data.recorded_at } : null);
+      };
+      fetchLatest().catch(() => undefined);
+      // Realtime + yedek olarak periyodik okuma (bağlantı koparsa takip donmasın)
+      const timer = setInterval(() => fetchLatest().catch(() => undefined), LOCATION_POLL_MS);
+      const channel = client
+        .channel(`order-loc-${orderId}`)
+        .on(
+          "postgres_changes",
+          { event: "INSERT", schema: "public", table: "courier_locations", filter: `order_id=eq.${orderId}` },
+          (p) => {
+            const r = p.new as { lat: number; lng: number; recorded_at: string };
+            if (!closed) cb({ lat: r.lat, lng: r.lng, recordedAt: r.recorded_at });
+          },
+        )
+        .subscribe();
+      return () => {
+        closed = true;
+        clearInterval(timer);
         client.removeChannel(channel);
       };
     },

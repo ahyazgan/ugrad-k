@@ -20,6 +20,7 @@ import {
   type Api,
   type Shift,
   type ConsentType,
+  type CourierPosition,
   type OrderDetail,
   type OrderInput,
   type Profile,
@@ -30,6 +31,23 @@ const DEMO_CODE = "123456";
 export const DEMO_COURIER_PHONE = "5550000000";
 const ADVANCE_MS = 6_000;
 const FLOW: OrderStatus[] = ["beklemede", "onaylandi", "kuryeye_atandi", "alindi", "yolda", "teslim_edildi"];
+
+/** Demo: kurye atanınca alış noktasına yaklaşır, yolda iken teslim noktasına ilerler */
+function demoCourierPosition(o: OrderDetail | undefined): CourierPosition | null {
+  if (!o || !["kuryeye_atandi", "alindi", "yolda"].includes(o.status)) return null;
+  const since = (s: OrderStatus) => {
+    const at = [...o.history].reverse().find((h) => h.status === s)?.at;
+    return at ? Date.now() - new Date(at).getTime() : 0;
+  };
+  const lerp = (a: number, b: number, t: number) => a + (b - a) * Math.min(1, Math.max(0, t));
+  if (o.status === "yolda") {
+    const t = since("yolda") / (ADVANCE_MS * 1.2);
+    return { lat: lerp(o.pickupLat, o.dropoffLat, t), lng: lerp(o.pickupLng, o.dropoffLng, t), recordedAt: new Date().toISOString() };
+  }
+  if (o.status === "alindi") return { lat: o.pickupLat, lng: o.pickupLng, recordedAt: new Date().toISOString() };
+  const t = since("kuryeye_atandi") / (ADVANCE_MS * 1.2);
+  return { lat: lerp(o.pickupLat + 0.012, o.pickupLat, t), lng: lerp(o.pickupLng - 0.015, o.pickupLng, t), recordedAt: new Date().toISOString() };
+}
 
 export function createDemoApi(): Api {
   const maps = mockMapsProvider();
@@ -290,6 +308,13 @@ export function createDemoApi(): Api {
       set.add(onChange);
       orderListeners.set(id, set);
       return () => set.delete(onChange);
+    },
+
+    watchCourierLocation(orderId, cb) {
+      const tick = () => cb(demoCourierPosition(orders.get(orderId)));
+      tick();
+      const timer = setInterval(tick, 2_000);
+      return () => clearInterval(timer);
     },
 
     // ───────── Kurye
