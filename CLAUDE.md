@@ -25,7 +25,7 @@ Bu dosya Claude Code için proje hafızasıdır. Her oturumda önce bunu oku.
 
 ## Fiyat kuralları (KDV hariç) — tek kaynak: `packages/shared/pricing.ts`
 - Açılış: 350 TL (ilk 3 km dahil)
-- Ek km: 30 TL/km (Distance Matrix sürüş mesafesi, yukarı yuvarla)
+- Ek km (kademeli, 2026-10-09'dan itibaren): 3–10 km arası 25 TL/km, 10 km üstü 18 TL/km (sürüş mesafesi, yukarı yuvarla). İlk tarife sabit 30 TL/km idi; panelden geri yüklenebilir
 - Acil (60 dk): +%50
 - Gece 22:00–07:00 ve resmi tatil: +%50
 - Bekleme: ilk 15 dk ücretsiz, sonra her 10 dk 50 TL
@@ -36,7 +36,7 @@ Bu dosya Claude Code için proje hafızasıdır. Her oturumda önce bunu oku.
 - Tüm fiyat parametreleri panelden değiştirilebilir olmalı (veritabanında `pricing_settings`)
 
 ### Netleşen kurallar (2026-10-08, kullanıcı kararı)
-- Acil ve gece/tatil ek ücretleri **toplanır** (+%50 + %50 = +%100); gece ile tatil aynı anda olursa tek kez uygulanır
+- Acil ve gece/tatil ek ücretleri **toplanır**, ancak toplam **en fazla +%75** (2026-10-09; tavanı aşan kısım gece/tatil payından düşülür); gece ile tatil aynı anda olursa tek kez uygulanır
 - Kurumsal indirim **ay sonu faturanın** KDV hariç toplamına uygulanır; kademe o ayın teslimat sayısıyla belirlenir
 - Bekleme: 15 dk'dan sonra **başlayan** her 10 dk ücretlenir (yukarı yuvarlama)
 - Gidiş-dönüş: dönüş ayağı **ek ücretler dahil** fiyatın %50'si; köprü ücreti indirimsiz

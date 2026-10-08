@@ -88,15 +88,22 @@ fs.mkdirSync(out, { recursive: true });
   await shot("06c-asistan");
 
   await nav("Fiyatlar");
-  const perKm = page.getByLabel("Ek km ücreti (TL)");
-  await perKm.waitFor();
-  await perKm.fill("25");
+  const kmTiers = page.getByLabel("Km kademeleri (toplam km'ye kadar : TL/km)");
+  await kmTiers.waitFor();
+  if ((await kmTiers.inputValue()) !== "10:25, *:18") throw new Error("varsayılan kademeler yüklenmedi");
+  await kmTiers.fill("10:22, *:16");
   await page.getByText("Tarife").first().waitFor();
   await shot("07-fiyatlar");
   const preview = await page.locator("table").first().innerText();
   console.log("ONIZLEME", preview.replace(/\n/g, " | ").slice(0, 400));
   await page.getByRole("button", { name: "Tarifeyi kaydet" }).click();
   await page.getByText("Kaydedildi").waitFor();
+  // Geçersiz kademe kaydı engellenir
+  await kmTiers.fill("abc");
+  await page.getByText("Geçersiz alanlar: Km kademeleri").waitFor();
+  // İlk tarifeye tek tıkla dönüş
+  await page.getByRole("button", { name: /İlk tarifeyi yükle/ }).click();
+  if ((await kmTiers.inputValue()) !== "") throw new Error("ilk tarife yüklenmedi");
 
   // Herkese açık takip sayfası: oturum gerekmez
   const pub = await browser.newPage({ viewport: { width: 390, height: 844 } });

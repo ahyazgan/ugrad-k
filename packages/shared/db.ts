@@ -1,10 +1,12 @@
-import type { PricingSettings, CorporateTier, Holiday } from "./pricing.ts";
+import type { PricingSettings, CorporateTier, Holiday, KmTier } from "./pricing.ts";
 
 /** `pricing_settings` tablosunun satırı (Supabase'den geldiği hâliyle). */
 export interface PricingSettingsRow {
   base_fee_kurus: number;
   included_km: number;
   per_km_kurus: number;
+  km_tiers: KmTier[];
+  max_surcharge_pct: number | string | null;
   urgent_surcharge_pct: number | string;
   night_holiday_surcharge_pct: number | string;
   night_start_hour: number;
@@ -27,6 +29,8 @@ export const PRICING_COLUMN_MAP = {
   baseFeeKurus: "base_fee_kurus",
   includedKm: "included_km",
   perKmKurus: "per_km_kurus",
+  kmTiers: "km_tiers",
+  maxSurchargePct: "max_surcharge_pct",
   urgentSurchargePct: "urgent_surcharge_pct",
   nightHolidaySurchargePct: "night_holiday_surcharge_pct",
   nightStartHour: "night_start_hour",
@@ -51,7 +55,9 @@ export function pricingSettingsFromRow(row: PricingSettingsRow): PricingSettings
   const out = {} as Record<string, unknown>;
   for (const [key, col] of Object.entries(PRICING_COLUMN_MAP)) {
     const v = row[col];
-    out[key] = col === "corporate_tiers" ? v : num(v as number | string);
+    if (col === "corporate_tiers" || col === "km_tiers") out[key] = v ?? [];
+    else if (col === "max_surcharge_pct") out[key] = v == null ? null : num(v as number | string);
+    else out[key] = num(v as number | string);
   }
   return out as unknown as PricingSettings;
 }

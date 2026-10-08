@@ -5,13 +5,14 @@ import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Button, Card, ErrorText, Input, PageHeader, Table, Td } from "@/components/ui";
 import { fmtDateTime } from "@/lib/dates";
 import { repo } from "@/lib/repo";
+import { formatKmTiers, parseCap, parseKmTiers } from "@/lib/pricing-form";
 import { useLoad } from "@/lib/use-load";
 
 type Kind = "tl" | "pct" | "int" | "kg" | "hour";
 const FIELDS: Array<{ key: keyof PricingSettings; label: string; kind: Kind; hint?: string }> = [
   { key: "baseFeeKurus", label: "Açılış ücreti", kind: "tl" },
   { key: "includedKm", label: "Açılışa dahil km", kind: "int" },
-  { key: "perKmKurus", label: "Ek km ücreti", kind: "tl" },
+  { key: "perKmKurus", label: "Ek km ücreti (kademe yoksa)", kind: "tl" },
   { key: "urgentSurchargePct", label: "Acil ek ücreti", kind: "pct" },
   { key: "nightHolidaySurchargePct", label: "Gece / resmi tatil ek ücreti", kind: "pct" },
   { key: "nightStartHour", label: "Gece başlangıç saati", kind: "hour" },
@@ -41,6 +42,7 @@ const SCENARIOS = [
   { label: "5 km standart (gündüz)", input: { distanceMeters: 5_000 } },
   { label: "12 km acil", input: { distanceMeters: 12_000, urgent: true } },
   { label: "8 km gece", input: { distanceMeters: 8_000, night: true } },
+  { label: "12 km acil + gece", input: { distanceMeters: 12_000, urgent: true, night: true } },
   { label: "22 km köprü geçişli", input: { distanceMeters: 22_000, bridgeCrossings: 1 } },
   { label: "6 km gidiş-dönüş, 12 kg", input: { distanceMeters: 6_000, roundTrip: true, weightKg: 12 } },
   { label: "4 km, 32 dk bekleme", input: { distanceMeters: 4_000, waitingMinutes: 32 } },
@@ -52,6 +54,8 @@ export default function FiyatlarPage() {
   const { data, error, reload } = useLoad(() => repo.getPricing());
   const [values, setValues] = useState<Record<string, string>>({});
   const [tiers, setTiers] = useState("");
+  const [kmTiers, setKmTiers] = useState("");
+  const [cap, setCap] = useState("");
   const [saveMsg, setSaveMsg] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [holiday, setHoliday] = useState<Holiday>({ date: "", name: "", halfDay: false });
@@ -60,6 +64,8 @@ export default function FiyatlarPage() {
     if (!data) return;
     setValues(Object.fromEntries(FIELDS.map((f) => [f.key, toInput(data.settings[f.key] as number, f.kind)])));
     setTiers(data.settings.corporateTiers.map((t) => `${t.minDeliveries}:${t.discountPct}`).join(", "));
+    setKmTiers(formatKmTiers(data.settings.kmTiers));
+    setCap(data.settings.maxSurchargePct == null ? "" : String(data.settings.maxSurchargePct));
   }, [data]);
 
   // Formdaki değerlerden ayar nesnesi (geçersiz alan varsa hatalarla)
@@ -79,9 +85,15 @@ export default function FiyatlarPage() {
       .map((x) => x.split(":").map((n) => Number(n.trim())));
     if (parsed.some((p) => p.length !== 2 || p.some((n) => !Number.isFinite(n) || n < 0))) errors.push("Kurumsal kademeler");
     else s.corporateTiers = parsed.map(([minDeliveries, discountPct]) => ({ minDeliveries: minDeliveries!, discountPct: discountPct! }));
+    const kt = parseKmTiers(kmTiers);
+    if (kt === null) errors.push("Km kademeleri");
+    else s.kmTiers = kt;
+    const c = parseCap(cap);
+    if (c === undefined) errors.push("Ek ücret tavanı");
+    else s.maxSurchargePct = c;
     if (s.waitingBlockMinutes <= 0) errors.push("Bekleme dilimi");
     return { settings: s, errors };
-  }, [data, values, tiers]);
+  }, [data, values, tiers, kmTiers, cap]);
 
   async function save(e: FormEvent) {
     e.preventDefault();
@@ -129,6 +141,18 @@ export default function FiyatlarPage() {
                 </div>
               ))}
             </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <Input label="Km kademeleri (toplam km'ye kadar : TL/km)" value={kmTiers} onChange={(e) => setKmTiers(e.target.value)} />
+                <p className="mt-1 text-xs text-slate-500">
+                  Örn. 10:25, *:18 → açılıştan sonra 10 km&apos;ye kadar 25 TL, üstü 18 TL. Boş bırakılırsa sabit km ücreti kullanılır.
+                </p>
+              </div>
+              <div>
+                <Input label="Acil + gece toplam ek ücret tavanı (%)" value={cap} inputMode="decimal" onChange={(e) => setCap(e.target.value)} />
+                <p className="mt-1 text-xs text-slate-500">Örn. 75. Boş bırakılırsa tavan yok (acil + gece = %100).</p>
+              </div>
+            </div>
             <div>
               <Input label="Kurumsal kademeler (teslimat:indirim%)" value={tiers} onChange={(e) => setTiers(e.target.value)} />
               <p className="mt-1 text-xs text-slate-500">Örn. 20:15, 50:25 → ayda 20+ teslimatta %15, 50+ teslimatta %25</p>
@@ -136,9 +160,23 @@ export default function FiyatlarPage() {
             {draft?.errors.length ? <ErrorText>Geçersiz alanlar: {draft.errors.join(", ")}</ErrorText> : null}
             <ErrorText>{saveError}</ErrorText>
             {saveMsg ? <p className="text-sm text-emerald-700">{saveMsg}</p> : null}
-            <Button type="submit" disabled={!draft || !!draft.errors.length}>
-              Tarifeyi kaydet
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button type="submit" disabled={!draft || !!draft.errors.length}>
+                Tarifeyi kaydet
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => {
+                  // İlk tarife: sabit 30 TL/km, ek ücret tavanı yok (kaydetmeden önce önizlemede görünür)
+                  setKmTiers("");
+                  setCap("");
+                  setValues((v) => ({ ...v, perKmKurus: "30" }));
+                }}
+              >
+                İlk tarifeyi yükle (30 TL/km, tavansız)
+              </Button>
+            </div>
           </form>
         </Card>
 

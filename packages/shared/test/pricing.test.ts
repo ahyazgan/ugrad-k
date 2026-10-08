@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  DEFAULT_PRICING_SETTINGS as S,
+  DEFAULT_PRICING_SETTINGS,
   PricingError,
   applyWaitingFee,
   calculateMonthlyInvoice,
@@ -9,9 +9,17 @@ import {
   formatTL,
   metersToBillableKm,
   nightOrHolidayAt,
+  splitExtraKm,
+  surchargePercents,
   waitingFeeKurus,
   type Holiday,
+  type PricingSettings,
 } from "../pricing.ts";
+
+// Çekirdek kurallar sabit km ücretli ve tavansız ("eski") tarifeyle test edilir;
+// kademe ve tavan aşağıda ayrıca test edilir.
+const S: PricingSettings = { ...DEFAULT_PRICING_SETTINGS, kmTiers: [], maxSurchargePct: null };
+const T = DEFAULT_PRICING_SETTINGS; // güncel tarife (kademeli km + %75 tavan)
 
 // İstanbul saati (UTC+3) ile tarih üretir.
 const ist = (isoLocal: string) => new Date(`${isoLocal}+03:00`);
@@ -270,5 +278,73 @@ describe("applyWaitingFee", () => {
   it("tarife sonradan değişse de diğer kalemler korunur", () => {
     const q = applyWaitingFee(base, 20, { ...S, perKmKurus: 99_999 });
     expect(q.lines.find((l) => l.code === "extra_km")!.amountKurus).toBe(6_000);
+  });
+});
+
+describe("kademeli km ücreti", () => {
+  it("varsayılan kademeler: 3–10 km 25 TL, 10 km üstü 18 TL", () => {
+    expect(splitExtraKm(3, T)).toEqual([]);
+    expect(splitExtraKm(5, T)).toEqual([{ km: 2, perKmKurus: 2_500 }]);
+    expect(splitExtraKm(10, T)).toEqual([{ km: 7, perKmKurus: 2_500 }]);
+    expect(splitExtraKm(11, T)).toEqual([
+      { km: 7, perKmKurus: 2_500 },
+      { km: 1, perKmKurus: 1_800 },
+    ]);
+  });
+
+  it("kademe boşsa sabit km ücreti", () => {
+    expect(splitExtraKm(5, S)).toEqual([{ km: 2, perKmKurus: 3_000 }]);
+  });
+
+  it("sırasız tanımlanmış kademeler ve son kademesi sınırlı tablo", () => {
+    const s = { ...T, kmTiers: [{ uptoKm: 20, perKmKurus: 2_000 }, { uptoKm: 8, perKmKurus: 2_600 }] };
+    expect(splitExtraKm(25, s)).toEqual([
+      { km: 5, perKmKurus: 2_600 },
+      { km: 12, perKmKurus: 2_000 },
+      { km: 5, perKmKurus: 2_000 },
+    ]);
+  });
+
+  it("araştırma senaryoları (KDV hariç)", () => {
+    const at = (iso: string) => ist(iso);
+    expect(calculatePrice({ distanceMeters: 5_000, pickupAt: DAY }, T).subtotalKurus).toBe(40_000); // S1
+    // S2: 12 km acil → (350 + 7×25 + 2×18) × 1,5 = 841,50
+    expect(calculatePrice({ distanceMeters: 12_000, urgent: true, pickupAt: DAY }, T).subtotalKurus).toBe(84_150);
+    // S4: 22 km köprülü → 350 + 175 + 12×18 + 25 = 766
+    expect(calculatePrice({ distanceMeters: 22_000, bridgeCrossings: 1, pickupAt: at("2026-10-07T14:00:00") }, T).subtotalKurus).toBe(76_600);
+  });
+
+  it("kalem etiketi kademeleri gösterir", () => {
+    const q = calculatePrice({ distanceMeters: 12_000, pickupAt: DAY }, T);
+    expect(q.lines.find((l) => l.code === "extra_km")!.label).toBe("Ek mesafe (7 km × 25 TL + 2 km × 18 TL)");
+  });
+});
+
+describe("ek ücret tavanı", () => {
+  it("acil + gece %100 yerine en fazla %75", () => {
+    expect(surchargePercents(true, true, T)).toEqual({ urgentPct: 50, nightPct: 25, capped: true });
+    const q = calculatePrice({ distanceMeters: 3_000, urgent: true, pickupAt: ist("2026-10-07T23:00:00") }, T);
+    expect(q.meta.surchargePct).toBe(75);
+    expect(q.subtotalKurus).toBe(35_000 + 17_500 + 8_750);
+    expect(q.lines.find((l) => l.code === "night_holiday")!.label).toBe("Gece teslimatı (+%25, toplam ek ücret en fazla %75)");
+  });
+
+  it("tek ek ücret tavanın altındaysa dokunulmaz", () => {
+    expect(surchargePercents(true, false, T)).toEqual({ urgentPct: 50, nightPct: 0, capped: false });
+    expect(surchargePercents(false, true, T)).toEqual({ urgentPct: 0, nightPct: 50, capped: false });
+  });
+
+  it("tavan acil ücretinden düşükse gece payı sıfırlanır, satır eklenmez", () => {
+    const s = { ...T, maxSurchargePct: 40 };
+    expect(surchargePercents(true, true, s)).toEqual({ urgentPct: 40, nightPct: 0, capped: true });
+    const q = calculatePrice({ distanceMeters: 3_000, urgent: true, pickupAt: ist("2026-10-07T23:00:00") }, s);
+    expect(q.lines.some((l) => l.code === "night_holiday")).toBe(false);
+    expect(q.subtotalKurus).toBe(35_000 + 14_000);
+  });
+
+  it("dönüş ayağı da tavanlı yüzdeyle hesaplanır", () => {
+    const q = calculatePrice({ distanceMeters: 3_000, urgent: true, roundTrip: true, pickupAt: ist("2026-10-07T23:00:00") }, T);
+    const leg = 35_000 + 26_250;
+    expect(q.subtotalKurus).toBe(leg + leg / 2);
   });
 });

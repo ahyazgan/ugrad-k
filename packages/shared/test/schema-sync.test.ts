@@ -31,8 +31,11 @@ describe("şema senkronu", () => {
 
   it("pricing_settings sütunları PricingSettings ile eşleşir", () => {
     const table = sql.split("create table public.pricing_settings (")[1]?.split(");")[0] ?? "";
+    const altered = [...sql.matchAll(/alter table public\.pricing_settings([\s\S]*?);/g)].map((m) => m[1]).join("\n");
     for (const col of Object.values(PRICING_COLUMN_MAP)) {
-      expect(table, col).toMatch(new RegExp(`\\n\\s+${col}\\s`));
+      const inCreate = new RegExp(`\\n\\s+${col}\\s`).test(table);
+      const inAlter = new RegExp(`add column ${col}\\s`).test(altered);
+      expect(inCreate || inAlter, col).toBe(true);
     }
   });
 

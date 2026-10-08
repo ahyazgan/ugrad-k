@@ -15,10 +15,21 @@ export interface CorporateTier {
   discountPct: number;
 }
 
+/** Ek km kademesi: toplam mesafe `uptoKm`'ye kadar olan kilometreler bu ücretle (null = üstü) */
+export interface KmTier {
+  uptoKm: number | null;
+  perKmKurus: number;
+}
+
 export interface PricingSettings {
   baseFeeKurus: number;
   includedKm: number;
+  /** Kademe tanımlı değilse (kmTiers boş) tüm ek km'lere uygulanan ücret */
   perKmKurus: number;
+  /** Kademeli ek km ücreti; boşsa perKmKurus kullanılır */
+  kmTiers: KmTier[];
+  /** Acil + gece/tatil toplam ek ücret tavanı (%); null = tavan yok */
+  maxSurchargePct: number | null;
   urgentSurchargePct: number;
   /** Gece ve resmi tatil için tek ek ücret (ikisi birden olsa da bir kez uygulanır) */
   nightHolidaySurchargePct: number;
@@ -44,6 +55,12 @@ export const DEFAULT_PRICING_SETTINGS: PricingSettings = {
   baseFeeKurus: 35_000,
   includedKm: 3,
   perKmKurus: 3_000,
+  // 2026-10-08 fiyat araştırması önerisi (docs/fiyat-arastirmasi.md §6.3)
+  kmTiers: [
+    { uptoKm: 10, perKmKurus: 2_500 },
+    { uptoKm: null, perKmKurus: 1_800 },
+  ],
+  maxSurchargePct: 75,
   urgentSurchargePct: 50,
   nightHolidaySurchargePct: 50,
   nightStartHour: 22,
@@ -171,9 +188,42 @@ export function waitingFeeKurus(minutes: number, settings: PricingSettings): num
   return Math.ceil(billable / settings.waitingBlockMinutes) * settings.waitingBlockFeeKurus;
 }
 
-function distanceFeeKurus(km: number, settings: PricingSettings) {
+/** Ek km'leri kademelere böler: [{ km, perKmKurus }] (sıralı, boş kademeler atlanır) */
+export function splitExtraKm(km: number, settings: PricingSettings): Array<{ km: number; perKmKurus: number }> {
   const extraKm = Math.max(0, km - settings.includedKm);
-  return { base: settings.baseFeeKurus, extraKm, extra: extraKm * settings.perKmKurus };
+  if (extraKm === 0) return [];
+  const tiers = [...settings.kmTiers].sort((a, b) => (a.uptoKm ?? Infinity) - (b.uptoKm ?? Infinity));
+  if (!tiers.length) return [{ km: extraKm, perKmKurus: settings.perKmKurus }];
+  const parts: Array<{ km: number; perKmKurus: number }> = [];
+  let from = settings.includedKm; // bu km'den sonrası ücretlenir
+  for (const t of tiers) {
+    if (from >= km) break;
+    const upto = Math.min(km, t.uptoKm ?? Infinity);
+    if (upto > from) {
+      parts.push({ km: upto - from, perKmKurus: t.perKmKurus });
+      from = upto;
+    }
+  }
+  // Son kademe sınırlıysa kalan km son kademenin ücretiyle
+  if (from < km) parts.push({ km: km - from, perKmKurus: tiers[tiers.length - 1]!.perKmKurus });
+  return parts;
+}
+
+function distanceFeeKurus(km: number, settings: PricingSettings) {
+  const parts = splitExtraKm(km, settings);
+  const extraKm = parts.reduce((s, p) => s + p.km, 0);
+  const extra = parts.reduce((s, p) => s + p.km * p.perKmKurus, 0);
+  return { base: settings.baseFeeKurus, extraKm, extra, parts };
+}
+
+/** Acil ve gece/tatil ek ücret yüzdeleri; toplam tavanı aşarsa gece/tatil payı kırpılır. */
+export function surchargePercents(urgent: boolean, nightOrHoliday: boolean, settings: PricingSettings) {
+  const urgentPct = urgent ? settings.urgentSurchargePct : 0;
+  const rawNightPct = nightOrHoliday ? settings.nightHolidaySurchargePct : 0;
+  const cap = settings.maxSurchargePct;
+  if (cap == null || urgentPct + rawNightPct <= cap) return { urgentPct, nightPct: rawNightPct, capped: false };
+  const u = Math.min(urgentPct, cap);
+  return { urgentPct: u, nightPct: Math.max(0, cap - u), capped: true };
 }
 
 const tl = (kurus: number) => (kurus / 100).toLocaleString("tr-TR", { maximumFractionDigits: 2 });
@@ -190,10 +240,9 @@ export function calculatePrice(
     settings,
     input.holidays,
   );
-  // Acil ve gece/tatil ek ücretleri toplanır (+%50 + %50 = +%100).
-  const surchargePct =
-    (input.urgent ? settings.urgentSurchargePct : 0) +
-    (nightOrHoliday ? settings.nightHolidaySurchargePct : 0);
+  // Acil ve gece/tatil ek ücretleri toplanır; toplam tavanı (maxSurchargePct) aşamaz.
+  const { urgentPct, nightPct, capped } = surchargePercents(!!input.urgent, nightOrHoliday, settings);
+  const surchargePct = urgentPct + nightPct;
   const heavy =
     !!input.largePackage || (input.weightKg ?? 0) > settings.heavyThresholdKg;
 
@@ -209,7 +258,7 @@ export function calculatePrice(
   if (outbound.extraKm > 0) {
     lines.push({
       code: "extra_km",
-      label: `Ek mesafe (${outbound.extraKm} km × ${tl(settings.perKmKurus)} TL)`,
+      label: `Ek mesafe (${outbound.parts.map((p) => `${p.km} km × ${tl(p.perKmKurus)} TL`).join(" + ")})`,
       amountKurus: outbound.extra,
     });
   }
@@ -217,17 +266,18 @@ export function calculatePrice(
   if (input.urgent) {
     lines.push({
       code: "urgent",
-      label: `Acil teslimat (+%${settings.urgentSurchargePct})`,
-      amountKurus: pct(outboundDistance, settings.urgentSurchargePct),
+      label: `Acil teslimat (+%${urgentPct})`,
+      amountKurus: pct(outboundDistance, urgentPct),
     });
   }
-  if (nightOrHoliday) {
+  if (nightOrHoliday && nightPct > 0) {
+    const capNote = capped ? `, toplam ek ücret en fazla %${settings.maxSurchargePct}` : "";
     lines.push({
       code: "night_holiday",
       label: holidayName
-        ? `Resmi tatil – ${holidayName} (+%${settings.nightHolidaySurchargePct})`
-        : `Gece teslimatı (+%${settings.nightHolidaySurchargePct})`,
-      amountKurus: pct(outboundDistance, settings.nightHolidaySurchargePct),
+        ? `Resmi tatil – ${holidayName} (+%${nightPct}${capNote})`
+        : `Gece teslimatı (+%${nightPct}${capNote})`,
+      amountKurus: pct(outboundDistance, nightPct),
     });
   }
   if (heavy) {
