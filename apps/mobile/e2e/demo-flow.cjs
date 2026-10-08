@@ -130,6 +130,14 @@ fs.mkdirSync(out, { recursive: true });
   await kt('offer-decline').click();
   await kt('decline-reason-Çok uzak').click();
   await kp.locator('[data-testid^="offer-YK"]').waitFor({ state: 'detached' });
+  // Mola: molada yeni teklif gelmez, moladan dönülür
+  await kt('break-toggle').click();
+  await kp.getByText('Moladasınız').waitFor();
+  await kt('break-info').getByText(/0 dk · molada yeni iş teklifi gelmez/).waitFor();
+  await kp.getByText(/Elinizdeki 2 iş devam ediyor/).waitFor();
+  await kshot('09b-kurye-mola');
+  await kt('break-toggle').click();
+  await kp.getByText('Vardiyadasınız').waitFor();
   await kp.getByText(/Aktif işler \(2\)/).waitFor();
   await kshot('10-kurye-isler');
   await kp.locator('[data-testid^="job-"]').first().click();

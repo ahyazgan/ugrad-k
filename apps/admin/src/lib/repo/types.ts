@@ -152,6 +152,8 @@ export interface Courier {
   vehicleModel: string | null;
   active: boolean;
   isOnShift: boolean;
+  /** Vardiyada molada (otomatik iş almaz) */
+  onBreak: boolean;
   lastLat: number | null;
   lastLng: number | null;
   lastLocationAt: string | null;
@@ -166,6 +168,8 @@ export interface Shift {
   plate: string | null;
   startedAt: string;
   endedAt: string | null;
+  /** Vardiyadaki molalar (açık mola şimdiye kadar sayılır) */
+  breaks: Array<{ startedAt: string; endedAt: string | null; auto: boolean }>;
 }
 
 export interface Customer {
@@ -292,6 +296,10 @@ export interface OpsSettings {
   arrivalAutoRadiusM: number;
   /** Kurye "Vardım" derken adrese en fazla bu kadar metre uzakta olabilir */
   arrivalMaxRadiusM: number;
+  /** Bu kadar dakikayı aşan mola yöneticiye bildirilir */
+  maxBreakMinutes: number;
+  /** Üst üste bu kadar teklife yanıt vermeyen kurye otomatik molaya alınır (0 = kapalı) */
+  offerAutoBreakAfter: number;
 }
 
 export interface PromoCodeRow extends Promo {

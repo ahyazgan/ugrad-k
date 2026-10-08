@@ -96,6 +96,37 @@ Deno.test("auto-dispatch: süresi dolan teklifler her çalışmada geri alınır
   assertEquals(data.expiredOffers, 2);
 });
 
+Deno.test("auto-dispatch: moladaki kuryeye iş verilmez", async () => {
+  const { ctx, assigned } = setup({
+    couriers: [{ id: "k1", active: true, is_on_shift: true, on_break: true, last_lat: 41.12, last_lng: 29.1, last_location_at: fresh, profile: { full_name: "Mehmet" } }],
+  });
+  const data = await (await handler((r) => handleAutoDispatch(r, ctx, { env, now: NOW }))(cron())).json();
+  assertEquals(assigned.length, 0);
+  assertEquals(data.unassigned, ["o1"]);
+});
+
+Deno.test("auto-dispatch: yanıtsız kurye molaya alınınca haberdar edilir; uzun mola yöneticiye bir kez", async () => {
+  const sent: string[] = [];
+  const fetchFn = ((url: string, init?: RequestInit) => {
+    sent.push(`${url} ${init?.body ?? ""}`);
+    return Promise.resolve(Response.json({ data: [{ status: "ok" }] }));
+  }) as unknown as typeof fetch;
+  const { ctx, updated } = setup({
+    ops_settings: [{ ...ops, auto_assign: false, offer_auto_break_after: 3, max_break_minutes: 45 }],
+    "rpc:auto_break_unresponsive": ["k1"],
+    profiles: [{ id: "k1", phone: "+905551110001", push_token: "ExponentPushToken[k1]" }],
+    courier_breaks: [{ id: "b1", courier_id: "k2", started_at: "2026-10-09T08:00:00Z", ended_at: null, alerted_at: null, courier: { profile: { full_name: "Uzun Molacı" } } }],
+  });
+  const data = await (await handler((r) => handleAutoDispatch(r, ctx, { env, now: NOW, fetchFn }))(cron())).json();
+  assertEquals(data.autoBreaks, ["k1"]);
+  assertEquals(sent.some((x) => x.includes("exp.host") && x.includes("molaya alındınız")), true);
+  assertEquals(data.breakAlerts, ["b1"]);
+  assertEquals(typeof updated.courier_breaks![0]!.alerted_at, "string");
+  // İkinci çalıştırmada tekrar uyarı yok
+  const again = await (await handler((r) => handleAutoDispatch(r, ctx, { env, now: NOW, fetchFn }))(cron())).json();
+  assertEquals(again.breakAlerts, []);
+});
+
 Deno.test("auto-dispatch: uzun süredir atanamayan için yöneticiye bir kez uyarı", async () => {
   const old = { id: "o1", order_no: "YK-1", status: "onaylandi", pickup_lat: 41.1295, pickup_lng: 29.1135, urgent: false, created_at: "2026-10-09T08:40:00Z", scheduled_pickup_at: null, payment_method: "nakit", payment_status: "odenmedi" };
   const { ctx, updated } = setup({ couriers: [], orders: [old] });

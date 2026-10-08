@@ -35,6 +35,7 @@ Kodun tamamı yazıldı ve testlerden geçti. Bu rehber, sistemi **gerçek hesap
 28. [Canlıya alma: hazırlık denetimi, yedek, deneme ortamı](#28-canlıya-alma)
 29. [Kurye iş teklifi (kabul / ret)](#29-kurye-iş-teklifi)
 30. [Adrese varış ve bekleme ölçümü](#30-adrese-varış-ve-bekleme-ölçümü)
+31. [Kurye molası](#31-kurye-molası)
 
 ---
 
@@ -457,3 +458,11 @@ Kayıtlı müşteriler `siparis@<alan adı>` adresine yazar; yapay zeka asistan�
 - **Mesajlar**: alışa varışta gönderene (alış yetkilisi müşteriden farklıysa ona WhatsApp/SMS, değilse müşteriye) "kurye kapıda"; teslime varışta alıcıya "kurye adresinizde" (teslim kodu varsa kodla birlikte). WhatsApp şablonları: `kurye_alista`, `alici_kurye_kapida`, `alici_kurye_kapida_kod` (§8).
 - **Bekleme ücreti**: varış kaydı varsa bekleme, varıştan paketin alınmasına kadar **otomatik ölçülür** (planlı alışta planlanan saatten önce geçen süre sayılmaz) ve kuryenin elle girdiği değerin yerine geçer. Varış yoksa kuryenin girdiği süre kullanılır. Sipariş detayında "varıştan ölçüldü / kuryenin girdiği" diye görünür; itirazlarda bu kaydı kullanın.
 - **Müşteri**: uygulamada "Kurye alış adresinde / teslim adresinde" satırı görünür.
+
+## 31. Kurye molası
+
+- **Kurye**: vardiyadayken *Mola ver*; molada yeni iş teklifi gelmez, bekleyen teklifler geri alınır (kabul oranını etkilemez). Elinde iş yoksa molada konumu paylaşılmaz. *Moladan dön* ile devam eder; vardiya bitince açık mola da kapanır.
+- **Otomatik mola**: üst üste *Yanıtsız teklif sonrası otomatik mola* (varsayılan 3) teklife yanıt vermeyen kurye molaya alınır ve push/SMS ile haber verilir (telefonu cebinde unutan kuryeye iş gitmeye devam etmesin). 0 = kapalı.
+- **Uzun mola**: *En uzun mola* (varsayılan 45 dk) aşılınca yöneticiye bir kez WhatsApp/SMS uyarısı gider.
+- **BTK raporu**: panel → Çalışma saatleri. Vardiya başına mola süresi ve **net çalışma** süresi; CSV'de *Mola (saat)* ve *Net çalışma (saat)* sütunları.
+- Panelde molada olan kurye *Molada* olarak (kurye listesi, genel bakış, canlı harita) görünür; elle atama listesinde "molada" uyarısıyla yer alır.

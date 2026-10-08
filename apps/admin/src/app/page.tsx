@@ -69,11 +69,11 @@ export default function Dashboard() {
               .map((c) => (
                 <li key={c.id} className="flex items-center justify-between gap-2">
                   <span>
-                    <span className={`mr-2 inline-block h-2.5 w-2.5 rounded-full ${c.isOnShift ? "bg-emerald-500" : "bg-slate-300"}`} />
+                    <span className={`mr-2 inline-block h-2.5 w-2.5 rounded-full ${c.onBreak ? "bg-amber-400" : c.isOnShift ? "bg-emerald-500" : "bg-slate-300"}`} />
                     {c.fullName}
                   </span>
                   <span className="text-slate-500">
-                    {c.isOnShift ? `${c.activeOrderCount} aktif iş` : "Vardiya dışı"}
+                    {c.onBreak ? `Molada · ${c.activeOrderCount} aktif iş` : c.isOnShift ? `${c.activeOrderCount} aktif iş` : "Vardiya dışı"}
                   </span>
                 </li>
               ))}

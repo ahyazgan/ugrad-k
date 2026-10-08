@@ -151,6 +151,11 @@ fs.mkdirSync(out, { recursive: true });
   await page.getByRole("heading", { name: "Kurye çalışma saatleri" }).waitFor();
   await page.getByLabel("Başlangıç").fill("2026-01-01");
   await page.getByText("Devam ediyor").first().waitFor();
+  // Molalar BTK raporunda net çalışmadan düşülür
+  const net = await page.getByTestId("net-hours").first().innerText();
+  console.log("BTK NET", net);
+  if (!/^\d+ sa \d+ dk$/.test(net)) throw new Error("net çalışma süresi yok: " + net);
+  await page.getByText("Mola", { exact: true }).first().waitFor();
   await shot("05-vardiyalar");
 
   await nav("Kurumsal & fatura");

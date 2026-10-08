@@ -49,10 +49,14 @@ export async function handleAutoDispatch(
     alerted: [] as string[],
     slaAlerted: [] as string[],
     expiredOffers: 0,
+    autoBreaks: [] as string[],
+    breakAlerts: [] as string[],
   };
   // Süresi dolan teklifler havuza döner (otomatik atama kapalı olsa da)
   const { data: expired } = await ctx.admin.rpc("expire_offers");
   summary.expiredOffers = Number(expired ?? 0);
+  summary.autoBreaks = await autoBreakUnresponsive(ctx, deps, ops);
+  summary.breakAlerts = await alertLongBreaks(ctx, deps, ops, now);
   if (!ops.auto_assign) {
     summary.slaAlerted = await checkUrgentSla(ctx, deps, now);
     return json(summary);
@@ -61,7 +65,7 @@ export async function handleAutoDispatch(
   const [couriersRes, activeRes, ordersRes] = await Promise.all([
     ctx.admin
       .from("couriers")
-      .select("id, last_lat, last_lng, last_location_at, profile:profiles(full_name)")
+      .select("id, last_lat, last_lng, last_location_at, on_break, profile:profiles(full_name)")
       .eq("active", true)
       .eq("is_on_shift", true),
     ctx.admin.from("orders").select("courier_id").in("status", ACTIVE),
@@ -93,6 +97,7 @@ export async function handleAutoDispatch(
     lng: c.last_lng,
     locationAt: c.last_location_at,
     activeOrders: load.get(c.id) ?? 0,
+    onBreak: !!c.on_break,
   }));
 
   // Kartla ödenmemişler atanmaz
@@ -170,4 +175,54 @@ export async function handleAutoDispatch(
   }
   summary.slaAlerted = await checkUrgentSla(ctx, deps, now);
   return json(summary);
+}
+
+/** Üst üste yanıtsız teklif bırakan kuryeleri molaya alır ve kuryeye haber verir */
+async function autoBreakUnresponsive(ctx: Ctx, deps: { env: Env; fetchFn?: typeof fetch }, ops: Row): Promise<string[]> {
+  const { data } = await ctx.admin.rpc("auto_break_unresponsive");
+  const ids = ((data ?? []) as unknown[]).map((x) => (typeof x === "string" ? x : (x as Row).auto_break_unresponsive as string));
+  if (!ids.length) return [];
+  const { data: profiles } = await ctx.admin.from("profiles").select("id, phone, push_token").in("id", ids);
+  await Promise.all(
+    ((profiles ?? []) as Row[]).map((p) =>
+      deliver(
+        {
+          to: { role: "courier", phone: p.phone, pushToken: p.push_token },
+          channels: ["push", "sms"],
+          title: "Molaya alındınız",
+          text: `Üst üste ${ops.offer_auto_break_after} iş teklifine yanıt vermediğiniz için molaya alındınız. Hazır olduğunuzda uygulamada "Moladan dön"e basın.`,
+        },
+        { env: deps.env, fetchFn: deps.fetchFn },
+      ),
+    ),
+  );
+  return ids;
+}
+
+/** İzin verilenden uzun süren molalar için yöneticiye bir kez uyarı */
+async function alertLongBreaks(ctx: Ctx, deps: { env: Env; fetchFn?: typeof fetch }, ops: Row, now: Date): Promise<string[]> {
+  const limit = Number(ops.max_break_minutes ?? 45);
+  const { data } = await ctx.admin
+    .from("courier_breaks")
+    .select("id, courier_id, started_at, courier:couriers(profile:profiles(full_name))")
+    .is("ended_at", null)
+    .is("alerted_at", null)
+    .lt("started_at", new Date(now.getTime() - limit * 60_000).toISOString());
+  const rows = (data ?? []) as Row[];
+  if (!rows.length) return [];
+  const cfg = notificationConfig(deps.env);
+  for (const b of rows) {
+    const minutes = Math.floor((now.getTime() - new Date(b.started_at).getTime()) / 60_000);
+    const text = `${b.courier?.profile?.full_name ?? "Kurye"} ${minutes} dakikadır molada (sınır ${limit} dk).`;
+    await Promise.all(
+      cfg.adminPhones.map((phone) =>
+        deliver(
+          { to: { role: "admin", phone }, channels: ["whatsapp", "sms"], title: "Uzun mola", text, whatsappTemplate: { name: "yonetici_uyari", params: [text] } },
+          { env: deps.env, fetchFn: deps.fetchFn },
+        ),
+      ),
+    );
+    await ctx.admin.from("courier_breaks").update({ alerted_at: now.toISOString() }).eq("id", b.id);
+  }
+  return rows.map((b) => b.id);
 }

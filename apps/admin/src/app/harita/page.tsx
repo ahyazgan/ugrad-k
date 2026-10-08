@@ -60,7 +60,7 @@ function buildLayers(orders: AdminOrder[], couriers: Courier[], maxAgeMin: numbe
       size: 32,
       color: stale ? C.stale : C.courier,
       front: true,
-      popup: `<b>${esc(c.fullName ?? "Kurye")}</b> · ${esc(c.plate ?? "")}<br>${c.activeOrderCount} aktif iş<br>Konum: ${
+      popup: `<b>${esc(c.fullName ?? "Kurye")}</b> · ${esc(c.plate ?? "")}${c.onBreak ? " · <b style='color:#b45309'>MOLADA</b>" : ""}<br>${c.activeOrderCount} aktif iş<br>Konum: ${
         c.lastLocationAt ? esc(ageLabel(c.lastLocationAt)) : "yok"
       }${c.phone ? `<br><a href="tel:${esc(c.phone)}">${esc(c.phone)}</a>` : ""}`,
     });
@@ -150,7 +150,10 @@ export default function HaritaPage() {
                 return (
                   <li key={c.id} className="flex items-center justify-between gap-2 py-2 text-sm">
                     <div>
-                      <div className="font-semibold text-slate-900">{c.fullName}</div>
+                      <div className="font-semibold text-slate-900">
+                        {c.fullName}
+                        {c.onBreak ? <span className="ml-2 text-xs font-semibold text-amber-700">Molada</span> : null}
+                      </div>
                       <div className={stale ? "text-xs text-red-700" : "text-xs text-slate-500"}>
                         {c.activeOrderCount} aktif iş · konum {c.lastLocationAt ? ageLabel(c.lastLocationAt) : "yok"}
                       </div>

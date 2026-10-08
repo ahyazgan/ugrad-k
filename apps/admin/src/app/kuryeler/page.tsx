@@ -86,7 +86,15 @@ export default function KuryelerPage() {
                   <div className="text-xs text-slate-500">{c.vehicleModel}</div>
                 </Td>
                 <Td>
-                  {!c.active ? "Pasif" : c.isOnShift ? <span className="font-semibold text-emerald-700">Vardiyada</span> : "Vardiya dışı"}
+                  {!c.active ? (
+                    "Pasif"
+                  ) : c.onBreak ? (
+                    <span className="font-semibold text-amber-700">Molada</span>
+                  ) : c.isOnShift ? (
+                    <span className="font-semibold text-emerald-700">Vardiyada</span>
+                  ) : (
+                    "Vardiya dışı"
+                  )}
                 </Td>
                 <Td>
                   <button className="text-left" onClick={() => setSelected(c.id)} data-testid={`docs-${c.id}`}>

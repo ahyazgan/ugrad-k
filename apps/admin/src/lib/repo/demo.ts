@@ -154,8 +154,8 @@ async function seed(): Promise<State> {
     { id: "cus-2", fullName: "Av. Murat Demir", phone: "+905334445566", email: "murat@ornek-hukuk.com", corporateAccountId: "corp-1", createdAt: hoursAgo(900), orderCount: 0 },
   ];
   const couriers: Courier[] = [
-    { id: "kur-1", fullName: "Mehmet Kaya", phone: "+905551110001", plate: "34 YZG 01", vehicleModel: "Honda PCX 125", active: true, isOnShift: true, lastLat: 41.08, lastLng: 29.06, lastLocationAt: hoursAgo(0.05), activeOrderCount: 0 },
-    { id: "kur-2", fullName: "Emre Şahin", phone: "+905551110002", plate: "34 YZG 02", vehicleModel: "Yamaha NMAX", active: true, isOnShift: false, lastLat: null, lastLng: null, lastLocationAt: null, activeOrderCount: 0 },
+    { id: "kur-1", fullName: "Mehmet Kaya", phone: "+905551110001", plate: "34 YZG 01", vehicleModel: "Honda PCX 125", active: true, isOnShift: true, onBreak: false, lastLat: 41.08, lastLng: 29.06, lastLocationAt: hoursAgo(0.05), activeOrderCount: 0 },
+    { id: "kur-2", fullName: "Emre Şahin", phone: "+905551110002", plate: "34 YZG 02", vehicleModel: "Yamaha NMAX", active: true, isOnShift: false, onBreak: false, lastLat: null, lastLng: null, lastLocationAt: null, activeOrderCount: 0 },
   ];
   const place = (id: string) => MOCK_PLACES.find((p) => p.placeId === id)!;
   const specs: Array<[string, string, string, OrderStatus, number, boolean, string | null]> = [
@@ -360,6 +360,8 @@ async function seed(): Promise<State> {
       plate: c.plate,
       startedAt: start.toISOString(),
       endedAt: new Date(start.getTime() + (8 + (i % 3)) * 3_600_000).toISOString(),
+      // Öğle molası 13:00 (İstanbul), 30–50 dk
+      breaks: [{ startedAt: new Date(start.getTime() + 4 * 3_600_000).toISOString(), endedAt: new Date(start.getTime() + (4 * 60 + 30 + (i % 3) * 10) * 60_000).toISOString(), auto: false }],
     };
   });
   shifts.push({
@@ -370,6 +372,7 @@ async function seed(): Promise<State> {
     plate: "34 YZG 01",
     startedAt: hoursAgo(3),
     endedAt: null,
+    breaks: [],
   });
   return {
     signedIn: false,
@@ -392,6 +395,8 @@ async function seed(): Promise<State> {
       offerTimeoutSeconds: 60,
       arrivalAutoRadiusM: 100,
       arrivalMaxRadiusM: 300,
+      maxBreakMinutes: 45,
+      offerAutoBreakAfter: 3,
     },
     consented: new Set(["cus-1", "cus-2", "cus-3"]),
     apiKeys: [],
@@ -688,6 +693,7 @@ export function createDemoRepo(): AdminRepo {
         vehicleModel: input.vehicleModel ?? null,
         active: true,
         isOnShift: false,
+        onBreak: false,
         lastLat: null,
         lastLng: null,
         lastLocationAt: null,
@@ -880,7 +886,7 @@ export function createDemoRepo(): AdminRepo {
           declinedBy: [],
         })),
         s.couriers
-          .filter((c) => c.active && c.isOnShift)
+          .filter((c) => c.active && c.isOnShift && !c.onBreak)
           .filter((c) => !s.ops.enforceCourierDocuments || courierCompliance(s.documents.filter((d) => d.courierId === c.id)).ok)
           .map((c) => ({ id: c.id, name: c.fullName, lat: c.lastLat, lng: c.lastLng, locationAt: c.lastLocationAt, activeOrders: c.activeOrderCount })),
         {

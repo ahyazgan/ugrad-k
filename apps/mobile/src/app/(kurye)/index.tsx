@@ -21,6 +21,12 @@ export default function KuryeIsler() {
   const [compliance, setCompliance] = useState<Compliance | null>(null);
   const [me, setMe] = useState<{ lat: number; lng: number } | null>(null);
   const [offerMsg, setOfferMsg] = useState<string | null>(null);
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 30_000);
+    return () => clearInterval(t);
+  }, []);
 
   const load = useCallback(async () => {
     try {
@@ -77,29 +83,74 @@ export default function KuryeIsler() {
     }
   }
 
+  async function toggleBreak() {
+    setBusy(true);
+    setError(null);
+    try {
+      if (shift?.break) {
+        await api.endBreak();
+        const tracking = await startTracking();
+        setTrackingMsg(tracking.message ?? null);
+      } else {
+        await api.startBreak();
+        // Elde iş yoksa molada konum paylaşılmaz (KVKK: yalnız gerekli veri)
+        if (!jobs.some((j) => ["kuryeye_atandi", "alindi", "yolda"].includes(j.status) && !j.offerExpiresAt)) await stopTracking();
+      }
+      setNow(Date.now());
+      await load();
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : "İşlem başarısız");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   const offers = jobs.filter((j): j is OrderSummary & { offerExpiresAt: string } => !!j.offerExpiresAt);
   const active = jobs.filter((j) => ACTIVE.includes(j.status) && !j.offerExpiresAt);
   const done = jobs.filter((j) => j.status === "teslim_edildi");
 
   return (
     <Screen>
-      <Card style={shift ? { borderColor: colors.success, backgroundColor: colors.successLight } : undefined}>
-        <Title>{shift ? "Vardiyadasınız" : "Vardiya kapalı"}</Title>
-        <Muted>
-          {shift
-            ? `Başlangıç ${formatTime(shift.startedAt)} · konumunuz yalnızca vardiya boyunca paylaşılır`
-            : "İş almak için vardiyayı başlatın. Çalışma saatleriniz kayıt altına alınır."}
-        </Muted>
-        {trackingMsg ? <Muted>{trackingMsg}</Muted> : null}
-        <Button
-          title={shift ? "Vardiyayı bitir" : "Vardiyayı başlat"}
-          variant={shift ? "secondary" : "primary"}
-          onPress={toggleShift}
-          loading={busy}
-          disabled={shift === undefined}
-          testID="shift-toggle"
-        />
-      </Card>
+      {shift?.break ? (
+        <Card style={{ borderColor: colors.accent, backgroundColor: "#FEF3C7" }}>
+          <Title>Moladasınız</Title>
+          <Text testID="break-info" style={{ color: colors.muted }}>
+            {Math.max(0, Math.floor((now - new Date(shift.break.startedAt).getTime()) / 60_000))} dk · molada yeni iş teklifi gelmez
+          </Text>
+          {shift.break.auto ? (
+            <Text style={{ color: colors.danger }}>Üst üste iş tekliflerine yanıt vermediğiniz için otomatik molaya alındınız.</Text>
+          ) : null}
+          {active.length ? <Muted>Elinizdeki {active.length} iş devam ediyor; konumunuz bu işler için paylaşılmaya devam eder.</Muted> : null}
+          <Button title="Moladan dön" onPress={toggleBreak} loading={busy} testID="break-toggle" />
+        </Card>
+      ) : (
+        <Card style={shift ? { borderColor: colors.success, backgroundColor: colors.successLight } : undefined}>
+          <Title>{shift ? "Vardiyadasınız" : "Vardiya kapalı"}</Title>
+          <Muted>
+            {shift
+              ? `Başlangıç ${formatTime(shift.startedAt)} · konumunuz yalnızca vardiya boyunca paylaşılır`
+              : "İş almak için vardiyayı başlatın. Çalışma saatleriniz kayıt altına alınır."}
+          </Muted>
+          {trackingMsg ? <Muted>{trackingMsg}</Muted> : null}
+          <View style={{ flexDirection: "row", gap: 8 }}>
+            {shift ? (
+              <View style={{ flex: 1 }}>
+                <Button title="Mola ver" variant="secondary" onPress={toggleBreak} disabled={busy} testID="break-toggle" />
+              </View>
+            ) : null}
+            <View style={{ flex: 1 }}>
+              <Button
+                title={shift ? "Vardiyayı bitir" : "Vardiyayı başlat"}
+                variant={shift ? "secondary" : "primary"}
+                onPress={toggleShift}
+                loading={busy}
+                disabled={shift === undefined}
+                testID="shift-toggle"
+              />
+            </View>
+          </View>
+        </Card>
+      )}
       <ErrorBox message={error} />
       {offerMsg ? <Muted style={{ color: colors.danger }}>{offerMsg}</Muted> : null}
       {offers.map((j) => (

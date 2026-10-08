@@ -93,7 +93,15 @@ export default function SiparisDetayPage() {
     },
     data!.couriers
       .filter((c) => c.isOnShift)
-      .map((c) => ({ id: c.id, name: c.fullName, lat: c.lastLat, lng: c.lastLng, locationAt: c.lastLocationAt, activeOrders: c.activeOrderCount })),
+      .map((c) => ({
+        id: c.id,
+        name: c.fullName,
+        lat: c.lastLat,
+        lng: c.lastLng,
+        locationAt: c.lastLocationAt,
+        activeOrders: c.activeOrderCount,
+        onBreak: c.onBreak,
+      })),
     {
       maxActiveOrdersPerCourier: data!.ops.maxActiveOrdersPerCourier,
       maxPickupDistanceKm: data!.ops.maxPickupDistanceKm,

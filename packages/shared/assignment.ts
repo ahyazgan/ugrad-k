@@ -2,7 +2,7 @@
  * Otomatik kurye atama (saf fonksiyonlar). Edge Function (auto-dispatch), panel
  * önerileri ve demo modu aynı algoritmayı kullanır.
  *
- * Uygunluk: vardiyada, konumu taze, aktif iş sayısı sınırın altında, alışa
+ * Uygunluk: vardiyada ve molada değil, konumu taze, aktif iş sayısı sınırın altında, alışa
  * mesafesi sınır içinde ve bu işi daha önce bırakmamış kurye.
  * Puan (düşük = iyi): tahmini yol km'si + aktif iş başına ceza km'si.
  */
@@ -15,6 +15,8 @@ export interface CandidateCourier {
   lng: number | null;
   locationAt: string | null;
   activeOrders: number;
+  /** Moladaki kurye otomatik iş almaz */
+  onBreak?: boolean;
 }
 
 export interface AssignableOrder {
@@ -44,7 +46,7 @@ export const LOAD_PENALTY_KM = 3;
 /** Planlı sipariş, alış zamanından bu kadar dakika önce atanabilir */
 export const SCHEDULE_LEAD_MINUTES = 30;
 
-export type Ineligibility = "no_location" | "stale_location" | "at_capacity" | "too_far" | "declined";
+export type Ineligibility = "on_break" | "no_location" | "stale_location" | "at_capacity" | "too_far" | "declined";
 
 export interface RankedCourier {
   courier: CandidateCourier;
@@ -55,6 +57,7 @@ export interface RankedCourier {
 }
 
 export const INELIGIBILITY_LABELS: Record<Ineligibility, string> = {
+  on_break: "molada",
   no_location: "konum yok",
   stale_location: "konum eski",
   at_capacity: "iş kapasitesi dolu",
@@ -72,7 +75,8 @@ export function rankCouriers(order: AssignableOrder, couriers: CandidateCourier[
     const distanceKm =
       c.lat != null && c.lng != null ? roadKm({ lat: c.lat, lng: c.lng }, { lat: order.pickupLat, lng: order.pickupLng }) : null;
     let reason: Ineligibility | null = null;
-    if (order.declinedBy.includes(c.id)) reason = "declined";
+    if (c.onBreak) reason = "on_break";
+    else if (order.declinedBy.includes(c.id)) reason = "declined";
     else if (distanceKm == null || !c.locationAt) reason = "no_location";
     else if (cfg.now.getTime() - new Date(c.locationAt).getTime() > cfg.locationMaxAgeMinutes * 60_000) reason = "stale_location";
     else if (c.activeOrders >= cfg.maxActiveOrdersPerCourier) reason = "at_capacity";

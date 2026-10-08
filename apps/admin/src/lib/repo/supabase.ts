@@ -295,6 +295,7 @@ export function createSupabaseRepo(url: string, anonKey: string): AdminRepo & { 
           vehicleModel: r.vehicle_model,
           active: r.active,
           isOnShift: r.is_on_shift,
+          onBreak: !!r.on_break,
           lastLat: r.last_lat,
           lastLng: r.last_lng,
           lastLocationAt: r.last_location_at,
@@ -373,7 +374,7 @@ export function createSupabaseRepo(url: string, anonKey: string): AdminRepo & { 
     async listShifts({ from, to, courierId }) {
       let q = client
         .from("courier_shifts")
-        .select("*, courier:couriers(plate, profile:profiles(full_name, phone))")
+        .select("*, courier:couriers(plate, profile:profiles(full_name, phone)), breaks:courier_breaks(started_at, ended_at, auto)")
         .gte("started_at", istDayStartUtc(from))
         .lt("started_at", istDayEndUtc(to))
         .order("started_at");
@@ -386,6 +387,7 @@ export function createSupabaseRepo(url: string, anonKey: string): AdminRepo & { 
         plate: r.courier?.plate ?? null,
         startedAt: r.started_at,
         endedAt: r.ended_at,
+        breaks: ((r.breaks ?? []) as Row[]).map((b) => ({ startedAt: b.started_at, endedAt: b.ended_at, auto: !!b.auto })),
       }));
     },
 
@@ -524,6 +526,8 @@ export function createSupabaseRepo(url: string, anonKey: string): AdminRepo & { 
         offerTimeoutSeconds: r.offer_timeout_seconds ?? 60,
         arrivalAutoRadiusM: r.arrival_auto_radius_m ?? 100,
         arrivalMaxRadiusM: r.arrival_max_radius_m ?? 300,
+        maxBreakMinutes: r.max_break_minutes ?? 45,
+        offerAutoBreakAfter: r.offer_auto_break_after ?? 3,
       };
     },
     async saveOpsSettings(s) {
@@ -549,6 +553,8 @@ export function createSupabaseRepo(url: string, anonKey: string): AdminRepo & { 
             offer_timeout_seconds: s.offerTimeoutSeconds,
             arrival_auto_radius_m: s.arrivalAutoRadiusM,
             arrival_max_radius_m: s.arrivalMaxRadiusM,
+            max_break_minutes: s.maxBreakMinutes,
+            offer_auto_break_after: s.offerAutoBreakAfter,
           })
           .eq("id", 1),
         "Ayarlar kaydedilemedi",

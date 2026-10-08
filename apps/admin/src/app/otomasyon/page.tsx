@@ -7,7 +7,7 @@ import { Button, Card, ErrorText, Input, PageHeader } from "@/components/ui";
 import { repo, type DispatchResult, type OpsSettings, type ReadinessItem } from "@/lib/repo";
 import { useLoad } from "@/lib/use-load";
 
-const NUMBERS: Array<{ key: keyof OpsSettings; label: string; hint: string }> = [
+const NUMBERS: Array<{ key: keyof OpsSettings; label: string; hint: string; allowZero?: boolean }> = [
   { key: "maxActiveOrdersPerCourier", label: "Kurye başına en fazla aktif iş", hint: "Atanmış + alınmış + yolda" },
   { key: "maxPickupDistanceKm", label: "Alışa en fazla uzaklık (km)", hint: "Tahmini yol mesafesi" },
   { key: "locationMaxAgeMinutes", label: "Konum en fazla kaç dakikalık olsun", hint: "Daha eski konumdaki kuryeye atanmaz" },
@@ -18,6 +18,13 @@ const NUMBERS: Array<{ key: keyof OpsSettings; label: string; hint: string }> = 
   { key: "offerTimeoutSeconds", label: "Teklif yanıt süresi (sn)", hint: "15–600; süre dolarsa iş sıradaki kuryeye geçer" },
   { key: "arrivalAutoRadiusM", label: "Otomatik varış mesafesi (m)", hint: "30–500; konum adrese bu kadar yaklaşınca 'kurye kapıda'" },
   { key: "arrivalMaxRadiusM", label: "'Vardım' için en fazla uzaklık (m)", hint: "50–2000; daha uzaktan varış bildirilemez" },
+  { key: "maxBreakMinutes", label: "En uzun mola (dk)", hint: "5–240; aşılırsa size WhatsApp/SMS gelir" },
+  {
+    key: "offerAutoBreakAfter",
+    label: "Yanıtsız teklif sonrası otomatik mola",
+    hint: "Üst üste bu kadar teklife yanıt vermeyen kurye molaya alınır (0 = kapalı)",
+    allowZero: true,
+  },
 ];
 
 export default function OtomasyonPage() {
@@ -221,7 +228,7 @@ function OpsForm({ initial, onSaved }: { initial: OpsSettings; onSaved: () => vo
     e.preventDefault();
     setMsg(null);
     setSaveError(null);
-    const bad = NUMBERS.find((n) => !(Number(form[n.key]) > 0));
+    const bad = NUMBERS.find((n) => !(Number(form[n.key]) > 0 || (n.allowZero && Number(form[n.key]) === 0)));
     if (bad) {
       setSaveError(`Geçersiz değer: ${bad.label}`);
       return;
@@ -232,6 +239,10 @@ function OpsForm({ initial, onSaved }: { initial: OpsSettings; onSaved: () => vo
     }
     if (form.arrivalAutoRadiusM < 30 || form.arrivalAutoRadiusM > 500 || form.arrivalMaxRadiusM < 50 || form.arrivalMaxRadiusM > 2000) {
       setSaveError("Varış mesafeleri: otomatik 30–500 m, 'Vardım' 50–2000 m");
+      return;
+    }
+    if (form.maxBreakMinutes < 5 || form.maxBreakMinutes > 240 || form.offerAutoBreakAfter < 0 || form.offerAutoBreakAfter > 20) {
+      setSaveError("Mola: en uzun 5–240 dk, otomatik mola 0–20 teklif");
       return;
     }
     try {

@@ -366,16 +366,33 @@ export function createDemoApi(): Api {
 
     // ───────── Kurye
     async getOpenShift() {
-      return shift;
+      return shift ? { ...shift, break: shift.break ? { ...shift.break } : null } : null;
     },
     async startShift() {
-      shift ??= { id: "demo-shift", startedAt: new Date().toISOString() };
+      shift ??= { id: "demo-shift", startedAt: new Date().toISOString(), break: null };
       await seedCourierJobs();
       notifyJobs();
       return shift;
     },
     async endShift() {
       shift = null;
+      notifyJobs();
+    },
+    async startBreak() {
+      if (!shift) throw new ApiError("Mola için önce vardiyayı başlatın");
+      shift.break ??= { startedAt: new Date().toISOString(), auto: false };
+      // Bekleyen teklifler geri alınır
+      for (const o of orders.values()) {
+        if (o.courierName === "Demo Kurye" && o.offerExpiresAt && o.status === "kuryeye_atandi") {
+          move(o.id, "onaylandi", "Kurye molada; teklif geri alındı");
+          o.courierName = null;
+          o.offerExpiresAt = null;
+        }
+      }
+      notifyJobs();
+    },
+    async endBreak() {
+      if (shift) shift.break = null;
       notifyJobs();
     },
     async listCourierJobs() {

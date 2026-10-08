@@ -291,19 +291,29 @@ export function createSupabaseApi(url: string, anonKey: string): Api & { client:
 
     // ───────── Kurye
     async getOpenShift() {
-      const { data, error } = await client
-        .from("courier_shifts")
-        .select("id, started_at")
-        .eq("courier_id", await uid())
-        .is("ended_at", null)
-        .maybeSingle();
-      fail(error, "Vardiya okunamadı");
-      return data ? ({ id: data.id, startedAt: data.started_at } satisfies Shift) : null;
+      const id = await uid();
+      const [s, b] = await Promise.all([
+        client.from("courier_shifts").select("id, started_at").eq("courier_id", id).is("ended_at", null).maybeSingle(),
+        client.from("courier_breaks").select("started_at, auto").eq("courier_id", id).is("ended_at", null).maybeSingle(),
+      ]);
+      fail(s.error, "Vardiya okunamadı");
+      const data = s.data;
+      return data
+        ? ({ id: data.id, startedAt: data.started_at, break: b.data ? { startedAt: b.data.started_at, auto: !!b.data.auto } : null } satisfies Shift)
+        : null;
     },
     async startShift(at) {
       const { data, error } = await client.rpc("start_shift", { p_lat: at?.lat ?? null, p_lng: at?.lng ?? null });
       if (error) throw new ApiError(error.message);
-      return { id: data.id, startedAt: data.started_at };
+      return { id: data.id, startedAt: data.started_at, break: null };
+    },
+    async startBreak() {
+      const { error } = await client.rpc("start_break");
+      if (error) throw new ApiError(error.message);
+    },
+    async endBreak() {
+      const { error } = await client.rpc("end_break");
+      if (error) throw new ApiError(error.message);
     },
     async endShift(at) {
       const { error } = await client.rpc("end_shift", { p_lat: at?.lat ?? null, p_lng: at?.lng ?? null });

@@ -119,6 +119,8 @@ export interface OrderDetail extends OrderSummary {
 export interface Shift {
   id: string;
   startedAt: string;
+  /** Açık mola (yoksa null); auto: yanıtsız teklifler nedeniyle sistem molaya aldı */
+  break: { startedAt: string; auto: boolean } | null;
 }
 
 export interface CourierLocation {
@@ -206,6 +208,9 @@ export interface Api {
   getOpenShift(): Promise<Shift | null>;
   startShift(at?: CourierLocation | null): Promise<Shift>;
   endShift(at?: CourierLocation | null): Promise<void>;
+  /** Mola: molada otomatik iş gelmez, bekleyen teklifler geri alınır */
+  startBreak(): Promise<void>;
+  endBreak(): Promise<void>;
   /** Atanmış aktif işler + bugün teslim edilenler */
   listCourierJobs(): Promise<OrderSummary[]>;
   /**
