@@ -12,6 +12,7 @@ import {
   calculateMonthlyInvoice,
   courierCompliance,
   courierEarning,
+  aggregateDemand,
   closedIncentivePeriods,
   DEFAULT_COST_MODEL,
   formatTL,
@@ -867,6 +868,19 @@ export function createDemoRepo(): AdminRepo {
         "kur-1": { offersAccepted: 46, offersDeclined: 2, offersTimedOut: 1, delivered: 52, urgentDelivered: 14, urgentOnTime: 13, ratingCount: 21, ratingAvg: 4.81, released: 0, failedDeliveries: 1, shiftsBooked: 18, shiftsAttended: 18, lateCancels: 0 },
         "kur-2": { offersAccepted: 19, offersDeclined: 4, offersTimedOut: 5, delivered: 22, urgentDelivered: 6, urgentOnTime: 4, ratingCount: 9, ratingAvg: 4.2, released: 2, failedDeliveries: 1, shiftsBooked: 9, shiftsAttended: 6, lateCancels: 1 },
       };
+    },
+    async getDemand(days) {
+      const s = await get();
+      return aggregateDemand(
+        s.orders.map((o) => ({
+          at: o.scheduledPickupAt ?? o.createdAt,
+          pickup: { lat: o.pickupLat, lng: o.pickupLng },
+          pickupAddress: o.pickupAddress,
+          cancelled: o.status === "iptal",
+        })),
+        new Date(),
+        { days },
+      );
     },
     async listShiftPlan(fromDay, days) {
       const s = await get();

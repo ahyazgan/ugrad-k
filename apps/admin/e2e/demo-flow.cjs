@@ -194,6 +194,28 @@ fs.mkdirSync(out, { recursive: true });
   await newRow.getByRole("button", { name: "Durdur" }).click();
   await newRow.getByText("Kapalı").waitFor();
 
+  // Talep yoğunluğu: ısı tablosu → gün/saat süzme, sıcak bölgeler haritada, vardiya önerisini uygula
+  await nav("Talep yoğunluğu");
+  await page.getByTestId("demand-matrix").waitFor();
+  await page.getByTestId("hotspot-row").first().waitFor();
+  const busy = await page.evaluate(() => {
+    const cells = [...document.querySelectorAll('[data-testid^="demand-cell-"]')];
+    const hit = cells.find((c) => c.style.background && !/241, 245, 249|f1f5f9/i.test(c.style.background));
+    return hit ? hit.getAttribute("data-testid") : null;
+  });
+  if (!busy) throw new Error("ısı tablosunda dolu hücre yok");
+  await page.getByTestId(busy).click();
+  await page.getByTestId("demand-hover").filter({ hasText: /haftada ort\. [\d,]+ sipariş/ }).waitFor();
+  await page.getByTestId("hotspot-row").first().waitFor();
+  await page.waitForFunction(() => document.querySelectorAll('[data-pin^="hot-"]').length > 0);
+  console.log("YOGUNLUK", busy, (await page.getByTestId("hotspot-row").first().innerText()).replace(/\s+/g, " "));
+  await shot("04e-yogunluk");
+  // Son dilim (Pazar akşamı): sonraki vardiya planı adımının kullandığı ilk dilime dokunmasın
+  const applyBtn = page.locator('[data-testid^="apply-"]').last();
+  await applyBtn.click();
+  await page.getByTestId("demand-msg").filter({ hasText: "gereken kurye" }).waitFor();
+  await page.getByTestId("demand-clear").click();
+
   // Vardiya planı: haftalık doluluk, kurye atama
   await nav("Vardiya planı");
   await page.getByTestId("plan-summary").getByText(/kurye-dilim eksik|tüm dilimler dolu/).waitFor();

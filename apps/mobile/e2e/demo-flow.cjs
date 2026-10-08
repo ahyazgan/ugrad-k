@@ -251,6 +251,11 @@ fs.mkdirSync(out, { recursive: true });
   await kp.getByText(/Bugün tamamlanan \(2\)/).waitFor();
   await kp.getByText(/Aktif işler \(0\)/).waitFor();
   await kp.getByText(/Göndericiye iade edildi/).waitFor();
+  // Boşta: önümüzdeki saatin yoğun bölgeleri (geçmiş talep), uzaklıkla
+  await kp.getByText('Yoğun bölgeler (önümüzdeki saat)').waitFor();
+  const areas = await kp.getByTestId('busy-area').allInnerTexts();
+  console.log('YOGUN:', areas.map((a) => a.replace(/\n+/g, ' ')).join(' | '));
+  if (areas.length !== 3 || !/^1\. Kadıköy · [\d,]+ km/.test(areas[0])) throw new Error('yoğun bölgeler eksik');
   // Kazancım: teslimat ve elde tutulan nakit
   await kp.getByRole('tab', { name: /Kazancım/ }).click();
   await kt('earnings-net').waitFor();

@@ -1,5 +1,6 @@
 import type {
   CourierDocument,
+  DemandData,
   FailedDeliveryReason,
   Incentive,
   PerformanceStats,
@@ -307,6 +308,8 @@ export interface Api {
   courierEarnings(): Promise<CourierEarnings>;
   /** Kuryenin son 30 günlük performans sayıları (puan: courierPerformance) */
   myPerformance(): Promise<PerformanceStats | null>;
+  /** Geçmiş talep (yalnız en az 3 siparişli ~1 km hücreler); yoğun bölge önerisi için */
+  demandStats(): Promise<DemandData>;
   /** Geçerli prim kampanyaları ve bu dönemin ilerlemesi */
   myIncentives(): Promise<IncentiveStatus[]>;
   /** Acil durum: yöneticiye konumla alarm (molaya alınır) */

@@ -2,6 +2,7 @@ import { ORDER_STATUS_LABELS, type Compliance } from "@yazgan/shared";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import { Pressable, Text, View } from "react-native";
+import { BusyAreas } from "@/components/BusyAreas";
 import { complianceFor, DocumentWarning } from "@/components/CourierDocs";
 import { OfferCard } from "@/components/OfferCard";
 import { OutboxBanner } from "@/components/OutboxBanner";
@@ -43,7 +44,8 @@ export default function KuryeIsler() {
         j.find((x) => x.status === "alindi") ??
         j.find((x) => x.status === "kuryeye_atandi" && !x.offerExpiresAt);
       // Teklif mesafesi ve durak sırası için kuryenin son konumu
-      if (j.some((x) => ACTIVE.includes(x.status))) lastKnownPosition().then(setMe, () => undefined);
+      // Boştayken de: yoğun bölgelere uzaklık için
+      if (j.some((x) => ACTIVE.includes(x.status)) || s) lastKnownPosition().then(setMe, () => undefined);
       setActiveOrderForLocation(live?.id ?? null);
       api.courierDocuments().then((d) => setCompliance(complianceFor(d)), () => undefined);
     } catch (e) {
@@ -176,6 +178,7 @@ export default function KuryeIsler() {
       <DocumentWarning c={compliance} />
 
       <StopPlan jobs={active} me={me} />
+      {shift && !shift.break && !active.length && !offers.length ? <BusyAreas me={me} /> : null}
 
       <Title>Aktif işler ({active.length})</Title>
       {active.length === 0 ? <Muted>{shift ? "Şu an atanmış iş yok. Yeni iş atandığında burada görünür." : "—"}</Muted> : null}

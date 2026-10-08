@@ -10,6 +10,8 @@ import {
   applyFailedDeliveryReturn,
   applyWaitingFee,
   courierBalance,
+  demandCell,
+  istanbulWeekHour,
   courierEarning,
   DEFAULT_COST_MODEL,
   DEFAULT_PRICING_SETTINGS,
@@ -562,6 +564,19 @@ export function createDemoApi(): Api {
     },
     async myPerformance() {
       return { offersAccepted: 23, offersDeclined: 1, offersTimedOut: 2, delivered: 31, urgentDelivered: 8, urgentOnTime: 7, ratingCount: 11, ratingAvg: 4.7, released: 1, failedDeliveries: 0, shiftsBooked: 10, shiftsAttended: 9, lateCancels: 0 };
+    },
+    async demandStats() {
+      requireSession();
+      // Demo: bu ve sonraki saatte Anadolu yakasında üç yoğun hücre (8 haftalık örnek)
+      const rows = [0, 1].flatMap((ahead) => {
+        const { weekday, hour } = istanbulWeekHour(new Date(Date.now() + ahead * 3_600_000));
+        return [
+          { ...demandCell({ lat: 40.9905, lng: 29.0291 }), orders: 22, district: "Kadıköy" },
+          { ...demandCell({ lat: 41.0226, lng: 29.0155 }), orders: 14, district: "Üsküdar" },
+          { ...demandCell({ lat: 40.9923, lng: 29.1244 }), orders: 9, district: "Ataşehir" },
+        ].map((c) => ({ ...c, weekday, hour }));
+      });
+      return { weeks: 8, rows };
     },
     async myIncentives() {
       requireSession();

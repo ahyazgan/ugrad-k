@@ -540,3 +540,14 @@ Kayıtlı müşteriler `siparis@<alan adı>` adresine yazar; yapay zeka asistan�
 - **Kurye**: Kazancım sekmesinde bugünün/bu haftanın ilerlemesi (ör. "bugün 6/8 iş · 2 iş daha → 100 TL") ve kazanılan primler.
 - Kampanyayı *Durdur*: kapanmamış dönem için ödül yazılmaz; kazanılmış primler kalır. Kural değiştirmek için durdurup yenisini açın (geçmiş ödüller eski kurala göre kalır).
 - Bütçe: hedef primleri iş başı maliyeti artırır; Fiyatlar → maliyet simülasyonunda marjı kontrol edin.
+
+## 40. Talep yoğunluğu (ısı haritası)
+
+- **Panel → Talep yoğunluğu**: son 4/8/12 hafta veya 6 ayın siparişleri; alış zamanı (planlı alış varsa o) İstanbul hafta günü × saat ve ~1 km'lik alış hücresi (iptaller hariç). Kaynak `demand_stats()` RPC'si, hesap `packages/shared/demand.ts`.
+  - *Hafta günü × saat* tablosu: haftalık ortalama sipariş (tek tonlu mavi; koyu = yoğun). Hücreye tıklayınca harita ve sıralama o gün/saate süzülür.
+  - *Sıcak bölgeler*: haritada sıra numaralı işaretler ve ilçe listesi (ilçe, hücredeki alış adreslerinde en sık geçen).
+  - *Vardiya önerisi*: her vardiya dilimi için öneri = dilimin en yoğun saatindeki haftalık ortalama sipariş ÷ kurye başına saatlik iş (varsayılan 1,5; yukarı yuvarlanır, talep varsa en az 1). **Uygula**, Vardiya planındaki gereken kurye sayısını değiştirir. Dilimi olmayan ama talep gelen saatler ayrıca listelenir.
+  - Ortalamanın paydası, yeni işletmede ilk siparişten bu yana geçen haftadır; 30'dan az sipariş veya 2 haftadan az veride "Az veri" uyarısı çıkar.
+- **Kurye uygulaması**: vardiyada, molada değil ve elinde iş yokken *Yoğun bölgeler (önümüzdeki saat)* kartı — bu ve sonraki saatin en yoğun 3 bölgesi, uzaklık ve yol tarifi. Veri 30 dk önbellekte.
+- **KVKK**: ham koordinat dönmez, yalnız hücre merkezi; kurye en az 3 siparişli hücreleri görür (tek bir müşterinin adresi seçilemez). Müşteri erişemez.
+- Dinamik fiyat (yoğunluk zammı) **yoktur** (B2B öngörülebilirlik, bkz. fiyat kuralları); yoğunluk yalnız kurye konumlandırma ve vardiya planı içindir.

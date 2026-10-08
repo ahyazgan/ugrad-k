@@ -452,6 +452,15 @@ export function createSupabaseApi(url: string, anonKey: string): Api & { client:
       const r = ((data ?? []) as Row[])[0];
       return r ? performanceStatsFromRow(r) : null;
     },
+    async demandStats() {
+      const { data, error } = await client.rpc("demand_stats", { p_days: 56 });
+      if (error) throw new ApiError(error.message);
+      const d = (data ?? {}) as { weeks?: number | string; rows?: Row[] };
+      return {
+        weeks: Number(d.weeks ?? 1),
+        rows: (d.rows ?? []).map((r) => ({ weekday: r.weekday, hour: r.hour, lat: Number(r.lat), lng: Number(r.lng), orders: r.orders, district: r.district ?? null })),
+      };
+    },
     async myIncentives() {
       const { data, error } = await client.rpc("my_incentive_progress");
       if (error) throw new ApiError(error.message);

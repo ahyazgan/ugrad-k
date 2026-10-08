@@ -52,7 +52,7 @@ Bu dosya Claude Code için proje hafızasıdır. Her oturumda önce bunu oku.
 
 ## Sipariş durumları
 `beklemede → onaylandi → kuryeye_atandi → alindi → yolda → teslim_edildi`
-Ek: `iptal`, `sorunlu`; teslim edilemezse `yolda → geri_donuyor → geri_teslim` (göndericiye iade, dönüş ayağı ücreti; `report_failed_delivery`, docs/kurulum.md §33). Tamamlanmış iş = `teslim_edildi` veya `geri_teslim` (`orders.completed_at`; hakediş, fatura, raporlar)
+Ek: `iptal`, `sorunlu`; teslim edilemezse `yolda → geri_donuyor → geri_teslim` (göndericiye iade, `completed_at`); teslim edilemezse `yolda → geri_donuyor → geri_teslim` (göndericiye iade, dönüş ayağı ücreti; `report_failed_delivery`, docs/kurulum.md §33). Tamamlanmış iş = `teslim_edildi` veya `geri_teslim` (`orders.completed_at`; hakediş, fatura, raporlar)
 
 ## Kurallar (Claude Code için)
 - Arayüz dili **Türkçe**, kod ve değişken adları İngilizce
@@ -74,10 +74,19 @@ Ek: `iptal`, `sorunlu`; teslim edilemezse `yolda → geri_donuyor → geri_tesli
 - `apps/mobile/` — Expo SDK 57 + expo-router (`src/app/`). Supabase env yoksa **DEMO modu** (sahte veri, kod 123456). `pnpm --filter @yazgan/mobile e2e:web` tarayıcıda tam akışı test eder
 - `apps/admin/` — Next.js 16 + Tailwind 4 panel. Supabase env yoksa **DEMO modu** (admin@yazgankurye.com / demo1234). Kurye hesabı oluşturma `/api/kuryeler` (service role yalnız sunucuda). `pnpm --filter @yazgan/admin e2e:web`
 - Herkese açık Edge Functions: `site-api` (fiyat/adres/başvuru/kurye başvurusu/değerlendirme; IP hız sınırı `hit_rate_limit`), `api` (kurumsal REST, `yk_live_` anahtar SHA-256), `email-inbound` (Postmark → asistan, SPF/DKIM + kayıtlı müşteri), `health` (GET ayrıntısız; cron uyarı), `webhook-dispatch` (HMAC imzalı kurumsal webhook kuyruğu)
-- Edge Functions: auto-dispatch (otomatik onay + kurye atama, `packages/shared/assignment.ts`), admin-order (telefon siparişi), quote, create-order, places, send-sms, reprice-order, notify-dispatch, payment-init/callback/refund, invoice-dispatch/monthly, whatsapp-webhook, assistant-voice, account-delete, courier-earnings, winback (günlük, varsayılan kapalı), readiness (yalnız yönetici; canlıya hazırlık denetimi, gizli değer döndürmez)
+- Edge Functions: auto-dispatch (otomatik onay + kurye atama, `packages/shared/assignment.ts`), admin-order (telefon siparişi), quote, create-order, places, send-sms, reprice-order, notify-dispatch, payment-init/callback/refund, invoice-dispatch/monthly, whatsapp-webhook, assistant-voice, account-delete, courier-earnings, winback (günlük, varsayılan kapalı), sos (kurye acil durum; JWT), readiness (yalnız yönetici; canlıya hazırlık denetimi, gizli değer döndürmez)
 - Kurye hakedişi: `cost_settings` (ödeme modeli = maliyet modeli, `packages/shared/cost.ts` `courierEarning`), `courier_earnings` (Edge Function `courier-earnings`, 5 dk cron), `courier_payouts` (RPC `create_courier_payout`/`cancel_courier_payout`). Kuryeye ödemeli siparişte teslimde `cash_collection` (nakit/iban/alinmadi) zorunlu; nakit hakedişten düşülür. Panel `/hakedis`, kurye uygulaması Kazancım sekmesi. docs/kurulum.md §23
 - Kurye belgeleri: `courier_document_types` (= `packages/shared/compliance.ts` `COURIER_DOCUMENT_TYPES`, schema-sync testi), `courier_documents`, bucket `courier-docs`. `ops_settings.enforce_courier_documents` açıkken zorunlu belgesi eksik/süresi dolmuş kurye `start_shift` ile vardiyaya giremez, auto-dispatch iş vermez; süresi dolan/yaklaşan belgeler `system_health` uyarısı. docs/kurulum.md §24
-- Operasyon ayarları `ops_settings` (panel → Otomasyon): otomatik onay/atama, kapasite, mesafe, ödeme süresi
+- Operasyon ayarları `ops_settings` (panel → Otomasyon): otomatik onay/atama, kapasite, mesafe, ödeme süresi, iş teklifi süresi, varış yarıçapı, mola sınırı, teslim edilemedi bekleme süresi
+- Kurye uygulaması saha özellikleri (2026-10-12, docs/kurulum.md §29–40):
+  - İş teklifi kabul/ret + geri sayım (`courier_offers`, `respond_offer`/`expire_offers`, `packages/shared/offers.ts`); ret eden kurye o işe tekrar önerilmez
+  - Adrese vardım (`mark_arrived`, konum tetikleyicisiyle otomatik varış); bekleme varıştan ölçülür; `notifications.kind` (varis_alis/varis_teslim/mesaj_*)
+  - Mola (`courier_breaks`, `start_break`/`end_break`; yanıtsız tekliflerde otomatik mola), BTK raporunda net süre
+  - SOS (`courier_incidents`, Edge Function `sos`, panel `SosBanner`; `ADMIN_ALERT_PHONES`)
+  - Teslim edilemedi → iade (`report_failed_delivery`, fiyat satırı `failed_return`)
+  - Durak sırası (`packages/shared/route.ts` `planStops`), uygulama içi mesajlaşma (`order_messages`, numara paylaşmadan; 90 gün saklama)
+  - Çevrimdışı kuyruk (`apps/mobile/src/lib/outbox*.ts`; RPC'ler `p_occurred_at` alır, `event_time()` 6 saatle sınırlı)
+- Vardiya planı (`shift_templates`, `shift_bookings`, `book_shift`; panel `/vardiya-plani`, kurye "Vardiyam"), performans puanı (`courier_performance_stats` + `packages/shared/performance.ts`; otomatik atamada ±3 km), hedef primleri (`courier_incentives`, `compute_incentive_awards` → hesaplaşmaya eklenir; panel `/primler`), talep yoğunluğu (`demand_stats`, `packages/shared/demand.ts`; panel `/yogunluk`, kurye "Yoğun bölgeler")
 - Kuyruklar (outbox): `notifications` ve `invoices` tabloları; dakikalık cron ile işlenir (docs/kurulum.md §6)
 - Yapay zeka asistanı: `supabase/functions/_shared/assistant.ts` (Claude, araçlar aynı sipariş API'sini kullanır; geçmiş yalnızca sona eklenir)
 - Panel: Raporlar (`/raporlar`, `lib/reports.ts`, CSV `;` + ondalık virgül), Canlı harita (`/harita`, Leaflet + OSM; karo URL'si env ile değişir). E2E'de harita karoları `scripts/e2e-tile-stub.cjs` ile sahte PNG'den gelir
@@ -102,4 +111,5 @@ Ek: `iptal`, `sorunlu`; teslim edilemezse `yolda → geri_donuyor → geri_tesli
 - [x] Müşteri büyütme: kampanya kodları, davet ödülü, geri kazanma (İYS onaylı, varsayılan kapalı) (2026-10-08)
 - [x] ETA ve 60 dk acil taahhüdü (2026-10-08): `packages/shared/eta.ts`, `orders.sla_due_at` (tetikleyici), auto-dispatch erken uyarı (`_shared/sla.ts`), kaçan taahhütte `customer_credits` → sonraki siparişte "credit" satırı (`_shared/credits.ts`). docs/kurulum.md §25
 - [x] Canlıya alma hazırlığı (2026-10-08): `readiness` denetimi + panel kartı, yedek/deneme ortamı/geri alma rehberi (docs/kurulum.md §28)
+- [x] Kurye saha özellikleri (2026-10-12): iş teklifi, varış + bekleme, mola, SOS, teslim edilemedi → iade, durak sırası, mesajlaşma, çevrimdışı kuyruk, vardiya planlama, performans puanı, hedef primi, talep yoğunluğu (docs/kurulum.md §29–40)
 - [x] Ek geliştirmeler (2026-10-09): panelden telefon siparişi, otomatik onay + kurye atama, ödenmemiş kart siparişi iptali, kademeli km + %75 ek ücret tavanı (panelden tek tıkla eski tarifeye dönüş), raporlar + CSV, canlı haritalar (panel, takip sayfası, müşteri ve kurye uygulaması)

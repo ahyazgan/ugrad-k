@@ -10,6 +10,7 @@ import type {
   PriceQuote,
   CostModel,
   CourierDocumentKind,
+  DemandData,
   IncidentKind,
   Incentive,
   PerformanceStats,
@@ -555,6 +556,8 @@ export interface AdminRepo {
   /** Kurye performans sayıları (son 30 gün); puan packages/shared courierPerformance */
   courierPerformanceStats(): Promise<Record<string, PerformanceStats>>;
   // Vardiya planı
+  /** Geçmiş siparişlerden talep yoğunluğu (hafta günü × saat × ~1 km hücre) */
+  getDemand(days: number): Promise<DemandData>;
   listShiftPlan(fromDay: string, days: number): Promise<{ templates: ShiftTemplate[]; bookings: ShiftBooking[] }>;
   saveShiftTemplate(id: number, patch: { required: number; active: boolean }): Promise<void>;
   bookShiftFor(templateId: number, day: string, courierId: string): Promise<void>;

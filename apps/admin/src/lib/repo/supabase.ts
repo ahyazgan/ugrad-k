@@ -314,6 +314,22 @@ export function createSupabaseRepo(url: string, anonKey: string): AdminRepo & { 
       const rows = (check(await client.rpc("courier_performance_stats", { p_days: 30 }), "Performans okunamadı") ?? []) as Row[];
       return Object.fromEntries(rows.map((r) => [r.courier_id, performanceStatsFromRow(r)]));
     },
+    async getDemand(days) {
+      const { data, error } = await client.rpc("demand_stats", { p_days: days });
+      if (error) throw new RepoError(error.message);
+      const d = (data ?? {}) as { weeks?: number | string; rows?: Row[] };
+      return {
+        weeks: Number(d.weeks ?? 1),
+        rows: (d.rows ?? []).map((r) => ({
+          weekday: r.weekday,
+          hour: r.hour,
+          lat: Number(r.lat),
+          lng: Number(r.lng),
+          orders: r.orders,
+          district: r.district ?? null,
+        })),
+      };
+    },
     async listShiftPlan(fromDay, days) {
       const to = new Date(new Date(`${fromDay}T00:00:00+03:00`).getTime() + days * 86_400_000).toISOString();
       const [t, b] = await Promise.all([

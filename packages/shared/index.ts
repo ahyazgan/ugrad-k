@@ -20,3 +20,4 @@ export * from "./messages.ts";
 export * from "./shift-plan.ts";
 export * from "./performance.ts";
 export * from "./incentives.ts";
+export * from "./demand.ts";
