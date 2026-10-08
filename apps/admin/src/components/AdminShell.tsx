@@ -24,7 +24,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const isLogin = pathname === "/giris";
   // Herkese açık sayfalar (müşteri/alıcı takip linki) yönetici girişi gerektirmez
-  const isPublic = pathname.startsWith("/takip/");
+  const isPublic = pathname.startsWith("/takip/") || ["/gizlilik", "/kvkk", "/hesap-silme"].includes(pathname);
 
   useEffect(() => {
     const check = () => repo.currentAdmin().then(setAdmin);

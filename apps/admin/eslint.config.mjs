@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Playwright betikleri (Node CommonJS)
+    "e2e/**",
   ]),
 ]);
 

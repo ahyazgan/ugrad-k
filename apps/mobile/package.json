@@ -12,7 +12,11 @@
     "test": "vitest run",
     "export:web": "expo export --platform web",
     "e2e:web": "node e2e/serve.cjs \"$PWD/dist\" 8099 & SERVER=$!; node e2e/demo-flow.cjs e2e/shots; CODE=$?; kill $SERVER; exit $CODE",
-    "lint": "eslint src"
+    "lint": "eslint src",
+    "build:dev": "eas build --profile development",
+    "build:preview": "eas build --profile preview",
+    "build:prod": "eas build --profile production --platform all",
+    "submit:prod": "eas submit --profile production --platform all"
   },
   "dependencies": {
     "@expo/metro-runtime": "~57.0.16",
@@ -23,6 +27,7 @@
     "expo": "~57.0.27",
     "expo-constants": "~57.0.21",
     "expo-crypto": "~57.0.3",
+    "expo-dev-client": "~57.0.19",
     "expo-device": "~57.0.2",
     "expo-image-picker": "~57.0.20",
     "expo-linking": "~57.0.12",

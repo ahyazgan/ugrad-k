@@ -108,6 +108,11 @@ fs.mkdirSync(out, { recursive: true });
   await pub.goto(base + "/takip/gecersiz");
   await pub.getByText("Gönderi bulunamadı").waitFor();
   if (pub.url().includes("/giris")) throw new Error("takip sayfası girişe yönlendirdi");
+  for (const [path, text] of [["/gizlilik", "Toplanan veriler"], ["/kvkk", "İşlenen veriler"], ["/hesap-silme", "Hesabımı sil"]]) {
+    await pub.goto(base + path);
+    await pub.getByText(text, { exact: false }).first().waitFor();
+    if (pub.url().includes("/giris")) throw new Error(path + " girişe yönlendirdi");
+  }
 
   if (errors.length) throw new Error("Tarayıcı hataları: " + JSON.stringify(errors.slice(0, 10)));
   console.log("✓ panel e2e akışı geçti");

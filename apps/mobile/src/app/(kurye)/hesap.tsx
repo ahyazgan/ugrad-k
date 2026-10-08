@@ -1,4 +1,5 @@
 import { router } from "expo-router";
+import { DeleteAccount } from "@/components/DeleteAccount";
 import { Button, Card, Muted, Screen, Title } from "@/components/ui";
 import { api } from "@/lib/api";
 import { COMPANY } from "@/lib/kvkk";
@@ -23,6 +24,7 @@ export default function KuryeHesap() {
           router.replace("/giris");
         }}
       />
+      <DeleteAccount />
       <Muted style={{ textAlign: "center", fontSize: 12 }}>{COMPANY.title}</Muted>
     </Screen>
   );

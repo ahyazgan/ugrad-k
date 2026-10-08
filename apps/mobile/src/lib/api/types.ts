@@ -131,6 +131,8 @@ export interface Api {
   sendOtp(phone: string): Promise<void>;
   verifyOtp(phone: string, code: string): Promise<Session>;
   signOut(): Promise<void>;
+  /** Hesabı siler (kişisel veriler anonimleştirilir; siparişler mevzuat gereği saklanır) */
+  deleteAccount(): Promise<void>;
   // Profil ve KVKK
   getProfile(): Promise<Profile>;
   updateProfile(patch: { fullName?: string; email?: string }): Promise<Profile>;

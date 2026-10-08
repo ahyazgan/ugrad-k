@@ -136,3 +136,17 @@ export async function handleRepriceOrder(req: Request, ctx: Ctx): Promise<Respon
   }
   return json({ quote, changed });
 }
+
+/** Kullanıcının kendi hesabını silmesi: kişisel veriler anonimleştirilir, oturum kimliği kaldırılır. */
+export async function handleAccountDelete(req: Request, ctx: Ctx): Promise<Response> {
+  const user = await ctx.getUser(req);
+  const { error } = await ctx.admin.rpc("anonymize_profile", { p_id: user.id });
+  if (error) {
+    if (error.code === "22023") throw new HttpError(409, error.message);
+    throw new Error(`Hesap silinemedi: ${error.message}`);
+  }
+  // Soft delete: auth kaydı anonimleşir, siparişlerdeki ilişki (vergi kaydı) bozulmaz
+  const { error: aErr } = await ctx.admin.auth.admin.deleteUser(user.id, true);
+  if (aErr) throw new Error(`Oturum kaydı silinemedi: ${aErr.message}`);
+  return json({ deleted: true });
+}

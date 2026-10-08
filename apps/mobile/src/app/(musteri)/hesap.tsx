@@ -1,5 +1,6 @@
 import { router } from "expo-router";
 import { useState } from "react";
+import { DeleteAccount } from "@/components/DeleteAccount";
 import { Button, Card, ErrorBox, Field, Muted, Screen, Title } from "@/components/ui";
 import { api, ApiError } from "@/lib/api";
 import { COMPANY } from "@/lib/kvkk";
@@ -64,6 +65,7 @@ function HesapForm() {
           router.replace("/giris");
         }}
       />
+      <DeleteAccount />
       <Muted style={{ textAlign: "center", fontSize: 12 }}>
         {COMPANY.title}
         {"\n"}

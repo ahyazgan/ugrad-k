@@ -466,3 +466,6 @@ verify_jwt = false
 
 [functions.assistant-voice]
 verify_jwt = false
+
+[functions.account-delete]
+verify_jwt = true

@@ -56,6 +56,11 @@ fs.mkdirSync(out, { recursive: true });
   // Geri tuşu müşteri sekmelerine dönmeli (giriş ekranına değil)
   await page.goBack();
   await tid('address-pickup').waitFor();
+  // Hesap silme: devam eden sipariş varken engellenir
+  await page.getByText('Hesabım').click();
+  await tid('delete-account').click();
+  await tid('delete-account-confirm').click();
+  await page.getByText('Devam eden siparişiniz varken hesap silinemez').waitFor();
   console.log('✓ müşteri akışı geçti');
 
   // ───────── Kurye akışı

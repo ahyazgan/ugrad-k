@@ -1,0 +1,28 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Birim testleri (fiyat, bildirim kuralları, panel, mobil)
+        run: pnpm test
+      - name: Tip kontrolü
+        run: pnpm typecheck
+      - name: Edge Function testleri ve tip kontrolü (Deno)
+        run: pnpm test:functions && pnpm check:functions
+      - name: Veritabanı migration + RLS testleri (yerel PostgreSQL)
+        run: pnpm test:db
+      - name: Lint
+        run: pnpm --filter @yazgan/admin lint && pnpm --filter @yazgan/mobile lint

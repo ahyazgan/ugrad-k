@@ -40,3 +40,7 @@ yarn-error.*
 /ios
 /android
 e2e/shots/
+
+# Mağaza gizli dosyaları
+google-play-service-account.json
+*.p8

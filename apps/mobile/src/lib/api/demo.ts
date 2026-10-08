@@ -206,6 +206,15 @@ export function createDemoApi(): Api {
       session = null;
       emit();
     },
+    async deleteAccount() {
+      const active = [...orders.values()].some((o) => ["beklemede", "onaylandi", "kuryeye_atandi", "alindi", "yolda", "sorunlu"].includes(o.status) && o.courierName !== "Demo Kurye");
+      if (active) throw new ApiError("Devam eden siparişiniz varken hesap silinemez");
+      orders.clear();
+      profile = null;
+      for (const k of Object.keys(consents)) delete consents[k as ConsentType];
+      session = null;
+      emit();
+    },
 
     async getProfile() {
       requireSession();

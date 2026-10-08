@@ -103,6 +103,10 @@ export function createSupabaseApi(url: string, anonKey: string): Api & { client:
     async signOut() {
       await client.auth.signOut();
     },
+    async deleteAccount() {
+      await invoke("account-delete", {});
+      await client.auth.signOut();
+    },
 
     async getProfile() {
       const { data, error } = await client.from("profiles").select("*").eq("id", await uid()).single();

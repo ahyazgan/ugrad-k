@@ -86,3 +86,23 @@ Deno.test("OPTIONS: CORS", async () => {
   const res = await handler((r) => handleQuote(r, ctx))(new Request("http://x", { method: "OPTIONS" }));
   assertEquals(res.headers.get("Access-Control-Allow-Origin"), "*");
 });
+
+Deno.test("account-delete: aktif sipariş varsa 409, yoksa silinir", async () => {
+  const { handleAccountDelete } = await import("../_shared/handlers.ts");
+  const mk = (rpcError: unknown) => {
+    const deleted: string[] = [];
+    const { ctx } = fakeCtx();
+    const admin = ctx.admin as unknown as Record<string, unknown>;
+    admin.rpc = () => Promise.resolve({ data: null, error: rpcError });
+    admin.auth = { admin: { deleteUser: (id: string) => (deleted.push(id), Promise.resolve({ error: null })) } };
+    return { ctx, deleted };
+  };
+  const busy = mk({ code: "22023", message: "Devam eden siparişiniz varken hesap silinemez" });
+  const r1 = await handler((r) => handleAccountDelete(r, busy.ctx))(post({}));
+  assertEquals(r1.status, 409);
+  assertEquals(busy.deleted.length, 0);
+  const free = mk(null);
+  const r2 = await handler((r) => handleAccountDelete(r, free.ctx))(post({}));
+  assertEquals(r2.status, 200);
+  assertEquals(free.deleted, ["u1"]);
+});

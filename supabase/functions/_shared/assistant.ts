@@ -7,6 +7,7 @@ import {
   formatTL,
   parseOrderRequest,
   buildQuote,
+  KVKK_VERSION,
   MapsError,
   ValidationError,
   type OrderStatus,
@@ -22,7 +23,6 @@ type ToolUseBlock = Anthropic.Beta.Messages.BetaToolUseBlock;
 type ToolResultBlockParam = Anthropic.Beta.Messages.BetaToolResultBlockParam;
 
 export const DEFAULT_MODEL = "claude-opus-5-5";
-export const KVKK_VERSION = "2026-10-08";
 const MAX_TOOL_ROUNDS = 8;
 
 // Sistem istemi oturum boyunca SABİTTİR (değişken bilgi ilk kullanıcı mesajında verilir).
