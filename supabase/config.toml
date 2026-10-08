@@ -488,3 +488,7 @@ verify_jwt = false
 # Webhook kuyruğu (cron, x-notify-secret)
 [functions.webhook-dispatch]
 verify_jwt = false
+
+# Postmark Inbound (Basic Auth parolası = EMAIL_INBOUND_SECRET)
+[functions.email-inbound]
+verify_jwt = false

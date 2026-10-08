@@ -135,7 +135,7 @@ export interface Invoice {
 
 export interface Conversation {
   id: string;
-  channel: "whatsapp" | "voice" | "app";
+  channel: "whatsapp" | "voice" | "app" | "email";
   externalId: string;
   status: "active" | "closed" | "handoff";
   handoffReason: string | null;

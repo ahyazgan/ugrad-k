@@ -40,7 +40,7 @@ async function customerContext(ctx: Ctx, profileId: string, fullName: string | n
 
 export async function handleIncomingText(
   deps: ConversationDeps,
-  channel: "whatsapp" | "voice" | "app",
+  channel: "whatsapp" | "voice" | "app" | "email",
   externalId: string,
   phone: string,
   text: string,
@@ -95,8 +95,13 @@ export async function handleIncomingText(
     channel,
     handoff: null,
   };
+  // Kanal notu yalnız ilk mesajda (sistem istemi sabit kalır, önbellek bozulmaz)
+  const channelNote =
+    channel === "email"
+      ? "\n[Kanal: e-posta. Yanıtını düz metin e-posta olarak yaz: kısa selamlama, net bilgiler; başlık/tablo kullanma. Müşteri yazana kadar yanıt alamaz, bu yüzden eksik bilgileri tek seferde topluca sor.]"
+      : "";
   const userText =
-    history.length === 0 ? `${await customerContext(ctx, customer.profileId, customer.fullName, customer.isNew)}\n\n${text}` : text;
+    history.length === 0 ? `${await customerContext(ctx, customer.profileId, customer.fullName, customer.isNew)}${channelNote}\n\n${text}` : text;
   const opts: AssistantOptions = {
     model: deps.env("ASSISTANT_MODEL") || undefined,
     effort: (deps.env("ASSISTANT_EFFORT") as AssistantOptions["effort"]) || undefined,
