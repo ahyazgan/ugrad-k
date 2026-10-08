@@ -7,6 +7,7 @@
 import * as Location from "expo-location";
 import * as TaskManager from "expo-task-manager";
 import { Platform } from "react-native";
+import { BRAND } from "@yazgan/shared";
 import { api } from "./api";
 
 export const LOCATION_TASK = "yazgan-kurye-konum";
@@ -66,7 +67,7 @@ export async function startTracking(): Promise<{ mode: TrackingMode; message?: s
             pausesUpdatesAutomatically: false,
             showsBackgroundLocationIndicator: true,
             foregroundService: {
-              notificationTitle: "Yazgan Kurye — vardiya açık",
+              notificationTitle: `${BRAND.name} — vardiya açık`,
               notificationBody: "Konumunuz yalnızca vardiya süresince paylaşılıyor.",
               notificationColor: "#0F3D6E",
             },

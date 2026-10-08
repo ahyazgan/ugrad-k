@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Text, View } from "react-native";
 import { Button, Card, ErrorBox, Field, Muted, Screen, Title, colors } from "@/components/ui";
 import { api, ApiError } from "@/lib/api";
+import { BRAND } from "@yazgan/shared";
 
 export default function Giris() {
   const [phone, setPhone] = useState("");
@@ -25,7 +26,7 @@ export default function Giris() {
   return (
     <Screen>
       <View style={{ gap: 6, marginTop: 16 }}>
-        <Text style={{ fontSize: 28, fontWeight: "800", color: colors.primary }}>Yazgan Kurye</Text>
+        <Text style={{ fontSize: 28, fontWeight: "800", color: colors.primary }}>{BRAND.name}</Text>
         <Muted>Acil evrak ve paketleriniz, moto kurye ile kapıdan kapıya.</Muted>
       </View>
       {api.mode === "demo" ? (

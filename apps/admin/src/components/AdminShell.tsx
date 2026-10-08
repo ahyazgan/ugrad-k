@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
+import { BRAND } from "@yazgan/shared";
 import { repo } from "@/lib/repo";
 
 const NAV = [
@@ -51,7 +52,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
       <aside className="bg-brand text-white md:sticky md:top-0 md:h-screen md:w-60 md:shrink-0">
         <div className="flex items-center justify-between px-4 py-4">
           <Link href="/" className="text-lg font-extrabold tracking-tight">
-            Yazgan Kurye
+            {BRAND.name}
           </Link>
           <button className="rounded px-2 py-1 text-sm md:hidden" onClick={() => setMenuOpen((v) => !v)} aria-label="Menü">
             ☰

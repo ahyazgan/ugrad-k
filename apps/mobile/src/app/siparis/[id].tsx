@@ -1,4 +1,4 @@
-import { ORDER_STATUS_LABELS, ageLabel, formatTL, type OrderStatus } from "@yazgan/shared";
+import { ORDER_STATUS_LABELS, ageLabel, formatTL, trackingBaseUrl, type OrderStatus } from "@yazgan/shared";
 import { useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import { Linking, Share, Text, TextInput, View } from "react-native";
@@ -9,7 +9,7 @@ import { api, ApiError, type CourierPosition, type OrderDetail } from "@/lib/api
 import { formatDateTime, formatTime } from "@/lib/format";
 import { payOrder } from "@/lib/payment";
 
-const TRACKING_BASE = process.env.EXPO_PUBLIC_TRACKING_BASE_URL ?? "https://panel.yazgankurye.com/takip";
+const TRACKING_BASE = process.env.EXPO_PUBLIC_TRACKING_BASE_URL ?? trackingBaseUrl;
 const trackingUrl = (token: string) => `${TRACKING_BASE.replace(/\/$/, "")}/${token}`;
 
 const PAYMENT_LABEL: Record<string, string> = {

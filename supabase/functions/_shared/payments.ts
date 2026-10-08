@@ -1,4 +1,5 @@
 // Kartla ödeme akışı: payment-init → (iyzico ödeme sayfası) → payment-callback; iptalde payment-refund.
+import { BRAND } from "../../../packages/shared/brand.ts";
 import type { Ctx } from "./context.ts";
 import { HttpError, json, readJson } from "./http.ts";
 import {
@@ -19,7 +20,7 @@ const clientIp = (req: Request) => req.headers.get("x-forwarded-for")?.split(","
 
 function splitName(full: string | null): { name: string; surname: string } {
   const parts = (full ?? "").trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return { name: "Müşteri", surname: "Yazgan" };
+  if (parts.length === 0) return { name: "Müşteri", surname: BRAND.shortName };
   if (parts.length === 1) return { name: parts[0]!, surname: parts[0]! };
   return { name: parts.slice(0, -1).join(" "), surname: parts[parts.length - 1]! };
 }
@@ -50,7 +51,7 @@ export async function handlePaymentInit(req: Request, ctx: Ctx, deps: PaymentDep
     name,
     surname,
     gsmNumber: `+90${digits}`,
-    email: p?.email || `musteri-${user.id.slice(0, 8)}@yazgankurye.com`,
+    email: p?.email || `musteri-${user.id.slice(0, 8)}@${BRAND.domain}`,
     // Bireysel müşteride TCKN istenmiyor; iyzico'nun kabul ettiği genel değer
     identityNumber: "11111111111",
     address: o.pickup_address,
@@ -69,7 +70,7 @@ export async function handlePaymentInit(req: Request, ctx: Ctx, deps: PaymentDep
 }
 
 function resultPage(ok: boolean, orderId: string | null, message: string, deps: PaymentDeps) {
-  const appUrl = `yazgankurye://odeme?durum=${ok ? "basarili" : "hata"}${orderId ? `&siparis=${orderId}` : ""}`;
+  const appUrl = `${BRAND.appScheme}://odeme?durum=${ok ? "basarili" : "hata"}${orderId ? `&siparis=${orderId}` : ""}`;
   const html = `<!doctype html><html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Ödeme ${ok ? "başarılı" : "başarısız"}</title>
 <meta http-equiv="refresh" content="1;url=${appUrl}"></head>

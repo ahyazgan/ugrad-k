@@ -1,4 +1,5 @@
 import {
+  BRAND,
   DEFAULT_TILE_ATTRIBUTION,
   DEFAULT_TILE_URL,
   fitView,
@@ -14,7 +15,7 @@ import { colors } from "@/components/ui";
 const TILE_URL = process.env.EXPO_PUBLIC_MAP_TILE_URL || DEFAULT_TILE_URL;
 const ATTRIBUTION = process.env.EXPO_PUBLIC_MAP_TILE_ATTRIBUTION || DEFAULT_TILE_ATTRIBUTION;
 // OSM karo politikası uygulamanın kendini tanıtmasını ister (tarayıcı bunu kendisi yapar)
-const TILE_HEADERS = Platform.OS === "web" ? undefined : { "User-Agent": "YazganKurye/1.0 (+https://yazgankurye.com)" };
+const TILE_HEADERS = Platform.OS === "web" ? undefined : { "User-Agent": `${BRAND.appScheme}/1.0 (+${BRAND.siteUrl})` };
 
 export interface MapMarker extends LatLng {
   kind: "pickup" | "dropoff" | "courier";

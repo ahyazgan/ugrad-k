@@ -1,5 +1,6 @@
 "use client";
 
+import { BRAND } from "@yazgan/shared";
 import { useState, type FormEvent } from "react";
 import { Button, ErrorText, Input } from "@/components/ui";
 import { repo } from "@/lib/repo";
@@ -27,7 +28,7 @@ export default function GirisPage() {
     <div className="flex min-h-screen items-center justify-center bg-brand p-4">
       <form onSubmit={submit} className="w-full max-w-sm space-y-4 rounded-2xl bg-white p-6 shadow-xl">
         <div>
-          <h1 className="text-2xl font-extrabold text-brand">Yazgan Kurye</h1>
+          <h1 className="text-2xl font-extrabold text-brand">{BRAND.name}</h1>
           <p className="text-sm text-slate-500">Yönetim paneli</p>
         </div>
         {repo.mode === "demo" ? (

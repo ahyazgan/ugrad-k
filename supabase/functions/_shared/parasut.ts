@@ -2,6 +2,7 @@
 // Ortam değişkenleri: PARASUT_CLIENT_ID, PARASUT_CLIENT_SECRET, PARASUT_USERNAME,
 //   PARASUT_PASSWORD, PARASUT_COMPANY_ID, (isteğe bağlı) PARASUT_PRODUCT_ID, PARASUT_BASE_URL
 // NOT: Paraşüt test hesabıyla uçtan uca doğrulanmalıdır (docs/kurulum.md).
+import { BRAND } from "../../../packages/shared/brand.ts";
 import type { Env } from "./channels.ts";
 
 export interface ParasutConfig {
@@ -193,7 +194,7 @@ export class ParasutClient {
     const attributes: Record<string, unknown> = {};
     if (i.internetSale) {
       attributes.internet_sale = {
-        url: "https://yazgankurye.com",
+        url: BRAND.siteUrl,
         payment_type: "KREDIKARTI/BANKAKARTI",
         payment_platform: "iyzico",
         payment_date: i.internetSale.paymentDate,

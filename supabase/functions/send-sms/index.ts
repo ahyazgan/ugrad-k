@@ -2,6 +2,7 @@
 // Kurulum: Supabase panel → Authentication → Hooks → Send SMS → HTTPS → bu fonksiyonun URL'i.
 // Üretilen gizli anahtarı SEND_SMS_HOOK_SECRETS olarak secrets'a ekleyin ("v1,whsec_...").
 import { Webhook } from "npm:standardwebhooks@1.0.0";
+import { BRAND } from "../../../packages/shared/brand.ts";
 import { sendSms } from "../_shared/netgsm.ts";
 
 Deno.serve(async (req) => {
@@ -17,7 +18,7 @@ Deno.serve(async (req) => {
     return Response.json({ error: { http_code: 401, message: "İmza geçersiz" } }, { status: 401 });
   }
   try {
-    await sendSms(data.user.phone, `Yazgan Kurye doğrulama kodunuz: ${data.sms.otp}. Kimseyle paylaşmayın.`);
+    await sendSms(data.user.phone, `${BRAND.name} doğrulama kodunuz: ${data.sms.otp}. Kimseyle paylaşmayın.`);
     return Response.json({});
   } catch (e) {
     console.error(e);

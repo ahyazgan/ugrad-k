@@ -1,6 +1,8 @@
 // Yasal metinler — TEK KAYNAK (mobil uygulama, web sayfaları, asistan).
 // Metin değiştiğinde KVKK_VERSION artırılır; kullanıcıdan yeniden onay alınır.
 // Not: Nihai metinler bir hukukçu tarafından gözden geçirilmelidir.
+import { BRAND } from "./brand.ts";
+
 export const KVKK_VERSION = "2026-10-08";
 
 export const COMPANY = {
@@ -8,7 +10,7 @@ export const COMPANY = {
   address: "Kılıçlı Mah. Şile Cad. No: 8A, Beykoz / İstanbul",
 };
 
-export const AYDINLATMA_METNI = `${COMPANY.title} ("Yazgan Kurye") olarak, 6698 sayılı Kişisel Verilerin Korunması Kanunu ("KVKK") kapsamında veri sorumlusu sıfatıyla kişisel verilerinizi aşağıda açıklanan şekilde işliyoruz.
+export const AYDINLATMA_METNI = `${COMPANY.title} ("${BRAND.name}") olarak, 6698 sayılı Kişisel Verilerin Korunması Kanunu ("KVKK") kapsamında veri sorumlusu sıfatıyla kişisel verilerinizi aşağıda açıklanan şekilde işliyoruz.
 
 1. İşlenen veriler
 • Kimlik ve iletişim: ad-soyad, cep telefonu, e-posta
@@ -47,10 +49,10 @@ Konum geçmişi en fazla 6 ay, vardiya kayıtları mevzuatın öngördüğü sü
 
 export const KURYE_KONUM_ONAYI = `Vardiyam açıkken konumumun işlenmesi ve aktif teslimat süresince müşteriyle paylaşılması hakkında bilgilendirildim.`;
 
-export const CONTACT_EMAIL = "kvkk@yazgankurye.com";
+export const CONTACT_EMAIL = BRAND.email.kvkk;
 
 /** Gizlilik politikası (mağaza listelemeleri için herkese açık sayfa) */
-export const GIZLILIK_POLITIKASI = `Bu politika, ${COMPANY.title} ("Yazgan Kurye") tarafından sunulan Yazgan Kurye mobil uygulaması, web sayfaları ve WhatsApp/telefon asistanı için geçerlidir.
+export const GIZLILIK_POLITIKASI = `Bu politika, ${COMPANY.title} ("${BRAND.name}") tarafından sunulan ${BRAND.name} mobil uygulaması, web sayfaları ve WhatsApp/telefon asistanı için geçerlidir.
 
 Toplanan veriler
 • Hesap: telefon numarası (giriş için), ad-soyad, e-posta (isteğe bağlı)
@@ -77,7 +79,7 @@ Hizmet 18 yaşından küçüklere yönelik değildir.
 
 İletişim: ${CONTACT_EMAIL} · ${COMPANY.address}`;
 
-export const HESAP_SILME = `Yazgan Kurye hesabınızı iki yolla silebilirsiniz:
+export const HESAP_SILME = `${BRAND.name} hesabınızı iki yolla silebilirsiniz:
 
 1. Uygulamadan: Hesabım → Hesabımı sil → Evet, hesabımı sil.
 2. E-posta ile: Kayıtlı telefon numaranızla birlikte ${CONTACT_EMAIL} adresine "Hesap silme talebi" konulu bir e-posta gönderin. Talebiniz en geç 30 gün içinde sonuçlandırılır.

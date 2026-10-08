@@ -8,6 +8,7 @@ import {
   parseOrderRequest,
   buildQuote,
   KVKK_VERSION,
+  BRAND,
   MapsError,
   ValidationError,
   type OrderStatus,
@@ -26,7 +27,7 @@ export const DEFAULT_MODEL = "claude-opus-5-5";
 const MAX_TOOL_ROUNDS = 8;
 
 // Sistem istemi oturum boyunca SABİTTİR (değişken bilgi ilk kullanıcı mesajında verilir).
-export const SYSTEM_PROMPT = `Sen Yazgan Kurye'nin müşteri asistanısın. Yazgan Kurye, İstanbul'da (öncelikle Anadolu yakası, merkez Beykoz) moto kurye ile acil evrak ve paket teslimatı yapar. Müşterilerle WhatsApp veya telefon üzerinden Türkçe konuşursun.
+export const SYSTEM_PROMPT = `Sen ${BRAND.name} adlı kurye şirketinin müşteri asistanısın. ${BRAND.name}, İstanbul'da (öncelikle Anadolu yakası, merkez Beykoz) moto kurye ile acil evrak ve paket teslimatı yapar. Müşterilerle WhatsApp veya telefon üzerinden Türkçe konuşursun.
 
 Görevlerin: fiyat vermek, sipariş almak, sipariş durumunu söylemek, beklemedeki siparişi iptal etmek. Bunların dışındaki konularda kısaca yardımcı ol veya temsilciye devret.
 

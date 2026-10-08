@@ -1,5 +1,5 @@
 /**
- * Yazgan Kurye fiyat hesabı — TEK KAYNAK.
+ * Fiyat hesabı — TEK KAYNAK.
  *
  * Mobil uygulama, yönetim paneli, Edge Functions ve yapay zeka asistanı
  * fiyatı yalnızca bu dosyadaki fonksiyonlarla hesaplar. Tüm parametreler

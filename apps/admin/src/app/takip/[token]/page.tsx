@@ -1,6 +1,6 @@
 "use client";
 
-import { ORDER_STATUS_LABELS, type OrderStatus } from "@yazgan/shared";
+import { BRAND, COMPANY, ORDER_STATUS_LABELS, type OrderStatus } from "@yazgan/shared";
 import { useParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { LeafletMap, type MapPin } from "@/components/LeafletMap";
@@ -65,7 +65,7 @@ export default function TakipPage() {
   return (
     <div className="mx-auto min-h-screen max-w-xl bg-slate-50">
       <header className="bg-brand px-4 py-4 text-white">
-        <div className="text-lg font-extrabold">Yazgan Kurye</div>
+        <div className="text-lg font-extrabold">{BRAND.name}</div>
         <div className="text-sm text-white/80">Gönderi takibi · {data.order_no}</div>
       </header>
       <main className="space-y-4 p-4">
@@ -111,7 +111,7 @@ export default function TakipPage() {
           </ol>
         </section>
         <p className="pb-6 text-center text-xs text-slate-400">
-          Konum bilgisi yalnızca teslimat süresince gösterilir. · YAZGAN TEKNOLOJİ LOJİSTİK LTD. ŞTİ.
+          Konum bilgisi yalnızca teslimat süresince gösterilir. · {COMPANY.title}
         </p>
       </main>
     </div>

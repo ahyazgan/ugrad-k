@@ -4,6 +4,7 @@
  * alıcıda/ortamda mevcut ilk kanalı kullanır (ör. push token yoksa SMS).
  * Tüm mesajlar bilgilendirme amaçlıdır (İYS ticari ileti onayı gerektirmez).
  */
+import { BRAND } from "./brand.ts";
 import type { OrderStatus } from "./orders.ts";
 
 export type Channel = "push" | "whatsapp" | "sms";
@@ -74,7 +75,7 @@ export function buildNotifications(event: OrderStatus, o: NotificationOrder, cfg
         to: customer,
         channels: ["push", "sms"],
         title: "Siparişiniz alındı",
-        text: `Yazgan Kurye: ${o.orderNo} siparişiniz alındı. Takip: ${url}`,
+        text: `${BRAND.name}: ${o.orderNo} siparişiniz alındı. Takip: ${url}`,
         whatsappTemplate: { name: "siparis_alindi", params: [o.orderNo, url] },
       });
       out.push(...admins("Yeni sipariş", `Yeni sipariş ${o.orderNo}${o.urgent ? " (ACİL)" : ""}: ${route}`));
@@ -106,7 +107,7 @@ export function buildNotifications(event: OrderStatus, o: NotificationOrder, cfg
           to: { role: "receiver", phone: o.dropoffContactPhone },
           channels: ["whatsapp", "sms"],
           title: "Gönderiniz yolda",
-          text: `${name ? `Merhaba ${name}, ` : ""}size gönderilen paket Yazgan Kurye ile yola çıktı. Canlı takip: ${url}`,
+          text: `${name ? `Merhaba ${name}, ` : ""}size gönderilen paket ${BRAND.name} ile yola çıktı. Canlı takip: ${url}`,
           whatsappTemplate: { name: "alici_gonderi_yolda", params: [name || "Sayın alıcı", url] },
         });
       }
@@ -116,7 +117,7 @@ export function buildNotifications(event: OrderStatus, o: NotificationOrder, cfg
         to: customer,
         channels: ["push", "sms"],
         title: "Teslim edildi",
-        text: `Yazgan Kurye: ${o.orderNo} teslim edildi${o.podReceiverName ? ` (teslim alan: ${o.podReceiverName})` : ""}. Teşekkürler!`,
+        text: `${BRAND.name}: ${o.orderNo} teslim edildi${o.podReceiverName ? ` (teslim alan: ${o.podReceiverName})` : ""}. Teşekkürler!`,
         whatsappTemplate: { name: "teslim_edildi", params: [o.orderNo, o.podReceiverName ?? "-"] },
       });
       break;
@@ -125,7 +126,7 @@ export function buildNotifications(event: OrderStatus, o: NotificationOrder, cfg
         to: customer,
         channels: ["push", "sms"],
         title: "Sipariş iptal edildi",
-        text: `Yazgan Kurye: ${o.orderNo} iptal edildi.${o.cancelReason ? ` Neden: ${o.cancelReason}` : ""}`,
+        text: `${BRAND.name}: ${o.orderNo} iptal edildi.${o.cancelReason ? ` Neden: ${o.cancelReason}` : ""}`,
       });
       if (courier) out.push({ to: courier, channels: ["push", "sms"], title: "İş iptal edildi", text: `${o.orderNo} iptal edildi.` });
       break;

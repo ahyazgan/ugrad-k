@@ -4,6 +4,7 @@ import { runAssistantTurn, type AssistantCustomer, type AssistantOptions, type T
 import { deliver, type Env } from "./channels.ts";
 import type { Ctx } from "./context.ts";
 import { notificationConfig } from "./dispatch.ts";
+import { kvkkUrl } from "../../../packages/shared/brand.ts";
 
 type MessageParam = Anthropic.Beta.Messages.BetaMessageParam;
 
@@ -99,7 +100,7 @@ export async function handleIncomingText(
   const opts: AssistantOptions = {
     model: deps.env("ASSISTANT_MODEL") || undefined,
     effort: (deps.env("ASSISTANT_EFFORT") as AssistantOptions["effort"]) || undefined,
-    kvkkUrl: deps.env("KVKK_URL") ?? "https://yazgankurye.com/kvkk",
+    kvkkUrl: deps.env("KVKK_URL") ?? kvkkUrl,
   };
 
   try {

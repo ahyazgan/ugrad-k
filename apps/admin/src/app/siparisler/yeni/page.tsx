@@ -1,6 +1,6 @@
 "use client";
 
-import { AYDINLATMA_METNI, formatTL } from "@yazgan/shared";
+import { AYDINLATMA_METNI, BRAND, formatTL, kvkkUrl } from "@yazgan/shared";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
@@ -9,9 +9,9 @@ import { Button, Card, ErrorText, Input, PageHeader, Select } from "@/components
 import { repo, type AdminQuote, type OrderRequestInput, type PhoneCustomer } from "@/lib/repo";
 
 const KVKK_SCRIPT =
-  "Siparişinizi alabilmem için adınız, telefonunuz ve adres bilgileriniz Yazgan Kurye tarafından kurye hizmeti, " +
+  `Siparişinizi alabilmem için adınız, telefonunuz ve adres bilgileriniz ${BRAND.name} tarafından kurye hizmeti, ` +
   "faturalandırma ve yasal yükümlülükler için işlenecek; konum bilgisi harita sağlayıcısıyla paylaşılacak. " +
-  "Aydınlatma metnine yazgankurye.com/kvkk adresinden ulaşabilirsiniz. Onaylıyor musunuz?";
+  `Aydınlatma metnine ${kvkkUrl.replace("https://", "")} adresinden ulaşabilirsiniz. Onaylıyor musunuz?`;
 
 type Point = PickedPoint & { details?: string; contactName?: string; contactPhone?: string };
 
