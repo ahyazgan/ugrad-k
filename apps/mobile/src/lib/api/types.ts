@@ -66,6 +66,11 @@ export interface OrderSummary {
   totalKurus: number;
   urgent: boolean;
   createdAt: string;
+  /** Kurye: yanıt bekleyen iş teklifinin son anı (kabul edilmişse veya teklif değilse null) */
+  offerExpiresAt?: string | null;
+  /** Kurye iş listesi: alış/teslim konumu (mesafe ve durak sırası için) */
+  pickupPoint?: { lat: number; lng: number };
+  dropoffPoint?: { lat: number; lng: number };
 }
 
 export interface OrderDetail extends OrderSummary {
@@ -200,6 +205,11 @@ export interface Api {
   endShift(at?: CourierLocation | null): Promise<void>;
   /** Atanmış aktif işler + bugün teslim edilenler */
   listCourierJobs(): Promise<OrderSummary[]>;
+  /**
+   * İş teklifine yanıt. Süresi dolmuş/geri alınmış teklifte ok=false ve mesaj döner.
+   * timeout: geri sayım bitti (kurye yanıt vermedi)
+   */
+  respondOffer(orderId: string, accept: boolean, opts?: { reason?: string; timeout?: boolean }): Promise<{ ok: boolean; message: string | null }>;
   courierAction(
     orderId: string,
     action:

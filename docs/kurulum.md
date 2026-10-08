@@ -33,6 +33,7 @@ Kodun tamamı yazıldı ve testlerden geçti. Bu rehber, sistemi **gerçek hesap
 26. [Değerli gönderiler](#26-değerli-gönderiler-değer-beyanı-ve-teslim-kodu)
 27. [Kampanya, davet ve geri kazanma](#27-kampanya-davet-ve-geri-kazanma)
 28. [Canlıya alma: hazırlık denetimi, yedek, deneme ortamı](#28-canlıya-alma)
+29. [Kurye iş teklifi (kabul / ret)](#29-kurye-iş-teklifi)
 
 ---
 
@@ -437,3 +438,11 @@ Kayıtlı müşteriler `siparis@<alan adı>` adresine yazar; yapay zeka asistan�
   - Teslim fotoğrafları ve belgeler Storage'dadır; veritabanı yedeğine dahil değildir. Gerekirse `supabase storage` ile ayda bir indirin.
 - **Hata izleme**: Edge Function hataları Supabase → Edge Functions → Logs'ta; panel/web hataları Vercel → Logs'ta. Önemli sorunlar zaten yöneticiye mesajla gelir (§22). Daha fazlası istenirse Supabase *Log Drains* ile bir log servisine (ör. Better Stack) aktarılabilir.
 - **Geri alma**: kötü bir sürümde panel için Vercel → Deployments → önceki sürüm → *Promote*; fonksiyonlar için önceki commit'e dönüp `pnpm deploy:functions`. Veritabanı migration'ları geri alınmaz; düzeltme yeni migration ile yapılır.
+
+## 29. Kurye iş teklifi
+
+- **Nasıl çalışır**: otomatik atama (§6 `otomatik-dagitim`) işi kuryeye **teklif** olarak gönderir. Kurye uygulamasında telefon titrer, geri sayımlı bir kart çıkar: *Kabul et* ya da *Reddet* (hazır nedenler: çok uzak, elimde başka iş var, paket aracıma uygun değil, mola vereceğim, diğer). Uygulama kapalıysa push/SMS ile "Yeni iş teklifi" gider.
+- **Süre**: panel → Otomasyon → *Teklif yanıt süresi (sn)* (varsayılan 60). Süre dolarsa iş sıradaki uygun kuryeye geçer; yanıt vermeyen kuryeye aynı iş 10 dakika, reddedene hiç tekrar önerilmez. Kabul edilmemiş teklifte kurye paketi alamaz.
+- **Müşteri**: "Kurye atandı" bildirimi kurye kabul edince gider (ret/süre dolması müşteriye yansımaz).
+- **Yönetici ataması** teklif değildir, doğrudan geçerlidir (kuryeyi telefonla aradığınız durumlar için). Teklif özelliğini kapatmak için Otomasyon → *İşi kuryeye teklif olarak gönder* işaretini kaldırın.
+- **Kayıt**: her teklif ve sonucu (`courier_offers`) sipariş detayında *Kurye teklifleri* kartında; kabul oranı kurye performansında kullanılır.

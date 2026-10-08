@@ -30,11 +30,24 @@ describe("buildNotifications", () => {
   });
 
   it("kurye atandı: kuryeye push, müşteriye push yoksa gönderilmez", () => {
-    const m = buildNotifications("kuryeye_atandi", order, cfg);
+    const assigned = { ...order, status: "kuryeye_atandi" as const };
+    const m = buildNotifications("kuryeye_atandi", assigned, cfg);
     expect(m.map((x) => x.to.role)).toEqual(["courier"]);
     expect(m[0]!.title).toContain("ACİL");
-    const withPush = buildNotifications("kuryeye_atandi", { ...order, customer: { ...order.customer, pushToken: "t" } }, cfg);
+    const withPush = buildNotifications("kuryeye_atandi", { ...assigned, customer: { ...order.customer, pushToken: "t" } }, cfg);
     expect(withPush.find((x) => x.to.role === "customer")!.text).toContain("Mehmet");
+  });
+
+  it("iş teklifi: yalnız kuryeye teklif; kabulden sonra yalnız müşteriye", () => {
+    const base = { ...order, status: "kuryeye_atandi" as const, customer: { ...order.customer, pushToken: "t" } };
+    const offer = buildNotifications("kuryeye_atandi", { ...base, assignment: "offer" }, cfg);
+    expect(offer.map((x) => x.to.role)).toEqual(["courier"]);
+    expect(offer[0]!.title).toBe("⚡ ACİL iş teklifi");
+    expect(offer[0]!.text).toContain("kabul edin");
+    const accepted = buildNotifications("kuryeye_atandi", { ...base, assignment: "accepted" }, cfg);
+    expect(accepted.map((x) => x.to.role)).toEqual(["customer"]);
+    // Bildirim gönderilmeden teklif reddedilip iş havuza döndüyse kimseye gitmez
+    expect(buildNotifications("kuryeye_atandi", { ...base, status: "onaylandi", assignment: "offer" }, cfg)).toEqual([]);
   });
 
   it("yolda: alıcıya WhatsApp/SMS takip linki", () => {

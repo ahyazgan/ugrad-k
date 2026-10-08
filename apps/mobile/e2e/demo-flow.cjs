@@ -119,6 +119,17 @@ fs.mkdirSync(out, { recursive: true });
   await kp.getByText(/Zorunlu trafik sigortası: 10 gün kaldı/).waitFor();
   await kt('shift-toggle').click();
   await kp.getByText('Vardiyadasınız').waitFor();
+  // İş teklifleri: geri sayım, kabul ve nedenle ret
+  await kp.locator('[data-testid^="offer-YK"]').nth(1).waitFor();
+  await kp.getByText(/Aktif işler \(1\)/).waitFor();
+  const countdown = await kt('offer-countdown').first().innerText();
+  if (!/^[12]:\d\d$/.test(countdown)) throw new Error('geri sayım yok: ' + countdown);
+  await kshot('09-kurye-teklif');
+  await kt('offer-accept').first().click();
+  await kp.getByText(/Aktif işler \(2\)/).waitFor();
+  await kt('offer-decline').click();
+  await kt('decline-reason-Çok uzak').click();
+  await kp.locator('[data-testid^="offer-YK"]').waitFor({ state: 'detached' });
   await kp.getByText(/Aktif işler \(2\)/).waitFor();
   await kshot('10-kurye-isler');
   await kp.locator('[data-testid^="job-"]').first().click();

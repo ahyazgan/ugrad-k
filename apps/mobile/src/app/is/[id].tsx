@@ -1,6 +1,7 @@
 import { router, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import { Text, TextInput, View } from "react-native";
+import { OfferCard } from "@/components/OfferCard";
 import { StatusBadge } from "@/components/StatusBadge";
 import { TileMap, type MapMarker } from "@/components/TileMap";
 import { Button, Card, ErrorBox, Loading, Muted, Screen, Title, colors, styles } from "@/components/ui";
@@ -118,6 +119,7 @@ export default function IsDetay() {
 
   if (!order) return error ? <Screen><ErrorBox message={error} /></Screen> : <Loading />;
   const s = order.status;
+  const offerPending = !!order.offerExpiresAt;
   const waitingNum = Math.max(0, parseInt(waiting || "0", 10) || 0);
 
   return (
@@ -163,7 +165,18 @@ export default function IsDetay() {
 
       <ErrorBox message={error} />
 
-      {s === "kuryeye_atandi" ? (
+      {offerPending ? (
+        <OfferCard
+          job={{ ...order, offerExpiresAt: order.offerExpiresAt! }}
+          me={null}
+          onDone={(m) => {
+            if (m) setError(m);
+            api.getOrder(id).then((o) => (o.offerExpiresAt || o.status !== "kuryeye_atandi" ? router.back() : setOrder(o)), () => router.back());
+          }}
+        />
+      ) : null}
+
+      {s === "kuryeye_atandi" && !offerPending ? (
         <Card>
           <Text style={{ fontWeight: "600" }}>Alışta bekleme süresi (dakika)</Text>
           <Muted>İlk 15 dakika ücretsiz; sonrası müşteriye yansıtılır.</Muted>
@@ -181,7 +194,7 @@ export default function IsDetay() {
         />
       ) : null}
 
-      {["kuryeye_atandi", "alindi", "yolda"].includes(s) && !noteFor ? (
+      {["kuryeye_atandi", "alindi", "yolda"].includes(s) && !noteFor && !offerPending ? (
         <View style={{ flexDirection: "row", gap: 8 }}>
           <View style={{ flex: 1 }}>
             <Button title="Sorun bildir" variant="secondary" onPress={() => setNoteFor("problem")} />

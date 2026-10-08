@@ -2,6 +2,7 @@
 // Her dakika pg_cron ile (x-notify-secret) veya panelden yönetici tarafından tetiklenir.
 import {
   courierCompliance,
+  excludedCouriers,
   planAssignments,
   type AssignableOrder,
   type CandidateCourier,
@@ -47,7 +48,11 @@ export async function handleAutoDispatch(
     unassigned: [] as string[],
     alerted: [] as string[],
     slaAlerted: [] as string[],
+    expiredOffers: 0,
   };
+  // Süresi dolan teklifler havuza döner (otomatik atama kapalı olsa da)
+  const { data: expired } = await ctx.admin.rpc("expire_offers");
+  summary.expiredOffers = Number(expired ?? 0);
   if (!ops.auto_assign) {
     summary.slaAlerted = await checkUrgentSla(ctx, deps, now);
     return json(summary);
@@ -93,16 +98,25 @@ export async function handleAutoDispatch(
   // Kartla ödenmemişler atanmaz
   const rows = ((ordersRes.data ?? []) as Row[]).filter((o) => o.payment_method !== "kart" || o.payment_status === "odendi");
   const ids = rows.map((o) => o.id);
-  const declined = new Map<string, string[]>();
+  let declined = new Map<string, string[]>();
   if (ids.length) {
-    const { data: hist } = await ctx.admin
-      .from("order_status_history")
-      .select("order_id, changed_by")
-      .in("order_id", ids)
-      .eq("from_status", "kuryeye_atandi")
-      .eq("to_status", "onaylandi");
+    const [{ data: hist }, { data: offers }] = await Promise.all([
+      ctx.admin
+        .from("order_status_history")
+        .select("order_id, changed_by")
+        .in("order_id", ids)
+        .eq("from_status", "kuryeye_atandi")
+        .eq("to_status", "onaylandi"),
+      ctx.admin.from("courier_offers").select("order_id, courier_id, response, responded_at").in("order_id", ids),
+    ]);
+    // Teklifi reddeden (kalıcı) ve süresi dolan (10 dk) kuryeler
+    declined = excludedCouriers(
+      ((offers ?? []) as Row[]).map((r) => ({ orderId: r.order_id, courierId: r.courier_id, response: r.response, respondedAt: r.responded_at })),
+      now,
+    );
+    // İşi kabul edip sonra bırakan kuryeler
     for (const h of (hist ?? []) as Row[]) {
-      if (h.changed_by) declined.set(h.order_id, [...(declined.get(h.order_id) ?? []), h.changed_by]);
+      if (h.changed_by) declined.set(h.order_id, [...new Set([...(declined.get(h.order_id) ?? []), h.changed_by])]);
     }
   }
   const orders: AssignableOrder[] = rows.map((o) => ({

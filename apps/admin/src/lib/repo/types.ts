@@ -2,6 +2,7 @@ import type {
   Holiday,
   IstanbulSide,
   MonthlyInvoice,
+  OfferResponse,
   OrderStatus,
   PlaceDetails,
   PlaceSuggestion,
@@ -45,6 +46,8 @@ export interface AdminOrder {
   /** Acil teslim taahhüdü (yalnız acil) ve kaçırıldı mı */
   slaDueAt: string | null;
   slaMissed: boolean | null;
+  /** Kuryenin yanıtını bekleyen iş teklifinin son anı (teklif yoksa/kabul edildiyse null) */
+  offerExpiresAt: string | null;
   distanceMeters: number;
   scheduledPickupAt: string | null;
   deliveredAt: string | null;
@@ -123,6 +126,18 @@ export interface AdminOrderDetail extends AdminOrder {
   podSignaturePath: string | null;
   podReceiverName: string | null;
   history: Array<{ fromStatus: OrderStatus | null; toStatus: OrderStatus; at: string; note: string | null }>;
+  /** Otomatik atamada kuryelere giden teklifler ve sonuçları */
+  offers: OrderOffer[];
+}
+
+export interface OrderOffer {
+  courierId: string;
+  courierName: string | null;
+  offeredAt: string;
+  expiresAt: string;
+  respondedAt: string | null;
+  response: OfferResponse | null;
+  reason: string | null;
 }
 
 export interface Courier {
@@ -266,6 +281,9 @@ export interface OpsSettings {
   winbackEnabled: boolean;
   winbackAfterDays: number;
   winbackDiscountPct: number;
+  /** Otomatik atama kuryeye teklif olarak gider; kurye süre içinde kabul eder */
+  offerEnabled: boolean;
+  offerTimeoutSeconds: number;
 }
 
 export interface PromoCodeRow extends Promo {

@@ -43,6 +43,9 @@ const toSummary = (r: Row): OrderSummary => ({
   totalKurus: r.total_kurus,
   urgent: r.urgent,
   createdAt: r.created_at,
+  offerExpiresAt: r.offer_expires_at && !r.offer_accepted_at && r.status === "kuryeye_atandi" ? r.offer_expires_at : null,
+  ...(r.pickup_lat != null ? { pickupPoint: { lat: r.pickup_lat, lng: r.pickup_lng } } : {}),
+  ...(r.dropoff_lat != null ? { dropoffPoint: { lat: r.dropoff_lat, lng: r.dropoff_lng } } : {}),
 });
 
 export function createSupabaseApi(url: string, anonKey: string): Api & { client: SupabaseClient } {
@@ -308,12 +311,24 @@ export function createSupabaseApi(url: string, anonKey: string): Api & { client:
       const todayStart = new Date(Date.now() + 3 * 3600_000).toISOString().slice(0, 10) + "T00:00:00+03:00";
       const { data, error } = await client
         .from("orders")
-        .select("id, order_no, status, pickup_address, dropoff_address, total_kurus, urgent, created_at")
+        .select(
+          "id, order_no, status, pickup_address, dropoff_address, total_kurus, urgent, created_at, offer_expires_at, offer_accepted_at, pickup_lat, pickup_lng, dropoff_lat, dropoff_lng",
+        )
         .eq("courier_id", await uid())
         .or(`status.in.(kuryeye_atandi,alindi,yolda,sorunlu),delivered_at.gte.${new Date(todayStart).toISOString()}`)
         .order("created_at", { ascending: true });
       fail(error, "İşler okunamadı");
       return (data ?? []).map(toSummary);
+    },
+    async respondOffer(orderId, accept, opts = {}) {
+      const { data, error } = await client.rpc("respond_offer", {
+        p_order_id: orderId,
+        p_accept: accept,
+        p_reason: opts.reason ?? null,
+        p_timeout: !!opts.timeout,
+      });
+      if (error) throw new ApiError(error.message);
+      return data as { ok: boolean; message: string | null };
     },
     async courierAction(orderId, action) {
       const rpc = async (p: Record<string, unknown>) => {

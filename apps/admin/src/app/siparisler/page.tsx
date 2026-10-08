@@ -121,6 +121,7 @@ export default function SiparislerPage() {
             <Td className="whitespace-nowrap">{fmtDateTime(o.createdAt)}</Td>
             <Td>
               <StatusBadge status={o.status} />
+              {o.offerExpiresAt ? <div className="mt-1 text-xs font-semibold text-amber-700">Teklif bekliyor</div> : null}
             </Td>
             <Td>
               <div>{o.customerName ?? "—"}</div>

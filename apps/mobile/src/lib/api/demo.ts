@@ -151,15 +151,16 @@ export function createDemoApi(): Api {
     }
   };
 
-  /** Demo kuryesine iki iş atar */
+  /** Demo kuryesine bir atanmış iş ve iki iş teklifi (2 dk süreli) verir */
   async function seedCourierJobs() {
     if (courierSeeded) return;
     courierSeeded = true;
-    const routes: [string, string, boolean][] = [
-      ["mock-beykoz", "mock-levent", true],
-      ["mock-uskudar", "mock-kadikoy", false],
+    const routes: [string, string, boolean, boolean][] = [
+      ["mock-beykoz", "mock-levent", true, false],
+      ["mock-uskudar", "mock-kadikoy", false, true],
+      ["mock-kadikoy", "mock-atasehir", false, true],
     ];
-    for (const [from, to, urgent] of routes) {
+    for (const [from, to, urgent, offer] of routes) {
       const pickup = await maps.placeDetails(from);
       const dropoff = await maps.placeDetails(to);
       const { req, q } = await quoteFor({
@@ -183,10 +184,13 @@ export function createDemoApi(): Api {
         ...detailFrom(id, req, q, now),
         status: "kuryeye_atandi",
         courierName: "Demo Kurye",
+        offerExpiresAt: offer ? new Date(Date.now() + 120_000).toISOString() : null,
+        pickupPoint: { lat: req.pickup.lat, lng: req.pickup.lng },
+        dropoffPoint: { lat: req.dropoff.lat, lng: req.dropoff.lng },
         history: [
           { status: "beklemede", at: now, note: null },
           { status: "onaylandi", at: now, note: null },
-          { status: "kuryeye_atandi", at: now, note: null },
+          { status: "kuryeye_atandi", at: now, note: offer ? "Otomatik atama (teklif)" : null },
         ],
       });
     }
@@ -378,7 +382,27 @@ export function createDemoApi(): Api {
         .filter((o) => o.courierName === "Demo Kurye")
         .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
     },
+    async respondOffer(orderId, accept, opts = {}) {
+      const o = orders.get(orderId);
+      if (!o || !o.offerExpiresAt || o.status !== "kuryeye_atandi" || o.courierName !== "Demo Kurye") {
+        return { ok: false, message: "Bu teklif artık geçerli değil" };
+      }
+      const expired = Date.now() > new Date(o.offerExpiresAt).getTime() + 10_000;
+      if (accept && !expired) {
+        o.offerExpiresAt = null;
+        notify(orderId);
+        notifyJobs();
+        return { ok: true, message: null };
+      }
+      const timedOut = !!opts.timeout || expired;
+      const back = move(orderId, "onaylandi", timedOut ? "Teklif süresi doldu" : `Teklif reddedildi${opts.reason ? `: ${opts.reason}` : ""}`);
+      back.courierName = null;
+      back.offerExpiresAt = null;
+      notifyJobs();
+      return accept ? { ok: false, message: "Teklifin süresi doldu; iş başka kuryeye verilecek" } : { ok: true, message: null };
+    },
     async courierAction(orderId, action) {
+      if (orders.get(orderId)?.offerExpiresAt && action.type !== "release") throw new ApiError("Önce işi kabul edin");
       switch (action.type) {
         case "pickup": {
           const o = move(orderId, "alindi");

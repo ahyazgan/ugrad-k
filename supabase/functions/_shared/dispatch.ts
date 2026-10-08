@@ -30,6 +30,7 @@ export function toNotificationOrder(r: Row): NotificationOrder {
     cancelReason: r.cancel_reason,
     problemNote: r.problem_note,
     deliveryCode: (Array.isArray(r.secret) ? r.secret[0] : r.secret)?.delivery_code ?? null,
+    assignment: r.offer_expires_at ? (r.offer_accepted_at ? "accepted" : "offer") : "direct",
     customer: {
       fullName: r.customer?.full_name ?? null,
       phone: r.customer?.phone ?? null,

@@ -3,11 +3,12 @@ import { router, useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import { complianceFor, DocumentWarning } from "@/components/CourierDocs";
+import { OfferCard } from "@/components/OfferCard";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Button, Card, ErrorBox, Muted, Screen, Title, colors } from "@/components/ui";
 import { api, ApiError, type OrderSummary, type Shift } from "@/lib/api";
 import { formatTime } from "@/lib/format";
-import { currentPosition, setActiveOrderForLocation, startTracking, stopTracking } from "@/lib/location";
+import { currentPosition, lastKnownPosition, setActiveOrderForLocation, startTracking, stopTracking } from "@/lib/location";
 
 const ACTIVE = ["kuryeye_atandi", "alindi", "yolda", "sorunlu"];
 
@@ -18,6 +19,8 @@ export default function KuryeIsler() {
   const [error, setError] = useState<string | null>(null);
   const [trackingMsg, setTrackingMsg] = useState<string | null>(null);
   const [compliance, setCompliance] = useState<Compliance | null>(null);
+  const [me, setMe] = useState<{ lat: number; lng: number } | null>(null);
+  const [offerMsg, setOfferMsg] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -25,9 +28,12 @@ export default function KuryeIsler() {
       setShift(s);
       setJobs(j);
       // Konumu öncelikle yoldaki, sonra alınmış, yoksa atanmış (alışa gidilen) işe bağla:
-      // müşteri yalnız kendi siparişine bağlı konumu görür (RLS)
+      // müşteri yalnız kendi siparişine bağlı konumu görür (RLS). Yanıt bekleyen teklif sayılmaz.
       const live =
-        j.find((x) => x.status === "yolda") ?? j.find((x) => x.status === "alindi") ?? j.find((x) => x.status === "kuryeye_atandi");
+        j.find((x) => x.status === "yolda") ??
+        j.find((x) => x.status === "alindi") ??
+        j.find((x) => x.status === "kuryeye_atandi" && !x.offerExpiresAt);
+      if (j.some((x) => x.offerExpiresAt)) lastKnownPosition().then(setMe, () => undefined);
       setActiveOrderForLocation(live?.id ?? null);
       api.courierDocuments().then((d) => setCompliance(complianceFor(d)), () => undefined);
     } catch (e) {
@@ -71,7 +77,8 @@ export default function KuryeIsler() {
     }
   }
 
-  const active = jobs.filter((j) => ACTIVE.includes(j.status));
+  const offers = jobs.filter((j): j is OrderSummary & { offerExpiresAt: string } => !!j.offerExpiresAt);
+  const active = jobs.filter((j) => ACTIVE.includes(j.status) && !j.offerExpiresAt);
   const done = jobs.filter((j) => j.status === "teslim_edildi");
 
   return (
@@ -94,6 +101,19 @@ export default function KuryeIsler() {
         />
       </Card>
       <ErrorBox message={error} />
+      {offerMsg ? <Muted style={{ color: colors.danger }}>{offerMsg}</Muted> : null}
+      {offers.map((j) => (
+        <OfferCard
+          key={j.id}
+          job={j}
+          me={me}
+          onDone={(m) => {
+            setOfferMsg(m);
+            load();
+          }}
+        />
+      ))}
+
       <DocumentWarning c={compliance} />
 
       <Title>Aktif işler ({active.length})</Title>

@@ -201,6 +201,11 @@ fs.mkdirSync(out, { recursive: true });
   await page.getByTestId("readiness-toggle").click();
   await page.getByTestId("ready-job:courier-earnings").getByText("Kurye hakedişi").waitFor();
   await page.getByTestId("ready-cost").getByText("§23", { exact: false }).waitFor();
+  // İş teklifi: otomatik atanan sipariş kuryeye teklif olarak gider, detayda teklif kaydı görünür
+  await page.getByTestId("dispatch-result").locator("..").getByRole("link", { name: "Sipariş" }).first().click();
+  await page.getByTestId("offers").getByText("Mehmet Kaya").waitFor();
+  await page.getByTestId("offers").getByText(/Yanıt bekleniyor|Kabul etti/).waitFor();
+  await shot("06d1-teklif");
   await shot("06d-otomasyon");
 
   // ───── Canlı harita: kurye ve sipariş işaretleri, açılır kutu, odaklama

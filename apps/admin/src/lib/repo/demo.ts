@@ -274,6 +274,8 @@ async function seed(): Promise<State> {
       deliveryCodeRequired: false,
       deliveryCode: null,
       deliveryCodeFailedAttempts: 0,
+      offerExpiresAt: null,
+      offers: [],
       trackingToken: `demo${no}`.padEnd(32, "0"),
       cancelReason: status === "iptal" ? "Müşteri vazgeçti" : null,
       problemNote: null,
@@ -289,6 +291,15 @@ async function seed(): Promise<State> {
         note: null,
       })),
     });
+  }
+  // Teklif geçmişi örneği: uzak kurye reddetti, yakındaki kabul etti
+  for (const o of orders.filter((x) => x.status === "teslim_edildi" && x.courierId === "kur-1").slice(-2)) {
+    const at = new Date(o.history.find((h) => h.toStatus === "kuryeye_atandi")?.at ?? o.createdAt).getTime();
+    const iso = (ms: number) => new Date(at + ms).toISOString();
+    o.offers = [
+      { courierId: "kur-2", courierName: "Emre Şahin", offeredAt: iso(-90_000), expiresAt: iso(-30_000), respondedAt: iso(-75_000), response: "ret", reason: "Çok uzak" },
+      { courierId: "kur-1", courierName: "Mehmet Kaya", offeredAt: iso(-60_000), expiresAt: iso(0), respondedAt: iso(-40_000), response: "kabul", reason: null },
+    ];
   }
   // Kuryeye ödemeli teslimatlar: çoğu nakit tahsil edildi; biri IBAN bildirimi, biri tahsil edilemedi (alacak)
   orders
@@ -364,6 +375,8 @@ async function seed(): Promise<State> {
       winbackEnabled: false,
       winbackAfterDays: 30,
       winbackDiscountPct: 15,
+      offerEnabled: true,
+      offerTimeoutSeconds: 60,
     },
     consented: new Set(["cus-1", "cus-2", "cus-3"]),
     apiKeys: [],
@@ -550,6 +563,13 @@ export function createDemoRepo(): AdminRepo {
       throw new RepoError(`Geçersiz durum geçişi: ${o.status} → ${to}`);
     }
     o.history.push({ fromStatus: o.status, toStatus: to, at: new Date().toISOString(), note });
+    // Bekleyen teklif: geri alınır ya da yöneticinin ilerletmesiyle kabul sayılır
+    const open = o.offers.find((x) => !x.response);
+    if (o.status === "kuryeye_atandi" && open) {
+      open.respondedAt = new Date().toISOString();
+      open.response = to === "onaylandi" || to === "iptal" ? "geri_alindi" : "kabul";
+      o.offerExpiresAt = null;
+    }
     o.status = to;
     if (to === "teslim_edildi") {
       o.deliveredAt = new Date().toISOString();
@@ -861,6 +881,20 @@ export function createDemoRepo(): AdminRepo {
         o.courierId = c.id;
         o.courierName = c.fullName;
         transition(o, "kuryeye_atandi", `Otomatik atama (${a.distanceKm.toLocaleString("tr-TR")} km)`);
+        if (s.ops.offerEnabled) {
+          const offeredAt = new Date();
+          o.offerExpiresAt = new Date(offeredAt.getTime() + s.ops.offerTimeoutSeconds * 1000).toISOString();
+          o.offers.push({ courierId: c.id, courierName: c.fullName, offeredAt: offeredAt.toISOString(), expiresAt: o.offerExpiresAt, respondedAt: null, response: null, reason: null });
+          // Demo: kurye birkaç saniye içinde kabul eder
+          setTimeout(() => {
+            const open = o.offers.find((x) => !x.response && x.courierId === c.id);
+            if (!open || o.status !== "kuryeye_atandi") return;
+            open.respondedAt = new Date().toISOString();
+            open.response = "kabul";
+            o.offerExpiresAt = null;
+            touchOrders();
+          }, 4000);
+        }
       }
       refreshCounts(s);
       touchOrders();
@@ -981,6 +1015,8 @@ export function createDemoRepo(): AdminRepo {
         deliveryCodeRequired: req.deliveryCode,
         deliveryCode: req.deliveryCode ? String(1000 + Math.floor(Math.random() * 9000)) : null,
         deliveryCodeFailedAttempts: 0,
+        offerExpiresAt: null,
+        offers: [],
         trackingToken: `demo${n}`.padEnd(32, "0"),
         cancelReason: status === "iptal" ? "Müşteri vazgeçti" : null,
         problemNote: null,

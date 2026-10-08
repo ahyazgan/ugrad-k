@@ -13,3 +13,4 @@ export * from "./cost.ts";
 export * from "./compliance.ts";
 export * from "./eta.ts";
 export * from "./promo.ts";
+export * from "./offers.ts";

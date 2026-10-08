@@ -70,6 +70,32 @@ Deno.test("auto-dispatch: işi bırakan kuryeye tekrar verilmez; ödenmemiş kar
   assertEquals(data.unassigned, ["o1"]);
 });
 
+Deno.test("auto-dispatch: teklifi reddeden kuryeye verilmez, süresi dolan 10 dk sonra tekrar alabilir", async () => {
+  const declined = setup({
+    courier_offers: [{ order_id: "o1", courier_id: "k1", response: "ret", responded_at: "2026-10-09T07:00:00Z" }],
+  });
+  const d1 = await (await handler((r) => handleAutoDispatch(r, declined.ctx, { env, now: NOW }))(cron())).json();
+  assertEquals(d1.assigned.length, 0);
+
+  const timedOutRecently = setup({
+    courier_offers: [{ order_id: "o1", courier_id: "k1", response: "zaman_asimi", responded_at: "2026-10-09T08:55:00Z" }],
+  });
+  await handler((r) => handleAutoDispatch(r, timedOutRecently.ctx, { env, now: NOW }))(cron());
+  assertEquals(timedOutRecently.assigned.length, 0);
+
+  const timedOutLongAgo = setup({
+    courier_offers: [{ order_id: "o1", courier_id: "k1", response: "zaman_asimi", responded_at: "2026-10-09T08:45:00Z" }],
+  });
+  await handler((r) => handleAutoDispatch(r, timedOutLongAgo.ctx, { env, now: NOW }))(cron());
+  assertEquals(timedOutLongAgo.assigned[0].p_courier_id, "k1");
+});
+
+Deno.test("auto-dispatch: süresi dolan teklifler her çalışmada geri alınır", async () => {
+  const { ctx } = setup({ "rpc:expire_offers": 2, ops_settings: [{ ...ops, auto_assign: false }] });
+  const data = await (await handler((r) => handleAutoDispatch(r, ctx, { env, now: NOW }))(cron())).json();
+  assertEquals(data.expiredOffers, 2);
+});
+
 Deno.test("auto-dispatch: uzun süredir atanamayan için yöneticiye bir kez uyarı", async () => {
   const old = { id: "o1", order_no: "YK-1", status: "onaylandi", pickup_lat: 41.1295, pickup_lng: 29.1135, urgent: false, created_at: "2026-10-09T08:40:00Z", scheduled_pickup_at: null, payment_method: "nakit", payment_status: "odenmedi" };
   const { ctx, updated } = setup({ couriers: [], orders: [old] });

@@ -79,6 +79,7 @@ export const toAdminOrder = (r: Row): AdminOrder => ({
   cashCollection: r.cash_collection ?? null,
   slaDueAt: r.sla_due_at ?? null,
   slaMissed: r.sla_missed ?? null,
+  offerExpiresAt: r.status === "kuryeye_atandi" && r.offer_expires_at && !r.offer_accepted_at ? r.offer_expires_at : null,
   distanceMeters: r.distance_meters,
   scheduledPickupAt: r.scheduled_pickup_at,
   deliveredAt: r.delivered_at,
@@ -202,9 +203,10 @@ export function createSupabaseRepo(url: string, anonKey: string): AdminRepo & { 
       return rows.map(toAdminOrder);
     },
     async getOrder(id) {
-      const [o, h] = await Promise.all([
+      const [o, h, of] = await Promise.all([
         client.from("orders").select(`${ORDER_SELECT}, secret:order_secrets(delivery_code, failed_attempts)`).eq("id", id).single(),
         client.from("order_status_history").select("*").eq("order_id", id).order("created_at"),
+        client.from("courier_offers").select("*, courier:couriers(profile:profiles(full_name))").eq("order_id", id).order("offered_at"),
       ]);
       const r = check(o, "Sipariş okunamadı") as Row;
       return {
@@ -237,6 +239,15 @@ export function createSupabaseRepo(url: string, anonKey: string): AdminRepo & { 
           toStatus: x.to_status,
           at: x.created_at,
           note: x.note,
+        })),
+        offers: (check(of, "Teklifler okunamadı") ?? []).map((x: Row) => ({
+          courierId: x.courier_id,
+          courierName: x.courier?.profile?.full_name ?? null,
+          offeredAt: x.offered_at,
+          expiresAt: x.expires_at,
+          respondedAt: x.responded_at,
+          response: x.response,
+          reason: x.reason,
         })),
       } satisfies AdminOrderDetail;
     },
@@ -506,6 +517,8 @@ export function createSupabaseRepo(url: string, anonKey: string): AdminRepo & { 
         winbackEnabled: !!r.winback_enabled,
         winbackAfterDays: r.winback_after_days ?? 30,
         winbackDiscountPct: Number(r.winback_discount_pct ?? 15),
+        offerEnabled: r.offer_enabled ?? true,
+        offerTimeoutSeconds: r.offer_timeout_seconds ?? 60,
       };
     },
     async saveOpsSettings(s) {
@@ -527,6 +540,8 @@ export function createSupabaseRepo(url: string, anonKey: string): AdminRepo & { 
             winback_enabled: s.winbackEnabled,
             winback_after_days: s.winbackAfterDays,
             winback_discount_pct: s.winbackDiscountPct,
+            offer_enabled: s.offerEnabled,
+            offer_timeout_seconds: s.offerTimeoutSeconds,
           })
           .eq("id", 1),
         "Ayarlar kaydedilemedi",

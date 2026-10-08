@@ -2,6 +2,7 @@
 
 import {
   INELIGIBILITY_LABELS,
+  OFFER_RESPONSE_LABELS,
   ORDER_STATUS_LABELS,
   ORDER_TRANSITIONS,
   formatTL,
@@ -14,7 +15,7 @@ import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Button, Card, ErrorText, Input, PageHeader, Select } from "@/components/ui";
-import { fmtDateTime } from "@/lib/dates";
+import { fmtDateTime, fmtTime } from "@/lib/dates";
 import { repo } from "@/lib/repo";
 import { useLoad } from "@/lib/use-load";
 
@@ -128,6 +129,12 @@ export default function SiparisDetayPage() {
               {awaitingPayment && order.status !== "iptal" ? (
                 <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900">
                   Kartla ödeme bekleniyor — ödeme tamamlanınca kurye atanabilir.
+                </p>
+              ) : null}
+              {order.offerExpiresAt ? (
+                <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900" data-testid="offer-pending">
+                  {order.courierName} için iş teklifi bekliyor (son yanıt {fmtTime(order.offerExpiresAt)}). Kabul etmezse iş sıradaki
+                  kuryeye geçer; isterseniz aşağıdan doğrudan atayabilirsiniz.
                 </p>
               ) : null}
               {canAssign ? (
@@ -295,6 +302,25 @@ export default function SiparisDetayPage() {
               </div>
             </dl>
           </Card>
+          {order.offers.length ? (
+            <Card title="Kurye teklifleri">
+              <ol className="space-y-2 text-sm" data-testid="offers">
+                {order.offers.map((o, i) => (
+                  <li key={i} className="flex justify-between gap-3">
+                    <span>
+                      {o.courierName ?? "Kurye"}
+                      <span className="block text-xs text-slate-500">
+                        {o.response ? OFFER_RESPONSE_LABELS[o.response] : "Yanıt bekleniyor"}
+                        {o.reason ? ` · ${o.reason}` : ""}
+                        {o.respondedAt ? ` · ${Math.max(0, Math.round((new Date(o.respondedAt).getTime() - new Date(o.offeredAt).getTime()) / 1000))} sn` : ""}
+                      </span>
+                    </span>
+                    <span className="whitespace-nowrap text-slate-500">{fmtDateTime(o.offeredAt)}</span>
+                  </li>
+                ))}
+              </ol>
+            </Card>
+          ) : null}
           <Card title="Geçmiş">
             <ol className="space-y-2 text-sm">
               {order.history.map((h, i) => (

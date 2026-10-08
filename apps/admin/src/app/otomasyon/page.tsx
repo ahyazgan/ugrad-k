@@ -15,6 +15,7 @@ const NUMBERS: Array<{ key: keyof OpsSettings; label: string; hint: string }> = 
   { key: "unpaidCardTimeoutMinutes", label: "Kartla ödeme süresi (dk)", hint: "Ödenmeyen kart siparişi bu süre sonunda iptal edilir" },
   { key: "urgentSlaMinutes", label: "Acil teslim taahhüdü (dk)", hint: "Aşılırsa acil ek ücreti müşterinin sonraki siparişinden düşülür" },
   { key: "documentWarnDays", label: "Belge süresi uyarısı (gün)", hint: "Kurye belgesinin bitmesine bu kadar gün kala uyarı" },
+  { key: "offerTimeoutSeconds", label: "Teklif yanıt süresi (sn)", hint: "15–600; süre dolarsa iş sıradaki kuryeye geçer" },
 ];
 
 export default function OtomasyonPage() {
@@ -223,6 +224,10 @@ function OpsForm({ initial, onSaved }: { initial: OpsSettings; onSaved: () => vo
       setSaveError(`Geçersiz değer: ${bad.label}`);
       return;
     }
+    if (form.offerTimeoutSeconds < 15 || form.offerTimeoutSeconds > 600) {
+      setSaveError("Teklif yanıt süresi 15–600 saniye olmalı");
+      return;
+    }
     try {
       await repo.saveOpsSettings(form);
       setMsg("Kaydedildi");
@@ -250,6 +255,16 @@ function OpsForm({ initial, onSaved }: { initial: OpsSettings; onSaved: () => vo
               <span className="block text-slate-500">
                 Vardiyadaki, konumu güncel kuryelerden alışa en yakın ve en az yüklü olana; acil siparişler önce. İşi bırakan kuryeye aynı iş
                 tekrar verilmez. Planlı siparişler alıştan 30 dk önce atanır.
+              </span>
+            </span>
+          </label>
+          <label className="flex items-start gap-3">
+            <input type="checkbox" checked={form.offerEnabled} onChange={(e) => setForm({ ...form, offerEnabled: e.target.checked })} data-testid="offer-enabled" />
+            <span>
+              <b>İşi kuryeye teklif olarak gönder</b>
+              <span className="block text-slate-500">
+                Otomatik atanan iş kuryeye sesli bildirimle teklif edilir; kurye süre içinde kabul etmezse veya reddederse sıradaki kuryeye
+                geçer. Reddeden kuryeye aynı iş tekrar önerilmez. Müşteriye &quot;kurye atandı&quot; mesajı kabulden sonra gider.
               </span>
             </span>
           </label>

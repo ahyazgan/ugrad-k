@@ -38,6 +38,11 @@ export interface NotificationOrder {
   problemNote: string | null;
   /** Teslim kodu istenen siparişte alıcıya gönderilen 4 haneli kod */
   deliveryCode?: string | null;
+  /**
+   * Atama türü: "offer" = kurye henüz kabul etmedi (yalnız kuryeye teklif bildirimi),
+   * "accepted" = teklif kabul edildi (yalnız müşteriye), "direct" = yönetici ataması (ikisine de)
+   */
+  assignment?: "offer" | "accepted" | "direct";
   customer: { fullName: string | null; phone: string | null; pushToken: string | null };
   courier: { fullName: string | null; phone: string | null; pushToken: string | null } | null;
 }
@@ -82,22 +87,32 @@ export function buildNotifications(event: OrderStatus, o: NotificationOrder, cfg
       });
       out.push(...admins("Yeni sipariş", `Yeni sipariş ${o.orderNo}${o.urgent ? " (ACİL)" : ""}: ${route}`));
       break;
-    case "kuryeye_atandi":
-      if (courier) {
+    case "kuryeye_atandi": {
+      // Bildirim gönderilene kadar teklif reddedilmiş/iş geri alınmış olabilir
+      if (o.status === "onaylandi" || o.status === "iptal" || o.status === "beklemede") break;
+      const assignment = o.assignment ?? "direct";
+      if (courier && assignment !== "accepted") {
+        out.push(
+          assignment === "offer"
+            ? {
+                to: courier,
+                channels: ["push", "sms"],
+                title: o.urgent ? "⚡ ACİL iş teklifi" : "🔔 Yeni iş teklifi",
+                text: `${o.orderNo}: ${route}. Uygulamayı açıp kabul edin; süre dolarsa iş başka kuryeye geçer.`,
+              }
+            : { to: courier, channels: ["push", "sms"], title: o.urgent ? "⚡ Yeni ACİL iş" : "Yeni iş", text: `${o.orderNo}: ${route}` },
+        );
+      }
+      if (assignment !== "offer") {
         out.push({
-          to: courier,
-          channels: ["push", "sms"],
-          title: o.urgent ? "⚡ Yeni ACİL iş" : "Yeni iş",
-          text: `${o.orderNo}: ${route}`,
+          to: customer,
+          channels: ["push"],
+          title: "Kurye atandı",
+          text: `${o.orderNo} için kuryeniz ${firstName(o.courier?.fullName) || "atandı"} yola çıkıyor.`,
         });
       }
-      out.push({
-        to: customer,
-        channels: ["push"],
-        title: "Kurye atandı",
-        text: `${o.orderNo} için kuryeniz ${firstName(o.courier?.fullName) || "atandı"} yola çıkıyor.`,
-      });
       break;
+    }
     case "alindi":
       out.push({ to: customer, channels: ["push"], title: "Paket alındı", text: `${o.orderNo} kuryemiz tarafından alındı.` });
       break;
