@@ -209,6 +209,33 @@ export interface OrderFilter {
   limit?: number;
 }
 
+export interface ApiKeyInfo {
+  id: string;
+  name: string;
+  prefix: string;
+  profileId: string;
+  profileName: string | null;
+  createdAt: string;
+  lastUsedAt: string | null;
+  revokedAt: string | null;
+}
+export interface WebhookConfig {
+  url: string;
+  secret: string;
+  active: boolean;
+}
+export interface WebhookDelivery {
+  id: number;
+  event: string;
+  status: "pending" | "processing" | "delivered" | "failed";
+  attempts: number;
+  lastError: string | null;
+  responseStatus: number | null;
+  orderNo: string | null;
+  createdAt: string;
+  deliveredAt: string | null;
+}
+
 export type LeadStatus = "yeni" | "arandi" | "kazanildi" | "kaybedildi";
 export interface Lead {
   id: string;
@@ -286,6 +313,14 @@ export interface AdminRepo {
   quote(order: OrderRequestInput): Promise<AdminQuote>;
   lookupPhoneCustomer(phone: string): Promise<PhoneCustomer | null>;
   createPhoneOrder(input: { phone: string; fullName: string; verbalConsent: boolean; order: OrderRequestInput }): Promise<{ id: string; orderNo: string }>;
+  // Kurumsal API
+  listApiKeys(corporateAccountId: string): Promise<ApiKeyInfo[]>;
+  /** Anahtarı üretir; düz metin yalnız bu dönüşte görülür */
+  createApiKey(corporateAccountId: string, profileId: string, name: string): Promise<{ key: string }>;
+  revokeApiKey(id: string): Promise<void>;
+  getWebhook(corporateAccountId: string): Promise<WebhookConfig | null>;
+  saveWebhook(corporateAccountId: string, cfg: WebhookConfig): Promise<void>;
+  listWebhookDeliveries(corporateAccountId: string): Promise<WebhookDelivery[]>;
   // Başvurular (web sitesi)
   listLeads(): Promise<Lead[]>;
   updateLead(id: string, patch: { status?: LeadStatus; adminNote?: string | null }): Promise<void>;

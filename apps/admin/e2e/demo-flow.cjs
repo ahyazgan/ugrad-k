@@ -115,7 +115,7 @@ fs.mkdirSync(out, { recursive: true });
   await shot("05-vardiyalar");
 
   await nav("Kurumsal & fatura");
-  await page.getByLabel("Hesap").selectOption({ label: "Beykoz Hukuk Bürosu" });
+  await page.getByLabel(/^Hesap/).selectOption({ label: "Beykoz Hukuk Bürosu" });
   for (let i = 0; i < 3; i++) {
     await page.getByRole("button", { name: "Hesapla" }).click();
     await page.getByText("Genel toplam (KDV dahil)").waitFor();
@@ -130,6 +130,20 @@ fs.mkdirSync(out, { recursive: true });
   await page.getByRole("button", { name: "Faturayı oluştur" }).click();
   await page.getByText("Fatura kuyruğa alındı").waitFor();
   await shot("06-kurumsal");
+  // Kurumsal API: anahtar bir kez gösterilir, webhook https olmalı
+  await page.getByTestId("api-account").selectOption({ label: "Beykoz Hukuk Bürosu" });
+  await page.getByTestId("api-key-name").fill("ERP");
+  await page.getByTestId("api-key-create").click();
+  const newKey = await page.getByTestId("api-key-new").locator("code").innerText();
+  if (!/^yk_live_[A-Za-z0-9]{32}$/.test(newKey)) throw new Error("API anahtarı biçimi hatalı: " + newKey);
+  await page.getByText(newKey.slice(0, 12) + "…").waitFor();
+  await page.getByTestId("webhook-url").fill("http://guvensiz.example");
+  await page.getByRole("button", { name: "Webhook'u kaydet" }).click();
+  await page.getByText("https:// ile başlamalı").waitFor();
+  await page.getByTestId("webhook-url").fill("https://ornek-hukuk.com/kurye");
+  await page.getByRole("button", { name: "Webhook'u kaydet" }).click();
+  await page.getByText("Webhook kaydedildi").waitFor();
+  await shot("06a-kurumsal-api");
   await nav("Faturalar");
   await page.getByText(/^Aylık \d{4}-\d{2}$/).waitFor();
   await shot("06b-faturalar");

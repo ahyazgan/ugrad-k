@@ -85,6 +85,23 @@ fs.mkdirSync(out, { recursive: true });
   const faq = await page.locator('script[type="application/ld+json"]').allTextContents();
   if (!faq.some((s) => s.includes('"FAQPage"'))) throw new Error("FAQPage eksik");
 
+  // Kurye başvurusu: belge seçimi ve KVKK onayı
+  await page.goto(base + "/kurye-ol");
+  await t("apply-name").fill("Can Kurye");
+  await t("apply-phone").fill("0555 111 22 33");
+  await t("apply-birth").fill("1995");
+  await t("apply-doc-ehliyet_on").setInputFiles({ name: "ehliyet.jpg", mimeType: "image/jpeg", buffer: Buffer.from([0xff, 0xd8, 0xff, 0xd9]) });
+  await t("apply-submit").click();
+  await page.getByText("Aydınlatma metnini onaylamanız gerekiyor").waitFor();
+  await t("apply-consent").check();
+  await t("apply-submit").click();
+  await t("apply-done").waitFor();
+  await page.screenshot({ path: `${out}/06-kurye-ol.png`, fullPage: true });
+
+  await page.goto(base + "/api-belgeleri");
+  await page.getByRole("heading", { name: "Kurumsal API" }).waitFor();
+  await page.getByText("X-Webhook-Signature", { exact: false }).first().waitFor();
+
   // Telefon görünümü
   const m = await browser.newPage({ viewport: { width: 390, height: 844 } });
   watch(m);

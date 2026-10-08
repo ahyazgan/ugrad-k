@@ -480,3 +480,11 @@ verify_jwt = false
 # Tanıtım sitesi: herkese açık, IP başına hız sınırı fonksiyon içinde
 [functions.site-api]
 verify_jwt = false
+
+# Kurumsal API: kimlik API anahtarıyla (fonksiyon içinde)
+[functions.api]
+verify_jwt = false
+
+# Webhook kuyruğu (cron, x-notify-secret)
+[functions.webhook-dispatch]
+verify_jwt = false

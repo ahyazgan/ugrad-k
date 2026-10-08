@@ -25,8 +25,11 @@ import {
   type Invoice,
   type Lead,
   type PhoneCustomer,
+  type ApiKeyInfo,
+  type WebhookDelivery,
 } from "./types";
 import { toTranscript } from "./transcript";
+import { generateApiKey, keyPrefix, sha256Hex } from "../api-keys";
 
 // Supabase'den gelen tipsiz satırlar (şema tipi üretilene kadar)
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -428,6 +431,80 @@ export function createSupabaseRepo(url: string, anonKey: string): AdminRepo & { 
     async createPhoneOrder(input) {
       const r = await invoke<{ order: { id: string; order_no: string } }>("admin-order", { action: "create", ...input });
       return { id: r.order.id, orderNo: r.order.order_no };
+    },
+
+    // ───────── Kurumsal API
+    async listApiKeys(accountId) {
+      const rows =
+        check(
+          await client.from("api_keys").select("*, profile:profiles(full_name)").eq("corporate_account_id", accountId).order("created_at", { ascending: false }),
+          "API anahtarları okunamadı",
+        ) ?? [];
+      return rows.map(
+        (r: Row): ApiKeyInfo => ({
+          id: r.id,
+          name: r.name,
+          prefix: r.key_prefix,
+          profileId: r.profile_id,
+          profileName: r.profile?.full_name ?? null,
+          createdAt: r.created_at,
+          lastUsedAt: r.last_used_at,
+          revokedAt: r.revoked_at,
+        }),
+      );
+    },
+    async createApiKey(accountId, profileId, name) {
+      const key = generateApiKey();
+      check(
+        await client.from("api_keys").insert({
+          corporate_account_id: accountId,
+          profile_id: profileId,
+          name: name.trim() || "API",
+          key_prefix: keyPrefix(key),
+          key_hash: await sha256Hex(key),
+        }),
+        "API anahtarı oluşturulamadı",
+      );
+      return { key };
+    },
+    async revokeApiKey(id) {
+      check(await client.from("api_keys").update({ revoked_at: new Date().toISOString() }).eq("id", id), "Anahtar iptal edilemedi");
+    },
+    async getWebhook(accountId) {
+      const { data } = await client.from("corporate_webhooks").select("url, secret, active").eq("corporate_account_id", accountId).maybeSingle();
+      return data ? { url: data.url, secret: data.secret, active: data.active } : null;
+    },
+    async saveWebhook(accountId, cfg) {
+      if (!/^https:\/\/\S+$/.test(cfg.url)) throw new RepoError("Webhook adresi https:// ile başlamalı");
+      check(
+        await client.from("corporate_webhooks").upsert({ corporate_account_id: accountId, url: cfg.url, secret: cfg.secret, active: cfg.active }),
+        "Webhook kaydedilemedi",
+      );
+    },
+    async listWebhookDeliveries(accountId) {
+      const rows =
+        check(
+          await client
+            .from("webhook_deliveries")
+            .select("*, order:orders(order_no)")
+            .eq("corporate_account_id", accountId)
+            .order("created_at", { ascending: false })
+            .limit(30),
+          "Webhook kayıtları okunamadı",
+        ) ?? [];
+      return rows.map(
+        (r: Row): WebhookDelivery => ({
+          id: r.id,
+          event: r.event,
+          status: r.status,
+          attempts: r.attempts,
+          lastError: r.last_error,
+          responseStatus: r.response_status,
+          orderNo: r.order?.order_no ?? null,
+          createdAt: r.created_at,
+          deliveredAt: r.delivered_at,
+        }),
+      );
     },
 
     // ───────── Başvurular

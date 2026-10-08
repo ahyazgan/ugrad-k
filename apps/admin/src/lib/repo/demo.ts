@@ -35,7 +35,10 @@ import {
   type Shift,
   type CourierApplication,
   type Lead,
+  type ApiKeyInfo,
+  type WebhookConfig,
 } from "./types";
+import { generateApiKey, keyPrefix } from "../api-keys";
 
 const DEMO_EMAIL = "admin@yazgankurye.com";
 const DEMO_PASSWORD = "demo1234";
@@ -56,6 +59,8 @@ interface State {
   consented: Set<string>;
   leads: Lead[];
   applications: CourierApplication[];
+  apiKeys: Array<ApiKeyInfo & { accountId: string }>;
+  webhooks: Map<string, WebhookConfig>;
 }
 
 const phoneDigits = (p: string) => p.replace(/\D/g, "").replace(/^(90|0)/, "");
@@ -241,6 +246,8 @@ async function seed(): Promise<State> {
       unassignedAlertMinutes: 10,
     },
     consented: new Set(["cus-1", "cus-2", "cus-3"]),
+    apiKeys: [],
+    webhooks: new Map(),
     leads: [
       {
         id: "lead-1",
@@ -780,6 +787,42 @@ export function createDemoRepo(): AdminRepo {
       return { id: o.id, orderNo: o.orderNo };
     },
 
+    async listApiKeys(accountId) {
+      return clone((await get()).apiKeys.filter((k) => k.accountId === accountId));
+    },
+    async createApiKey(accountId, profileId, name) {
+      const s = await get();
+      const owner = s.customers.find((c) => c.id === profileId);
+      if (!owner || owner.corporateAccountId !== accountId) throw new RepoError("Anahtar kullanıcısı bu kurumsal hesaba bağlı değil");
+      const key = generateApiKey();
+      s.apiKeys.unshift({
+        id: `key-${s.apiKeys.length + 1}`,
+        accountId,
+        name: name.trim() || "API",
+        prefix: keyPrefix(key),
+        profileId,
+        profileName: owner.fullName,
+        createdAt: new Date().toISOString(),
+        lastUsedAt: null,
+        revokedAt: null,
+      });
+      return { key };
+    },
+    async revokeApiKey(id) {
+      const k = (await get()).apiKeys.find((x) => x.id === id);
+      if (k) k.revokedAt = new Date().toISOString();
+    },
+    async getWebhook(accountId) {
+      const w = (await get()).webhooks.get(accountId);
+      return w ? { ...w } : null;
+    },
+    async saveWebhook(accountId, cfg) {
+      if (!/^https:\/\/\S+$/.test(cfg.url)) throw new RepoError("Webhook adresi https:// ile başlamalı");
+      (await get()).webhooks.set(accountId, { ...cfg });
+    },
+    async listWebhookDeliveries() {
+      return [];
+    },
     async listLeads() {
       return clone((await get()).leads);
     },
