@@ -195,6 +195,7 @@ export function createSupabaseApi(url: string, anonKey: string): Api & { client:
         priceQuote: r!.price_quote,
         paymentMethod: r!.payment_method,
         paymentStatus: r!.payment_status,
+        paidKurus: r!.paid_kurus ?? null,
         trackingToken: r!.tracking_token,
         courierName: r!.courier?.profile?.full_name ?? null,
         courierPhone: r!.courier?.profile?.phone ?? null,
@@ -205,6 +206,11 @@ export function createSupabaseApi(url: string, anonKey: string): Api & { client:
     async cancelOrder(id, reason) {
       const { error } = await client.rpc("set_order_status", { p_order_id: id, p_status: "iptal", p_note: reason });
       if (error) throw new ApiError(error.message);
+      // Kartla ödenmişse ödeme iptal edilir (ödeme yoksa sunucu bir şey yapmaz)
+      await invoke("payment-refund", { orderId: id }).catch(() => undefined);
+    },
+    async startPayment(orderId) {
+      return invoke<{ paymentPageUrl: string }>("payment-init", { orderId });
     },
     subscribeOrder(id, onChange) {
       const channel = client

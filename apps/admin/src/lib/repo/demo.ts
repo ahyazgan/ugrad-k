@@ -125,6 +125,7 @@ async function seed(): Promise<State> {
       subtotalKurus: q.quote.subtotalKurus,
       paymentMethod: cust.corporateAccountId ? "cari" : "nakit",
       paymentStatus: cust.corporateAccountId ? "cari_hesap" : "odenmedi",
+      paidKurus: null,
       distanceMeters: q.distanceMeters,
       scheduledPickupAt: null,
       deliveredAt: status === "teslim_edildi" ? hoursAgo(ago - 1) : null,
@@ -142,6 +143,8 @@ async function seed(): Promise<State> {
       trackingToken: `demo${no}`.padEnd(32, "0"),
       cancelReason: null,
       problemNote: null,
+      paymentRef: null,
+      paymentError: null,
       podPhotoPath: status === "teslim_edildi" ? "demo/foto.jpg" : null,
       podSignaturePath: null,
       podReceiverName: status === "teslim_edildi" ? "Resepsiyon" : null,
@@ -214,7 +217,10 @@ export function createDemoRepo(): AdminRepo {
     o.history.push({ fromStatus: o.status, toStatus: to, at: new Date().toISOString(), note });
     o.status = to;
     if (to === "teslim_edildi") o.deliveredAt = new Date().toISOString();
-    if (to === "iptal") o.cancelReason = note;
+    if (to === "iptal") {
+      o.cancelReason = note;
+      if (o.paymentStatus === "odendi") o.paymentStatus = "iade_edildi";
+    }
     if (to === "sorunlu") o.problemNote = note;
   }
 

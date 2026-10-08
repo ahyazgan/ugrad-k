@@ -221,6 +221,10 @@ begin
   if not found then
     raise exception 'Sipariş bulunamadı' using errcode = 'P0002';
   end if;
+  -- Kartla ödenecek sipariş, ödeme alınmadan kuryeye verilmez
+  if o.payment_method = 'kart' and o.payment_status <> 'odendi' then
+    raise exception 'Ödeme bekleniyor: kartla ödenecek sipariş henüz ödenmedi' using errcode = '22023';
+  end if;
 
   if o.status = 'beklemede' then
     update public.orders set status = 'onaylandi' where id = p_order_id;

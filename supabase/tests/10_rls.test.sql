@@ -107,8 +107,17 @@ end $$;
 select id is not null as vardiya_acildi from public.start_shift(41.1, 29.1);
 reset role;
 
--- ───── Yönetici atar
+-- ───── Yönetici atar (ödenmemiş kart siparişi atanamaz)
+update public.orders set payment_method = 'kart' where id = '10000000-0000-0000-0000-000000000001';
 select set_config('request.jwt.claim.sub', :admin, false);
+set role authenticated;
+do $$ begin
+  perform public.assign_courier('10000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-00000000000b');
+  raise exception 'BEKLENMEDİ: ödenmemiş kart siparişi atandı';
+exception when invalid_parameter_value then null;
+end $$;
+reset role;
+update public.orders set payment_status = 'odendi' where id = '10000000-0000-0000-0000-000000000001';
 set role authenticated;
 do $$ begin
   if (select count(*) from public.orders) <> 2 then raise exception 'yönetici tüm siparişleri görmeli'; end if;

@@ -46,6 +46,7 @@ export const toAdminOrder = (r: Row): AdminOrder => ({
   subtotalKurus: r.subtotal_kurus,
   paymentMethod: r.payment_method,
   paymentStatus: r.payment_status,
+  paidKurus: r.paid_kurus ?? null,
   distanceMeters: r.distance_meters,
   scheduledPickupAt: r.scheduled_pickup_at,
   deliveredAt: r.delivered_at,
@@ -136,6 +137,8 @@ export function createSupabaseRepo(url: string, anonKey: string): AdminRepo & { 
         trackingToken: r.tracking_token,
         cancelReason: r.cancel_reason,
         problemNote: r.problem_note,
+        paymentRef: r.payment_ref,
+        paymentError: r.payment_error,
         podPhotoPath: r.pod_photo_path,
         podSignaturePath: r.pod_signature_path,
         podReceiverName: r.pod_receiver_name,
@@ -155,6 +158,8 @@ export function createSupabaseRepo(url: string, anonKey: string): AdminRepo & { 
         await client.rpc("set_order_status", { p_order_id: orderId, p_status: status, p_note: note ?? null }),
         "Durum değiştirilemedi",
       );
+      // İptalde kartla alınmış ödeme iyzico'dan iptal edilir (başarısızsa "iade_bekliyor" olur)
+      if (status === "iptal") await client.functions.invoke("payment-refund", { body: { orderId } });
     },
     subscribeOrders(onChange) {
       const ch = client

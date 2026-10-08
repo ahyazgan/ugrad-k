@@ -6,9 +6,18 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { Button, Card, ErrorBox, Loading, Muted, Row, Screen, Title, colors, styles } from "@/components/ui";
 import { api, ApiError, type OrderDetail } from "@/lib/api";
 import { formatDateTime, formatTime } from "@/lib/format";
+import { payOrder } from "@/lib/payment";
 
 const TRACKING_BASE = process.env.EXPO_PUBLIC_TRACKING_BASE_URL ?? "https://panel.yazgankurye.com/takip";
 const trackingUrl = (token: string) => `${TRACKING_BASE.replace(/\/$/, "")}/${token}`;
+
+const PAYMENT_LABEL: Record<string, string> = {
+  odenmedi: "Ödeme bekleniyor",
+  odendi: "Ödendi (kart)",
+  iade_edildi: "Ödeme iade edildi",
+  iade_bekliyor: "İade işleniyor",
+  cari_hesap: "Cari hesaba işlendi",
+};
 
 const STEPS: OrderStatus[] = ["beklemede", "onaylandi", "kuryeye_atandi", "alindi", "yolda", "teslim_edildi"];
 
@@ -132,7 +141,35 @@ export default function SiparisDetay() {
         ))}
         <Row label="KDV" value={formatTL(order.priceQuote.vatKurus)} />
         <Row label="Toplam" value={formatTL(order.totalKurus)} bold />
+        <Muted>
+          {order.paymentMethod === "nakit" && order.paymentStatus === "odenmedi"
+            ? "Teslimatta kuryeye ödenecek"
+            : (PAYMENT_LABEL[order.paymentStatus] ?? order.paymentStatus)}
+        </Muted>
+        {order.paymentMethod === "kart" && order.paidKurus != null && order.totalKurus > order.paidKurus ? (
+          <Muted>Bekleme ücreti farkı ({formatTL(order.totalKurus - order.paidKurus)}) ayrıca tahsil edilecek.</Muted>
+        ) : null}
       </Card>
+
+      {order.paymentMethod === "kart" && order.paymentStatus === "odenmedi" && order.status !== "iptal" ? (
+        <Button
+          title="Ödemeyi tamamla"
+          testID="pay"
+          loading={busy}
+          onPress={async () => {
+            setBusy(true);
+            setError(null);
+            try {
+              await payOrder(order.id);
+              await load();
+            } catch (e) {
+              setError(e instanceof ApiError ? e.message : "Ödeme başlatılamadı");
+            } finally {
+              setBusy(false);
+            }
+          }}
+        />
+      ) : null}
 
       <ErrorBox message={error} />
       {order.cancelReason ? <Muted>İptal nedeni: {order.cancelReason}</Muted> : null}

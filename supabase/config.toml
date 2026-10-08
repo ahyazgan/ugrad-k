@@ -443,3 +443,13 @@ verify_jwt = true
 
 [functions.notify-dispatch]
 verify_jwt = false
+
+[functions.payment-init]
+verify_jwt = true
+
+[functions.payment-refund]
+verify_jwt = true
+
+# iyzico tarayıcıyı buraya yönlendirir; JWT olmaz. Doğrulama iyzico'dan token sorgusuyla yapılır.
+[functions.payment-callback]
+verify_jwt = false

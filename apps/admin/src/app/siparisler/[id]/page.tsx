@@ -10,6 +10,15 @@ import { fmtDateTime } from "@/lib/dates";
 import { repo } from "@/lib/repo";
 import { useLoad } from "@/lib/use-load";
 
+const PAYMENT_METHOD: Record<string, string> = { kart: "Kart", nakit: "Kuryeye (nakit/IBAN)", cari: "Cari hesap" };
+const PAYMENT_STATUS: Record<string, string> = {
+  odenmedi: "Ödenmedi",
+  odendi: "Ödendi",
+  iade_edildi: "İade edildi",
+  iade_bekliyor: "İade bekliyor",
+  cari_hesap: "Cari hesap",
+};
+
 // Yöneticinin elle yapabileceği geçişler (kurye atama ayrı işlem)
 const MANUAL: OrderStatus[] = ["onaylandi", "alindi", "yolda", "teslim_edildi", "sorunlu", "iptal"];
 
@@ -62,7 +71,8 @@ export default function SiparisDetayPage() {
   if (!order) return <p className="text-slate-500">Yükleniyor…</p>;
 
   const allowed = ORDER_TRANSITIONS[order.status].filter((s) => MANUAL.includes(s));
-  const canAssign = ["beklemede", "onaylandi", "kuryeye_atandi", "sorunlu"].includes(order.status);
+  const awaitingPayment = order.paymentMethod === "kart" && order.paymentStatus !== "odendi";
+  const canAssign = ["beklemede", "onaylandi", "kuryeye_atandi", "sorunlu"].includes(order.status) && !awaitingPayment;
   const trackingUrl = `${typeof window !== "undefined" ? window.location.origin : ""}/takip/${order.trackingToken}`;
 
   return (
@@ -80,6 +90,11 @@ export default function SiparisDetayPage() {
         <div className="space-y-6 xl:col-span-2">
           <Card title="Durum" actions={<StatusBadge status={order.status} />}>
             <div className="space-y-4">
+              {awaitingPayment && order.status !== "iptal" ? (
+                <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                  Kartla ödeme bekleniyor — ödeme tamamlanınca kurye atanabilir.
+                </p>
+              ) : null}
               {canAssign ? (
                 <div className="flex flex-wrap items-end gap-2">
                   <div className="min-w-60 flex-1">
@@ -187,7 +202,15 @@ export default function SiparisDetayPage() {
               <Info label="Ad">{order.customerName}</Info>
               <Info label="Telefon">{order.customerPhone}</Info>
               <Info label="Ödeme">
-                {order.paymentMethod} · {order.paymentStatus}
+                {PAYMENT_METHOD[order.paymentMethod]} · {PAYMENT_STATUS[order.paymentStatus] ?? order.paymentStatus}
+                {order.paidKurus != null ? <div className="text-slate-500">Ödenen: {formatTL(order.paidKurus)}</div> : null}
+                {order.paidKurus != null && order.totalKurus > order.paidKurus ? (
+                  <div className="font-semibold text-amber-700">Ek tahsilat: {formatTL(order.totalKurus - order.paidKurus)}</div>
+                ) : null}
+                {order.paymentError ? <div className="text-red-700">{order.paymentError}</div> : null}
+                {order.paymentStatus === "iade_bekliyor" ? (
+                  <div className="text-red-700">iyzico panelinden iade yapılmalı (ödeme no: {order.paymentRef})</div>
+                ) : null}
               </Info>
               <Info label="Takip linki">
                 <button className="break-all text-left text-brand underline" onClick={() => navigator.clipboard?.writeText(trackingUrl)}>

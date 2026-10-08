@@ -85,6 +85,7 @@ export function createDemoApi(): Api {
     priceQuote: q.quote,
     paymentMethod: req.paymentMethod,
     paymentStatus: "odenmedi",
+    paidKurus: null,
     trackingToken: "demo".padEnd(32, "0"),
     courierName: null,
     courierPhone: null,
@@ -265,6 +266,14 @@ export function createDemoApi(): Api {
       o.cancelReason = reason;
       o.history.push({ status: "iptal", at: new Date().toISOString(), note: reason });
       notify(id);
+    },
+    async startPayment(orderId) {
+      const o = orders.get(orderId);
+      if (!o) throw new ApiError("Sipariş bulunamadı", undefined, 404);
+      o.paymentStatus = "odendi";
+      o.paidKurus = o.totalKurus;
+      notify(orderId);
+      return null;
     },
     subscribeOrder(id, onChange) {
       const set = orderListeners.get(id) ?? new Set();

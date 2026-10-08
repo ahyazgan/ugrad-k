@@ -21,6 +21,7 @@ export interface AdminOrder {
   subtotalKurus: number;
   paymentMethod: "kart" | "cari" | "nakit";
   paymentStatus: string;
+  paidKurus: number | null;
   distanceMeters: number;
   scheduledPickupAt: string | null;
   deliveredAt: string | null;
@@ -41,6 +42,8 @@ export interface AdminOrderDetail extends AdminOrder {
   trackingToken: string;
   cancelReason: string | null;
   problemNote: string | null;
+  paymentRef: string | null;
+  paymentError: string | null;
   podPhotoPath: string | null;
   podSignaturePath: string | null;
   podReceiverName: string | null;

@@ -5,12 +5,13 @@ import { Pressable, Text, View } from "react-native";
 import { Button, Card, ErrorBox, Loading, Muted, Row, Screen, Title, colors } from "@/components/ui";
 import { api, ApiError, type OrderInput, type QuoteResponse } from "@/lib/api";
 import { draftToInput, useOrderDraft } from "@/lib/order-draft";
+import { payOrder } from "@/lib/payment";
 import { useSession } from "@/lib/session";
 
 const PAYMENT_OPTIONS: { value: OrderInput["paymentMethod"]; label: string; hint: string; corporateOnly?: boolean; disabled?: boolean }[] = [
   { value: "nakit", label: "Kuryeye ödeme", hint: "Nakit veya IBAN ile teslimatta" },
   { value: "cari", label: "Cari hesap", hint: "Ay sonu tek fatura", corporateOnly: true },
-  { value: "kart", label: "Kartla online ödeme", hint: "Yakında", disabled: true },
+  { value: "kart", label: "Kartla online ödeme", hint: "iyzico güvenli ödeme sayfası" },
 ];
 
 export default function Ozet() {
@@ -47,6 +48,7 @@ export default function Ozet() {
     try {
       const order = await api.createOrder(input);
       reset();
+      if (input.paymentMethod === "kart") await payOrder(order.id);
       // Özet ekranının yerine sipariş detayı: geri tuşu sekmelere döner
       router.replace({ pathname: "/siparis/[id]", params: { id: order.id, yeni: "1" } });
     } catch (e) {
