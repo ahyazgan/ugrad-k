@@ -459,3 +459,10 @@ verify_jwt = false
 
 [functions.invoice-monthly]
 verify_jwt = true
+
+# Meta webhook'u ve sesli ağ geçidi kendi imza/gizli anahtarıyla doğrulanır
+[functions.whatsapp-webhook]
+verify_jwt = false
+
+[functions.assistant-voice]
+verify_jwt = false

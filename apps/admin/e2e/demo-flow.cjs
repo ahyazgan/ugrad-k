@@ -81,6 +81,12 @@ fs.mkdirSync(out, { recursive: true });
   await page.getByText(/^Aylık \d{4}-\d{2}$/).waitFor();
   await shot("06b-faturalar");
 
+  await nav("Asistan konuşmaları");
+  await page.getByText("Temsilci bekliyor").waitFor();
+  await page.getByRole("button", { name: "Yazışma" }).first().click();
+  await page.getByText("köşesi ezilmiş", { exact: false }).waitFor();
+  await shot("06c-asistan");
+
   await nav("Fiyatlar");
   const perKm = page.getByLabel("Ek km ücreti (TL)");
   await perKm.waitFor();

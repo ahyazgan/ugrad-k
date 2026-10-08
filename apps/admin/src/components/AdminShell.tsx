@@ -13,6 +13,7 @@ const NAV = [
   { href: "/musteriler", label: "Müşteriler" },
   { href: "/kurumsal", label: "Kurumsal & fatura" },
   { href: "/faturalar", label: "Faturalar" },
+  { href: "/asistan", label: "Asistan konuşmaları" },
   { href: "/fiyatlar", label: "Fiyatlar" },
 ];
 

@@ -4,6 +4,7 @@ import {
   buildQuote,
   orderRowFromQuote,
   parseOrderRequest,
+  type OrderRequest,
   type PriceQuote,
   type QuoteResult,
 } from "../../../packages/shared/index.ts";
@@ -30,14 +31,15 @@ export async function handleQuote(req: Request, ctx: Ctx): Promise<Response> {
   return json(quoteResponse(q));
 }
 
-export async function handleCreateOrder(req: Request, ctx: Ctx): Promise<Response> {
-  const user = await ctx.getUser(req);
-  const order = parseOrderRequest(await readJson(req));
-
+/**
+ * Sipariş oluşturmanın tek yolu (uygulama, asistan, panel). KVKK rızası ve cari
+ * hesap kontrol edilir; fiyat her zaman sunucuda pricing.ts ile yeniden hesaplanır.
+ */
+export async function createOrderForCustomer(ctx: Ctx, userId: string, order: OrderRequest) {
   const { data: profile, error: pErr } = await ctx.admin
     .from("profiles")
     .select("id, role, corporate_account_id")
-    .eq("id", user.id)
+    .eq("id", userId)
     .single();
   if (pErr || !profile) throw new HttpError(403, "Profil bulunamadı");
 
@@ -45,7 +47,7 @@ export async function handleCreateOrder(req: Request, ctx: Ctx): Promise<Respons
   const { data: consents } = await ctx.admin
     .from("current_consents")
     .select("consent_type, granted")
-    .eq("profile_id", user.id);
+    .eq("profile_id", userId);
   const granted = new Set((consents ?? []).filter((c) => c.granted).map((c) => c.consent_type));
   if (!granted.has("kvkk_aydinlatma") || !granted.has("acik_riza_konum")) {
     throw new HttpError(403, "Sipariş için KVKK aydınlatma metnini ve açık rızayı onaylamanız gerekiyor");
@@ -55,7 +57,6 @@ export async function handleCreateOrder(req: Request, ctx: Ctx): Promise<Respons
     throw new HttpError(400, "Cari hesap ile ödeme yalnızca kurumsal müşteriler içindir", "paymentMethod");
   }
 
-  // Fiyat her zaman sunucuda yeniden hesaplanır; istemcinin gönderdiği fiyata güvenilmez.
   const pricing = await ctx.loadPricing();
   const q = await buildQuote(order, { maps: ctx.maps, ...pricing });
 
@@ -63,15 +64,21 @@ export async function handleCreateOrder(req: Request, ctx: Ctx): Promise<Respons
     .from("orders")
     .insert({
       ...orderRowFromQuote(order, q),
-      customer_id: user.id,
+      customer_id: userId,
       corporate_account_id: profile.corporate_account_id,
       payment_status: order.paymentMethod === "cari" ? "cari_hesap" : "odenmedi",
     })
     .select("id, order_no, status, total_kurus, tracking_token, created_at")
     .single();
   if (error) throw new Error(`Sipariş kaydedilemedi: ${error.message}`);
+  return { order: data, quote: q };
+}
 
-  return json({ order: data, ...quoteResponse(q) }, 201);
+export async function handleCreateOrder(req: Request, ctx: Ctx): Promise<Response> {
+  const user = await ctx.getUser(req);
+  const order = parseOrderRequest(await readJson(req));
+  const { order: data, quote } = await createOrderForCustomer(ctx, user.id, order);
+  return json({ order: data, ...quoteResponse(quote) }, 201);
 }
 
 export async function handlePlaces(req: Request, ctx: Ctx): Promise<Response> {

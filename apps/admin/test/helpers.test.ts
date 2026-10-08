@@ -27,3 +27,20 @@ describe("İstanbul tarihleri", () => {
     expect(hoursBetween("2026-10-08T06:00:00Z", null, new Date("2026-10-08T08:30:00Z"))).toBe(2.5);
   });
 });
+
+import { toTranscript } from "../src/lib/repo/transcript";
+
+describe("asistan yazışması", () => {
+  it("bağlam satırını, araç ve düşünme bloklarını atlar", () => {
+    const t = toTranscript([
+      { role: "user", content: "[Müşteri bilgisi — sistem tarafından eklendi] Ad: Ayşe\n\nmerhaba" },
+      { role: "assistant", content: [{ type: "thinking" }, { type: "tool_use" }] },
+      { role: "user", content: [{ type: "tool_result" }] },
+      { role: "assistant", content: [{ type: "thinking" }, { type: "text", text: "Fiyat 410 TL" }] },
+    ]);
+    expect(t).toEqual([
+      { role: "user", text: "merhaba" },
+      { role: "assistant", text: "Fiyat 410 TL" },
+    ]);
+  });
+});

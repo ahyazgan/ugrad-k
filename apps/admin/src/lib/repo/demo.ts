@@ -24,6 +24,7 @@ import {
   type AdminRepo,
   type CorporateAccount,
   type Courier,
+  type Conversation,
   type Customer,
   type Invoice,
   type Shift,
@@ -42,6 +43,7 @@ interface State {
   orders: AdminOrderDetail[];
   shifts: Shift[];
   invoices: Invoice[];
+  conversations: Conversation[];
 }
 
 const hoursAgo = (h: number) => new Date(Date.now() - h * 3_600_000).toISOString();
@@ -194,6 +196,32 @@ async function seed(): Promise<State> {
     corporate,
     orders,
     shifts,
+    conversations: [
+      {
+        id: "conv-1",
+        channel: "whatsapp",
+        externalId: "905334445566",
+        status: "handoff",
+        handoffReason: "Paket hasarlı teslim edilmiş, müşteri iade istiyor",
+        lastMessageAt: hoursAgo(0.3),
+        transcript: [
+          { role: "user", text: "Merhaba, dün gelen paketin köşesi ezilmiş." },
+          { role: "assistant", text: "Çok üzgünüz. Durumu bir temsilcimize iletiyorum, en kısa sürede size dönecek." },
+        ],
+      },
+      {
+        id: "conv-2",
+        channel: "whatsapp",
+        externalId: "905321112233",
+        status: "active",
+        handoffReason: null,
+        lastMessageAt: hoursAgo(1),
+        transcript: [
+          { role: "user", text: "Beykoz'dan Levent'e acil gönderi ne kadar?" },
+          { role: "assistant", text: "Beykoz → Levent acil teslimat KDV dahil 1.146,00 TL. Sipariş oluşturalım mı?" },
+        ],
+      },
+    ],
     invoices: orders
       .filter((o) => o.status === "teslim_edildi" && !o.corporateAccountId)
       .map(
@@ -442,6 +470,14 @@ export function createDemoRepo(): AdminRepo {
     async retryInvoice(id) {
       const inv = (await get()).invoices.find((i) => i.id === id);
       if (inv) Object.assign(inv, { status: "pending", attempts: 0, lastError: null });
+    },
+
+    async listConversations() {
+      return clone((await get()).conversations);
+    },
+    async closeConversation(id) {
+      const c = (await get()).conversations.find((x) => x.id === id);
+      if (c) c.status = "closed";
     },
 
     async getPricing() {

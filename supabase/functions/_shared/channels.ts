@@ -102,3 +102,25 @@ export async function deliver(m: OutboundMessage, opts: { env: Env; fetchFn?: ty
   if (dryRunCandidate && !lastError) return dryRunCandidate;
   return { role, channel: "none", ok: false, error: lastError ?? "Uygun kanal yok" };
 }
+
+/** 24 saatlik müşteri hizmeti penceresinde serbest metin WhatsApp mesajı (bot yanıtı). */
+export async function sendWhatsAppText(
+  phone: string,
+  body: string,
+  opts: { env: Env; fetchFn?: typeof fetch },
+): Promise<{ ok: boolean; dryRun?: boolean; error?: string }> {
+  const token = opts.env("WHATSAPP_TOKEN");
+  const phoneId = opts.env("WHATSAPP_PHONE_NUMBER_ID");
+  if (!token || !phoneId) {
+    console.warn(`[WhatsApp deneme modu] ${phone}: ${body}`);
+    return { ok: true, dryRun: true };
+  }
+  const version = opts.env("WHATSAPP_API_VERSION") ?? "v23.0";
+  const res = await (opts.fetchFn ?? fetch)(`https://graph.facebook.com/${version}/${phoneId}/messages`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ messaging_product: "whatsapp", to: phone.replace(/\D/g, ""), type: "text", text: { body: body.slice(0, 4096) } }),
+  });
+  if (!res.ok) return { ok: false, error: `WhatsApp HTTP ${res.status}` };
+  return { ok: true };
+}

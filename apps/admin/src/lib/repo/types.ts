@@ -120,6 +120,17 @@ export interface Invoice {
   createdAt: string;
 }
 
+export interface Conversation {
+  id: string;
+  channel: "whatsapp" | "voice" | "app";
+  externalId: string;
+  status: "active" | "closed" | "handoff";
+  handoffReason: string | null;
+  lastMessageAt: string;
+  /** Yalnızca okunabilir metinler (araç çağrıları ve düşünme blokları hariç) */
+  transcript: Array<{ role: "user" | "assistant"; text: string }>;
+}
+
 export interface OrderFilter {
   statuses?: OrderStatus[];
   search?: string;
@@ -157,6 +168,9 @@ export interface AdminRepo {
   listInvoices(): Promise<Invoice[]>;
   createMonthlyInvoice(corporateAccountId: string, month: string): Promise<void>;
   retryInvoice(id: string): Promise<void>;
+  // Asistan
+  listConversations(): Promise<Conversation[]>;
+  closeConversation(id: string): Promise<void>;
   // Fiyatlar
   getPricing(): Promise<{ settings: PricingSettings; holidays: Holiday[]; updatedAt: string | null }>;
   savePricing(settings: PricingSettings): Promise<void>;

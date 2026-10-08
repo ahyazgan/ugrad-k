@@ -75,5 +75,5 @@ Ek: `iptal`, `sorunlu`
 - [x] Faz 4: Kurye uygulaması (iş kabul, konum, teslim fotoğrafı)
 - [x] Faz 5: Canlı takip linki + SMS/WhatsApp bildirimleri
 - [x] Faz 6: iyzico ödeme + otomatik e-arşiv fatura
-- [ ] Faz 7: Yapay zeka sesli asistan ve WhatsApp botu → aynı sipariş API'sine bağlanır
+- [x] Faz 7: Yapay zeka sesli asistan ve WhatsApp botu → aynı sipariş API'sine bağlanır
 - [ ] Faz 8: App Store / Google Play yayını

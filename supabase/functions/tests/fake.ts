@@ -5,7 +5,8 @@ import { HttpError } from "../_shared/http.ts";
 
 type Row = Record<string, unknown>;
 
-export function fakeDb(tables: Record<string, Row[]>) {
+// deno-lint-ignore no-explicit-any
+export function fakeDb(tables: Record<string, any>) {
   const inserted: Record<string, Row[]> = {};
   const updated: Record<string, Row[]> = {};
   const from = (table: string) => {
@@ -30,11 +31,26 @@ export function fakeDb(tables: Record<string, Row[]>) {
       gte: () => q,
       lt: () => q,
       limit: () => q,
-      insert: (row: Row) => {
-        insertRow = { id: "new-id", order_no: "YK-1000", status: "beklemede", tracking_token: "t".repeat(32), ...row };
-        (inserted[table] ??= []).push(insertRow);
+      insert: (row: Row | Row[]) => {
+        const rowsIn = Array.isArray(row) ? row : [row];
+        // assistant_inbound: message_id benzersiz
+        if (table === "assistant_inbound" && rowsIn.some((r) => (inserted[table] ?? []).some((x) => x.message_id === r.message_id))) {
+          const err = { data: null, error: { code: "23505", message: "duplicate" } };
+          return { ...q, then: (resolve: (v: unknown) => void) => resolve(err) };
+        }
+        for (const r of rowsIn) {
+          insertRow = { id: "new-id", order_no: "YK-1000", status: "beklemede", tracking_token: "t".repeat(32), messages: [], ...r };
+          (inserted[table] ??= []).push(insertRow);
+          (tables[table] ??= []).push(insertRow);
+        }
         return q;
       },
+      in: (col: string, vals: unknown[]) => {
+        rows = rows.filter((r) => vals.includes(r[col]));
+        return q;
+      },
+      order: () => q,
+      maybeSingle: () => Promise.resolve({ data: insertRow ?? rows[0] ?? null, error: null }),
       single: () =>
         Promise.resolve(
           insertRow
@@ -47,11 +63,17 @@ export function fakeDb(tables: Record<string, Row[]>) {
     };
     return q;
   };
-  const rpc = (name: string) => Promise.resolve({ data: tables[`rpc:${name}`] ?? [], error: null });
-  return { client: { from, rpc } as unknown as Ctx["admin"], inserted, updated };
+  const rpcCalls: Array<{ name: string; args: Row }> = [];
+  const rpc = (name: string, args: Row = {}) => {
+    rpcCalls.push({ name, args });
+    const v = tables[`rpc:${name}`];
+    return Promise.resolve({ data: typeof v === "function" ? (v as (a: Row) => unknown)(args) : (v ?? []), error: null });
+  };
+  return { client: { from, rpc } as unknown as Ctx["admin"], inserted, updated, rpcCalls };
 }
 
-export function fakeCtx(opts: { userId?: string | null; tables?: Record<string, Row[]> } = {}) {
+// deno-lint-ignore no-explicit-any
+export function fakeCtx(opts: { userId?: string | null; tables?: Record<string, any> } = {}) {
   const db = fakeDb(opts.tables ?? {});
   const ctx: Ctx = {
     maps: mockMapsProvider(),
@@ -62,5 +84,5 @@ export function fakeCtx(opts: { userId?: string | null; tables?: Record<string, 
         : Promise.resolve({ id: opts.userId ?? "u1" }),
     loadPricing: () => Promise.resolve({ settings: DEFAULT_PRICING_SETTINGS, holidays: [] }),
   };
-  return { ctx, inserted: db.inserted, updated: db.updated };
+  return { ctx, inserted: db.inserted, updated: db.updated, rpcCalls: db.rpcCalls };
 }

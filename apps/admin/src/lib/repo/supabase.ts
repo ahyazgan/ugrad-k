@@ -15,9 +15,11 @@ import {
   type AdminOrderDetail,
   type AdminRepo,
   type CorporateAccount,
+  type Conversation,
   type Courier,
   type Invoice,
 } from "./types";
+import { toTranscript } from "./transcript";
 
 // Supabase'den gelen tipsiz satırlar (şema tipi üretilene kadar)
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -344,6 +346,28 @@ export function createSupabaseRepo(url: string, anonKey: string): AdminRepo & { 
         await client.from("invoices").update({ status: "pending", attempts: 0, last_error: null }).eq("id", id),
         "Fatura yeniden kuyruğa alınamadı",
       );
+    },
+
+    async listConversations() {
+      const res = await client
+        .from("assistant_conversations")
+        .select("id, channel, external_id, status, handoff_reason, last_message_at, messages")
+        .order("last_message_at", { ascending: false })
+        .limit(100);
+      return (check(res, "Konuşmalar okunamadı") ?? []).map(
+        (r: Row): Conversation => ({
+          id: r.id,
+          channel: r.channel,
+          externalId: r.external_id,
+          status: r.status,
+          handoffReason: r.handoff_reason,
+          lastMessageAt: r.last_message_at,
+          transcript: toTranscript(r.messages ?? []),
+        }),
+      );
+    },
+    async closeConversation(id) {
+      check(await client.from("assistant_conversations").update({ status: "closed" }).eq("id", id), "Kapatılamadı");
     },
 
     async getPricing() {
