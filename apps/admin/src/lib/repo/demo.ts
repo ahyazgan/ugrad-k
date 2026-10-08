@@ -37,6 +37,7 @@ import {
   type CourierPayout,
   type EarningRow,
   type PromoCodeRow,
+  type ReadinessItem,
   type Conversation,
   type Customer,
   type Invoice,
@@ -793,6 +794,30 @@ export function createDemoRepo(): AdminRepo {
         },
         issues,
       };
+    },
+    async getReadiness() {
+      // Demo: Supabase bağlı değil, tüm dış servisler sahte sağlayıcıyla çalışır
+      const s = await get();
+      const items: ReadinessItem[] = [
+        { key: "supabase", group: "Servisler", label: "Supabase (veritabanı)", status: "eksik", detail: "DEMO modu: veriler tarayıcıda, kalıcı değil", doc: "§1" },
+        { key: "maps", group: "Servisler", label: "Google Maps (adres ve rota)", status: "eksik", detail: "Sahte harita: örnek adresler ve kuş uçuşu mesafe", doc: "§3" },
+        { key: "sms", group: "Servisler", label: "SMS (Netgsm)", status: "eksik", detail: "SMS gönderilmiyor (deneme modu)", doc: "§4" },
+        { key: "whatsapp", group: "Servisler", label: "WhatsApp Business", status: "uyari", detail: "WhatsApp kapalı, SMS'e düşer", doc: "§8" },
+        { key: "payment", group: "Servisler", label: "Kartla ödeme (iyzico)", status: "uyari", detail: "Test ortamı (sandbox): gerçek para çekilmez", doc: "§9" },
+        { key: "invoice", group: "Servisler", label: "e-Arşiv / e-Fatura (Paraşüt)", status: "eksik", detail: "Faturalar kesilmiyor (sahte entegratör)", doc: "§10" },
+        { key: "job:notify-dispatch", group: "Zamanlanmış görevler", label: "notify-dispatch", status: "ok", detail: "Çalışıyor", doc: "§6" },
+        { key: "job:courier-earnings", group: "Zamanlanmış görevler", label: "courier-earnings", status: "eksik", detail: "Hiç çalışmadı: cron kaydını ekleyin", doc: "§6" },
+        { key: "cost", group: "Ayarlar", label: "Kurye ödeme modeli", status: "uyari", detail: "Varsayılan öneri değerler kullanılıyor; kuryelerle anlaştığınız rakamları girin (Fiyatlar)", doc: "§23" },
+        {
+          key: "couriers",
+          group: "Operasyon",
+          label: "Belgeleri tam aktif kurye",
+          status: "ok",
+          detail: `${s.couriers.filter((c) => c.active).length} aktif kurye`,
+          doc: "§24",
+        },
+      ];
+      return { items, ready: !items.some((i) => i.status === "eksik") };
     },
     async runDispatch() {
       const s = await get();

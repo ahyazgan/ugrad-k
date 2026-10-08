@@ -344,6 +344,22 @@ export interface SystemHealth {
   issues: Array<{ key: string; severity: "critical" | "warning"; message: string }>;
 }
 
+export interface ReadinessItem {
+  key: string;
+  group: "Servisler" | "Zamanlanmış görevler" | "Ayarlar" | "Operasyon";
+  label: string;
+  status: "ok" | "uyari" | "eksik";
+  detail: string;
+  /** docs/kurulum.md bölümü */
+  doc?: string;
+}
+
+export interface Readiness {
+  items: ReadinessItem[];
+  /** "eksik" madde yoksa true */
+  ready: boolean;
+}
+
 export interface OrderRating {
   orderId: string;
   orderNo: string;
@@ -435,6 +451,8 @@ export interface AdminRepo {
   saveOpsSettings(s: OpsSettings): Promise<void>;
   runDispatch(): Promise<DispatchResult>;
   getSystemHealth(): Promise<SystemHealth>;
+  /** Canlıya hazırlık denetimi (readiness fonksiyonu); gizli değer döndürmez */
+  getReadiness(): Promise<Readiness>;
   // Telefon siparişi
   searchPlaces(input: string, sessionToken: string): Promise<PlaceSuggestion[]>;
   placeDetails(placeId: string, sessionToken: string): Promise<PlaceDetails>;

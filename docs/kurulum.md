@@ -27,6 +27,12 @@ Kodun tamamı yazıldı ve testlerden geçti. Bu rehber, sistemi **gerçek hesap
 20. [E-postayla sipariş (Postmark)](#20-e-postayla-sipariş)
 21. [Kurumsal API ve webhook](#21-kurumsal-api-ve-webhook)
 22. [Sistem izleme ve kesinti alarmı](#22-sistem-izleme)
+23. [Kurye hakedişi ve nakit tahsilatı](#23-kurye-hakedişi-ve-nakit-tahsilatı)
+24. [Kurye belgeleri ve uyum](#24-kurye-belgeleri-ve-uyum)
+25. [Acil teslim taahhüdü ve tahmini varış](#25-acil-teslim-taahhüdü-60-dk-ve-tahmini-varış)
+26. [Değerli gönderiler](#26-değerli-gönderiler-değer-beyanı-ve-teslim-kodu)
+27. [Kampanya, davet ve geri kazanma](#27-kampanya-davet-ve-geri-kazanma)
+28. [Canlıya alma: hazırlık denetimi, yedek, deneme ortamı](#28-canlıya-alma)
 
 ---
 
@@ -280,6 +286,12 @@ Buradaki kodlar birim/uçtan uca testlerle doğrulandı, ancak dış servislere 
 - [ ] Kurumsal API: test anahtarıyla `/api/v1/ping`, sipariş aç, webhook'un imzasını doğrula
 - [ ] Değerlendirme: teslim SMS'indeki bağlantıdan puan; 5 puanda Google yorum sayfası açılıyor mu
 - [ ] Kesinti izleyicisi (UptimeRobot) kuruldu, test alarmı geldi
+- [ ] Kurye hakedişi: gerçek ödeme modeli girildi (Fiyatlar), bir haftalık hesaplaşma kuryeyle karşılaştırıldı
+- [ ] Kurye belgeleri: tüm kuryelerin zorunlu belgeleri bitiş tarihleriyle girildi
+- [ ] Acil taahhüt: gecikme uyarısı (`acil_gecikme`) ve telafi kredisi bir deneme siparişinde görüldü
+- [ ] Teslim kodu: alıcıya kodlu SMS/WhatsApp geldi, kurye kodu doğrulayıp teslim etti
+- [ ] Sigorta poliçesi değer beyanı sınırını karşılıyor; geri kazanma açılmadan önce İYS kaydı yapıldı
+- [ ] Panel → Otomasyon → **Canlıya hazırlık**: "eksik" madde kalmadı (§28)
 
 ## 15. Tüm ortam değişkenleri
 
@@ -414,3 +426,14 @@ Kayıtlı müşteriler `siparis@<alan adı>` adresine yazar; yapay zeka asistan�
 - **Geri kazanma**: varsayılan **kapalı**. Açılırsa §6 `geri-kazanma` görevi günde bir kez, **ticari ileti onayı veren**, en az bir teslimatı olan ve belirlenen gün kadar sipariş vermeyen bireysel müşterilere kişiye özel, tek kullanımlık, 14 gün geçerli indirim kodu gönderir (aynı kişiye en fazla 60 günde bir).
   - **Yasal**: ticari elektronik ileti için **İYS (iys.org.tr)** kaydı ve izin yüklemesi zorunludur; SMS sağlayıcınızda (Netgsm) İYS entegrasyonunu açın. WhatsApp şablonu *Marketing* kategorisinde onaylanmalıdır.
   - Müşteri "RET" yazarsa onayı kaldırılır ve bir daha kampanya mesajı gitmez (sipariş bilgilendirmeleri devam eder).
+
+## 28. Canlıya alma
+
+- **Hazırlık denetimi**: panel → Otomasyon → *Canlıya hazırlık* (`readiness` Edge Function, yalnız yönetici). Hangi servisin gerçek, hangisinin sahte (deneme) sağlayıcıyla çalıştığını, iyzico'nun test ortamında olup olmadığını, zamanlanmış görevlerin son çalışmasını, tarife / kurye ödeme modeli / gelecek yıl tatillerinin girilip girilmediğini ve belgeleri tam kurye sayısını gösterir. Gizli anahtarların değerini asla göstermez, yalnız "var/yok". **"Eksik" madde kalmadan gerçek müşteri almayın**; "uyarı" maddeleri bilinçli bırakılabilir (ör. WhatsApp yokken SMS).
+- **Deneme ortamı (staging)**: ikinci bir ücretsiz Supabase projesi açın, aynı migration'ları ve fonksiyonları oraya yükleyin (§1). Deneme projesinde iyzico **sandbox**, Netgsm yerine boş bırakılmış SMS (deneme modu) kullanın; panelin ikinci bir Vercel ortamını (Preview) bu projeye bağlayın. Fiyat veya otomasyon değişikliğini önce orada deneyin.
+- **Yedekleme**:
+  - Supabase Pro planı günlük yedek alır (7 gün). Gerçek müşteri verisi için **PITR** (anlık geri dönüş) eklentisini açın: Dashboard → Database → Backups.
+  - Ek olarak haftada bir dış kopya: `npx supabase db dump --data-only -f yedek-$(date +%F).sql` (bilgisayarınızda; dosya kişisel veri içerir, şifreli diskte saklayın, 2 yıldan eski kopyaları silin — KVKK saklama süresi).
+  - Teslim fotoğrafları ve belgeler Storage'dadır; veritabanı yedeğine dahil değildir. Gerekirse `supabase storage` ile ayda bir indirin.
+- **Hata izleme**: Edge Function hataları Supabase → Edge Functions → Logs'ta; panel/web hataları Vercel → Logs'ta. Önemli sorunlar zaten yöneticiye mesajla gelir (§22). Daha fazlası istenirse Supabase *Log Drains* ile bir log servisine (ör. Better Stack) aktarılabilir.
+- **Geri alma**: kötü bir sürümde panel için Vercel → Deployments → önceki sürüm → *Promote*; fonksiyonlar için önceki commit'e dönüp `pnpm deploy:functions`. Veritabanı migration'ları geri alınmaz; düzeltme yeni migration ile yapılır.

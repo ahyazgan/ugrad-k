@@ -35,6 +35,7 @@ import {
   type PhoneCustomer,
   type ApiKeyInfo,
   type OrderRating,
+  type Readiness,
   type SystemHealth,
   type WebhookDelivery,
 } from "./types";
@@ -533,6 +534,7 @@ export function createSupabaseRepo(url: string, anonKey: string): AdminRepo & { 
     },
     runDispatch: () => invoke<DispatchResult>("auto-dispatch", {}),
     getSystemHealth: () => invoke<SystemHealth>("health", {}),
+    getReadiness: () => invoke<Readiness>("readiness", {}),
 
     async searchPlaces(input, sessionToken) {
       return (await invoke<{ suggestions: PlaceSuggestion[] }>("places", { input, sessionToken })).suggestions;

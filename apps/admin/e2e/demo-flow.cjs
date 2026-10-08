@@ -196,6 +196,11 @@ fs.mkdirSync(out, { recursive: true });
   console.log("DAGITIM", res);
   if (!/\d+ sipariş kuryeye atandı/.test(res) || /^0 sipariş onaylandı · 0 sipariş kuryeye/.test(res)) throw new Error("dağıtım bir şey yapmadı: " + res);
   await page.getByTestId("system-health").getByText("Fatura kesimi").waitFor();
+  // Canlıya hazırlık: demo'da servisler sahte → eksik; ayrıntılarda kurye hakedişi görevi adıyla
+  if (!/eksik/.test(await page.getByTestId("readiness-summary").innerText())) throw new Error("hazırlık özeti eksik göstermedi");
+  await page.getByTestId("readiness-toggle").click();
+  await page.getByTestId("ready-job:courier-earnings").getByText("Kurye hakedişi").waitFor();
+  await page.getByTestId("ready-cost").getByText("§23", { exact: false }).waitFor();
   await shot("06d-otomasyon");
 
   // ───── Canlı harita: kurye ve sipariş işaretleri, açılır kutu, odaklama

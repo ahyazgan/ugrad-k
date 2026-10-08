@@ -4,7 +4,7 @@ import { ageLabel } from "@yazgan/shared";
 import Link from "next/link";
 import { useState, type FormEvent } from "react";
 import { Button, Card, ErrorText, Input, PageHeader } from "@/components/ui";
-import { repo, type DispatchResult, type OpsSettings } from "@/lib/repo";
+import { repo, type DispatchResult, type OpsSettings, type ReadinessItem } from "@/lib/repo";
 import { useLoad } from "@/lib/use-load";
 
 const NUMBERS: Array<{ key: keyof OpsSettings; label: string; hint: string }> = [
@@ -67,6 +67,7 @@ export default function OtomasyonPage() {
         </Card>
       ) : null}
       <SystemHealthCard />
+      <ReadinessCard />
       {data ? <OpsForm key={JSON.stringify(data)} initial={data} onSaved={reload} /> : null}
     </>
   );
@@ -127,6 +128,80 @@ function SystemHealthCard() {
               })}
             </tbody>
           </table>
+        </div>
+      ) : null}
+    </Card>
+  );
+}
+
+const READY_ICON: Record<ReadinessItem["status"], { mark: string; cls: string; label: string }> = {
+  ok: { mark: "✓", cls: "text-emerald-700", label: "Hazır" },
+  uyari: { mark: "!", cls: "text-amber-700", label: "Uyarı" },
+  eksik: { mark: "✗", cls: "text-red-700", label: "Eksik" },
+};
+
+/** Canlıya hazırlık: hangi servis gerçek, hangisi sahte; cron ve ayarlar (readiness fonksiyonu, gizli değer göstermez) */
+function ReadinessCard() {
+  const [open, setOpen] = useState(false);
+  const { data, error, reload } = useLoad(() => repo.getReadiness());
+  const groups = data ? [...new Set(data.items.map((i) => i.group))] : [];
+  const missing = data?.items.filter((i) => i.status === "eksik").length ?? 0;
+  const warn = data?.items.filter((i) => i.status === "uyari").length ?? 0;
+  return (
+    <Card
+      className="mb-6"
+      title="Canlıya hazırlık"
+      actions={
+        <div className="flex gap-2">
+          <Button variant="ghost" onClick={() => setOpen(!open)} data-testid="readiness-toggle">
+            {open ? "Gizle" : "Ayrıntılar"}
+          </Button>
+          <Button variant="ghost" onClick={reload}>
+            Yenile
+          </Button>
+        </div>
+      }
+    >
+      <ErrorText>{error}</ErrorText>
+      {data ? (
+        <div data-testid="readiness">
+          <p className={`text-sm font-semibold ${data.ready ? "text-emerald-700" : "text-red-700"}`} data-testid="readiness-summary">
+            {data.ready ? "✓ Canlıya hazır" : `✗ ${missing} eksik`}
+            {warn ? <span className="font-normal text-amber-700"> · {warn} uyarı</span> : null}
+          </p>
+          <p className="mt-1 text-xs text-slate-500">
+            Eksik servisler sahte (deneme) sağlayıcıyla çalışır; gerçek müşteri almadan önce tamamlayın. Bölüm numaraları docs/kurulum.md&apos;yi gösterir.
+          </p>
+          {open ? (
+            <div className="mt-4 grid gap-4 md:grid-cols-2">
+              {groups.map((g) => (
+                <div key={g}>
+                  <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">{g}</h3>
+                  <ul className="space-y-1 text-sm">
+                    {data.items
+                      .filter((i) => i.group === g)
+                      .map((i) => {
+                        const icon = READY_ICON[i.status];
+                        return (
+                          <li key={i.key} data-testid={`ready-${i.key}`} className="flex gap-2">
+                            <span className={`w-4 shrink-0 font-bold ${icon.cls}`} aria-label={icon.label}>
+                              {icon.mark}
+                            </span>
+                            <span>
+                              <span className="text-slate-900">{JOB_LABELS[i.label] ?? i.label}</span>
+                              <span className="block text-xs text-slate-500">
+                                {i.detail}
+                                {i.doc ? ` · ${i.doc}` : ""}
+                              </span>
+                            </span>
+                          </li>
+                        );
+                      })}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          ) : null}
         </div>
       ) : null}
     </Card>

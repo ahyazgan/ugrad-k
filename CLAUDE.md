@@ -74,14 +74,14 @@ Ek: `iptal`, `sorunlu`
 - `apps/mobile/` — Expo SDK 57 + expo-router (`src/app/`). Supabase env yoksa **DEMO modu** (sahte veri, kod 123456). `pnpm --filter @yazgan/mobile e2e:web` tarayıcıda tam akışı test eder
 - `apps/admin/` — Next.js 16 + Tailwind 4 panel. Supabase env yoksa **DEMO modu** (admin@yazgankurye.com / demo1234). Kurye hesabı oluşturma `/api/kuryeler` (service role yalnız sunucuda). `pnpm --filter @yazgan/admin e2e:web`
 - Herkese açık Edge Functions: `site-api` (fiyat/adres/başvuru/kurye başvurusu/değerlendirme; IP hız sınırı `hit_rate_limit`), `api` (kurumsal REST, `yk_live_` anahtar SHA-256), `email-inbound` (Postmark → asistan, SPF/DKIM + kayıtlı müşteri), `health` (GET ayrıntısız; cron uyarı), `webhook-dispatch` (HMAC imzalı kurumsal webhook kuyruğu)
-- Edge Functions: auto-dispatch (otomatik onay + kurye atama, `packages/shared/assignment.ts`), admin-order (telefon siparişi), quote, create-order, places, send-sms, reprice-order, notify-dispatch, payment-init/callback/refund, invoice-dispatch/monthly, whatsapp-webhook, assistant-voice, account-delete
+- Edge Functions: auto-dispatch (otomatik onay + kurye atama, `packages/shared/assignment.ts`), admin-order (telefon siparişi), quote, create-order, places, send-sms, reprice-order, notify-dispatch, payment-init/callback/refund, invoice-dispatch/monthly, whatsapp-webhook, assistant-voice, account-delete, courier-earnings, winback (günlük, varsayılan kapalı), readiness (yalnız yönetici; canlıya hazırlık denetimi, gizli değer döndürmez)
 - Kurye hakedişi: `cost_settings` (ödeme modeli = maliyet modeli, `packages/shared/cost.ts` `courierEarning`), `courier_earnings` (Edge Function `courier-earnings`, 5 dk cron), `courier_payouts` (RPC `create_courier_payout`/`cancel_courier_payout`). Kuryeye ödemeli siparişte teslimde `cash_collection` (nakit/iban/alinmadi) zorunlu; nakit hakedişten düşülür. Panel `/hakedis`, kurye uygulaması Kazancım sekmesi. docs/kurulum.md §23
 - Kurye belgeleri: `courier_document_types` (= `packages/shared/compliance.ts` `COURIER_DOCUMENT_TYPES`, schema-sync testi), `courier_documents`, bucket `courier-docs`. `ops_settings.enforce_courier_documents` açıkken zorunlu belgesi eksik/süresi dolmuş kurye `start_shift` ile vardiyaya giremez, auto-dispatch iş vermez; süresi dolan/yaklaşan belgeler `system_health` uyarısı. docs/kurulum.md §24
 - Operasyon ayarları `ops_settings` (panel → Otomasyon): otomatik onay/atama, kapasite, mesafe, ödeme süresi
 - Kuyruklar (outbox): `notifications` ve `invoices` tabloları; dakikalık cron ile işlenir (docs/kurulum.md §6)
 - Yapay zeka asistanı: `supabase/functions/_shared/assistant.ts` (Claude, araçlar aynı sipariş API'sini kullanır; geçmiş yalnızca sona eklenir)
 - Panel: Raporlar (`/raporlar`, `lib/reports.ts`, CSV `;` + ondalık virgül), Canlı harita (`/harita`, Leaflet + OSM; karo URL'si env ile değişir). E2E'de harita karoları `scripts/e2e-tile-stub.cjs` ile sahte PNG'den gelir
-- Kurulum ve canlıya alma: `docs/kurulum.md`; mağaza: `docs/magaza.md`
+- Kurulum ve canlıya alma: `docs/kurulum.md` (§28: panel → Otomasyon → Canlıya hazırlık, yedek, deneme ortamı); mağaza: `docs/magaza.md`
 - `pnpm test` (vitest), `pnpm test:functions` (Deno), `pnpm test:db` (yerel Postgres'te migration + RLS), `pnpm test:all`
 - Google'ın eski Distance Matrix/Places API'leri yeni projelerde açılamıyor → **Routes API** ve **Places API (New)** kullanılıyor
 
@@ -101,4 +101,5 @@ Ek: `iptal`, `sorunlu`
 - [x] Değerli gönderi: değer beyanı sigortası + teslim kodu (2026-10-08)
 - [x] Müşteri büyütme: kampanya kodları, davet ödülü, geri kazanma (İYS onaylı, varsayılan kapalı) (2026-10-08)
 - [x] ETA ve 60 dk acil taahhüdü (2026-10-08): `packages/shared/eta.ts`, `orders.sla_due_at` (tetikleyici), auto-dispatch erken uyarı (`_shared/sla.ts`), kaçan taahhütte `customer_credits` → sonraki siparişte "credit" satırı (`_shared/credits.ts`). docs/kurulum.md §25
+- [x] Canlıya alma hazırlığı (2026-10-08): `readiness` denetimi + panel kartı, yedek/deneme ortamı/geri alma rehberi (docs/kurulum.md §28)
 - [x] Ek geliştirmeler (2026-10-09): panelden telefon siparişi, otomatik onay + kurye atama, ödenmemiş kart siparişi iptali, kademeli km + %75 ek ücret tavanı (panelden tek tıkla eski tarifeye dönüş), raporlar + CSV, canlı haritalar (panel, takip sayfası, müşteri ve kurye uygulaması)
