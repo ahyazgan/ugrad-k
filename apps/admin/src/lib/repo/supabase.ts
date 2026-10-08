@@ -21,7 +21,9 @@ import {
   type DispatchResult,
   type Conversation,
   type Courier,
+  type CourierApplication,
   type Invoice,
+  type Lead,
   type PhoneCustomer,
 } from "./types";
 import { toTranscript } from "./transcript";
@@ -240,7 +242,9 @@ export function createSupabaseRepo(url: string, anonKey: string): AdminRepo & { 
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${await accessToken()}` },
         body: JSON.stringify(input),
       });
-      if (!res.ok) throw new RepoError((await res.json().catch(() => ({}))).error ?? "Kurye eklenemedi");
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new RepoError(data.error ?? "Kurye eklenemedi");
+      return { id: data.id as string };
     },
     async updateCourier(id, patch) {
       check(
@@ -424,6 +428,76 @@ export function createSupabaseRepo(url: string, anonKey: string): AdminRepo & { 
     async createPhoneOrder(input) {
       const r = await invoke<{ order: { id: string; order_no: string } }>("admin-order", { action: "create", ...input });
       return { id: r.order.id, orderNo: r.order.order_no };
+    },
+
+    // ───────── Başvurular
+    async listLeads() {
+      const rows = check(await client.from("leads").select("*").order("created_at", { ascending: false }).limit(300), "Başvurular okunamadı") ?? [];
+      return rows.map(
+        (r: Row): Lead => ({
+          id: r.id,
+          kind: r.kind,
+          companyName: r.company_name,
+          contactName: r.contact_name,
+          phone: r.phone,
+          email: r.email,
+          monthlyVolume: r.monthly_volume,
+          message: r.message,
+          sourcePage: r.source_page,
+          status: r.status,
+          adminNote: r.admin_note,
+          createdAt: r.created_at,
+        }),
+      );
+    },
+    async updateLead(id, patch) {
+      check(await client.from("leads").update({ status: patch.status, admin_note: patch.adminNote }).eq("id", id), "Başvuru güncellenemedi");
+    },
+    async listCourierApplications() {
+      const rows =
+        check(await client.from("courier_applications").select("*").order("created_at", { ascending: false }).limit(300), "Kurye başvuruları okunamadı") ?? [];
+      return rows.map(
+        (r: Row): CourierApplication => ({
+          id: r.id,
+          fullName: r.full_name,
+          phone: r.phone,
+          email: r.email,
+          district: r.district,
+          birthYear: r.birth_year,
+          licenseClass: r.license_class,
+          hasMotorcycle: r.has_motorcycle,
+          plate: r.plate,
+          vehicleModel: r.vehicle_model,
+          experienceYears: r.experience_years,
+          availability: r.availability,
+          message: r.message,
+          documents: r.documents ?? [],
+          status: r.status,
+          adminNote: r.admin_note,
+          courierId: r.courier_id,
+          createdAt: r.created_at,
+        }),
+      );
+    },
+    async updateCourierApplication(id, patch) {
+      check(
+        await client.from("courier_applications").update({ status: patch.status, admin_note: patch.adminNote }).eq("id", id),
+        "Başvuru güncellenemedi",
+      );
+    },
+    async approveCourierApplication(id, input) {
+      const { data: a } = await client.from("courier_applications").select("full_name, phone").eq("id", id).single();
+      if (!a) throw new RepoError("Başvuru bulunamadı");
+      const { id: courierId } = await this.createCourier({ fullName: a.full_name, phone: a.phone, plate: input.plate, vehicleModel: input.vehicleModel });
+      check(
+        await client.from("courier_applications").update({ status: "onaylandi", courier_id: courierId, plate: input.plate }).eq("id", id),
+        "Başvuru güncellenemedi",
+      );
+      return { courierId };
+    },
+    async applicationDocumentUrl(path) {
+      const { data } = await client.storage.from("basvuru").createSignedUrl(path, 600);
+      return data?.signedUrl ?? null;
     },
 
     async listConversations() {

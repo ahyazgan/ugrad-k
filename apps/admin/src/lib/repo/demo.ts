@@ -33,6 +33,8 @@ import {
   type OpsSettings,
   type PhoneCustomer,
   type Shift,
+  type CourierApplication,
+  type Lead,
 } from "./types";
 
 const DEMO_EMAIL = "admin@yazgankurye.com";
@@ -52,6 +54,8 @@ interface State {
   ops: OpsSettings;
   /** KVKK onayı verilmiş müşteri kimlikleri */
   consented: Set<string>;
+  leads: Lead[];
+  applications: CourierApplication[];
 }
 
 const phoneDigits = (p: string) => p.replace(/\D/g, "").replace(/^(90|0)/, "");
@@ -237,6 +241,81 @@ async function seed(): Promise<State> {
       unassignedAlertMinutes: 10,
     },
     consented: new Set(["cus-1", "cus-2", "cus-3"]),
+    leads: [
+      {
+        id: "lead-1",
+        kind: "kurumsal",
+        companyName: "Kadıköy Mali Müşavirlik",
+        contactName: "Selin Arslan",
+        phone: "+902163334455",
+        email: "selin@ornek-mm.com",
+        monthlyVolume: "20-50",
+        message: "Ayda 30 civarı vergi dairesi ve SGK evrakımız var.",
+        sourcePage: "/kurumsal",
+        status: "yeni",
+        adminNote: null,
+        createdAt: hoursAgo(2),
+      },
+      {
+        id: "lead-2",
+        kind: "iletisim",
+        companyName: null,
+        contactName: "Burak Çelik",
+        phone: "+905301234567",
+        email: null,
+        monthlyVolume: null,
+        message: "Hafta sonu çalışıyor musunuz?",
+        sourcePage: "/iletisim",
+        status: "arandi",
+        adminNote: "Cumartesi de çalıştığımızı söyledim.",
+        createdAt: hoursAgo(30),
+      },
+    ],
+    applications: [
+      {
+        id: "app-1",
+        fullName: "Okan Yıldız",
+        phone: "+905441112233",
+        email: null,
+        district: "Ümraniye",
+        birthYear: 1996,
+        licenseClass: "A2",
+        hasMotorcycle: true,
+        plate: "34 OKN 34",
+        vehicleModel: "Yamaha NMAX 125",
+        experienceYears: 3,
+        availability: "tam_zamanli",
+        message: "Daha önce yemek kuryeliği yaptım.",
+        documents: [
+          { kind: "ehliyet_on", path: "app-1/ehliyet_on.jpg" },
+          { kind: "ruhsat", path: "app-1/ruhsat.pdf" },
+        ],
+        status: "yeni",
+        adminNote: null,
+        courierId: null,
+        createdAt: hoursAgo(5),
+      },
+      {
+        id: "app-2",
+        fullName: "Murat Ak",
+        phone: "+905467778899",
+        email: null,
+        district: "Kartal",
+        birthYear: 1990,
+        licenseClass: "A",
+        hasMotorcycle: false,
+        plate: null,
+        vehicleModel: null,
+        experienceYears: 6,
+        availability: "yari_zamanli",
+        message: null,
+        documents: [],
+        status: "gorusme",
+        adminNote: "Perşembe 14:00 görüşme",
+        courierId: null,
+        createdAt: hoursAgo(50),
+      },
+    ],
     settings: { ...DEFAULT_PRICING_SETTINGS },
     holidays: (holidaysJson as Array<{ date: string; name: string; half_day: boolean }>).map((h) => ({
       date: h.date,
@@ -424,6 +503,7 @@ export function createDemoRepo(): AdminRepo {
         lastLocationAt: null,
         activeOrderCount: 0,
       });
+      return { id: s.couriers[s.couriers.length - 1]!.id };
     },
     async updateCourier(id, patch) {
       const c = (await get()).couriers.find((x) => x.id === id);
@@ -700,6 +780,39 @@ export function createDemoRepo(): AdminRepo {
       return { id: o.id, orderNo: o.orderNo };
     },
 
+    async listLeads() {
+      return clone((await get()).leads);
+    },
+    async updateLead(id, patch) {
+      const l = (await get()).leads.find((x) => x.id === id);
+      if (!l) throw new RepoError("Başvuru bulunamadı");
+      if (patch.status) l.status = patch.status;
+      if (patch.adminNote !== undefined) l.adminNote = patch.adminNote;
+    },
+    async listCourierApplications() {
+      return clone((await get()).applications);
+    },
+    async updateCourierApplication(id, patch) {
+      const a = (await get()).applications.find((x) => x.id === id);
+      if (!a) throw new RepoError("Başvuru bulunamadı");
+      if (patch.status) a.status = patch.status;
+      if (patch.adminNote !== undefined) a.adminNote = patch.adminNote;
+    },
+    async approveCourierApplication(id, input) {
+      const a = (await get()).applications.find((x) => x.id === id);
+      if (!a) throw new RepoError("Başvuru bulunamadı");
+      if (!input.plate.trim()) throw new RepoError("Plaka zorunlu");
+      const { id: courierId } = await this.createCourier({ fullName: a.fullName, phone: a.phone, plate: input.plate, vehicleModel: input.vehicleModel });
+      a.status = "onaylandi";
+      a.courierId = courierId;
+      a.plate = input.plate;
+      return { courierId };
+    },
+    async applicationDocumentUrl(path) {
+      // Demo: gerçek dosya yok, yer tutucu görsel
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="480" height="300"><rect width="100%" height="100%" fill="#e7eef6"/><text x="50%" y="50%" text-anchor="middle" font-family="sans-serif" font-size="18" fill="#0f3d6e">Demo belge: ${path}</text></svg>`;
+      return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+    },
     async listConversations() {
       return clone((await get()).conversations);
     },

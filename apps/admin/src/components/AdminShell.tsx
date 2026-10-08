@@ -14,6 +14,7 @@ const NAV = [
   { href: "/kuryeler", label: "Kuryeler" },
   { href: "/vardiyalar", label: "Çalışma saatleri (BTK)" },
   { href: "/musteriler", label: "Müşteriler" },
+  { href: "/basvurular", label: "Başvurular" },
   { href: "/kurumsal", label: "Kurumsal & fatura" },
   { href: "/faturalar", label: "Faturalar" },
   { href: "/asistan", label: "Asistan konuşmaları" },

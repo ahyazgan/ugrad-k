@@ -16,7 +16,7 @@ fs.mkdirSync(out, { recursive: true });
   page.on("pageerror", (e) => errors.push(e.message));
   page.on("console", (m) => m.type() === "error" && errors.push(m.text()));
   const shot = (n) => page.screenshot({ path: `${out}/${n}.png`, fullPage: true });
-  const nav = (label) => page.getByRole("link", { name: label, exact: true }).click();
+  const nav = (label) => page.getByRole("navigation").getByRole("link", { name: label, exact: true }).click();
 
   await page.goto(base + "/");
   await page.waitForURL("**/giris");
@@ -94,6 +94,19 @@ fs.mkdirSync(out, { recursive: true });
   await page.getByRole("button", { name: "Kurye ekle" }).click();
   await page.getByText("Can Test").waitFor();
   await shot("04-kuryeler");
+
+  // ───── Başvurular: web sitesinden gelen müşteri ve kurye başvuruları
+  await nav("Başvurular");
+  await page.getByText("Kadıköy Mali Müşavirlik").waitFor();
+  await page.getByTestId("lead-lead-1").getByLabel("Durum").selectOption("arandi");
+  await page.getByRole("tab", { name: "Kurye başvuruları" }).click();
+  await page.getByTestId("application-app-1").waitFor();
+  await page.getByRole("button", { name: "Ehliyet (ön)" }).waitFor();
+  await shot("04b-basvurular");
+  await page.getByTestId("approve-app-1").click();
+  await page.getByText("Kurye hesabı açıldı.").waitFor();
+  await nav("Kuryeler");
+  await page.getByText("Okan Yıldız").waitFor();
 
   await nav("Çalışma saatleri (BTK)");
   await page.getByRole("heading", { name: "Kurye çalışma saatleri" }).waitFor();

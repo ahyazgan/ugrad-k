@@ -4,6 +4,7 @@ import { buildQuote, parseOrderRequest } from "../../../packages/shared/index.ts
 import { alertAdmins } from "./alerts.ts";
 import type { Env } from "./channels.ts";
 import type { Ctx } from "./context.ts";
+import { phoneKey } from "./customers.ts";
 import { quoteResponse } from "./handlers.ts";
 import { HttpError, json, readJson } from "./http.ts";
 
@@ -14,6 +15,7 @@ export const SITE_LIMITS = {
   quote: { perIp: 30, windowSeconds: 600 },
   places: { perIp: 150, windowSeconds: 600 },
   lead: { perIp: 5, windowSeconds: 3600 },
+  courierApply: { perIp: 3, windowSeconds: 3600 },
   /** Tüm ziyaretçiler için günlük üst sınır (Google faturasını sınırlar) */
   quotePerDay: 3000,
 };
@@ -106,7 +108,89 @@ export async function handleSite(req: Request, ctx: Ctx, deps: { env: Env; fetch
       ).catch((e) => console.error("lead alert", e));
       return json({ ok: true });
     }
+    case "courier-apply": {
+      await rateLimit(ctx, `site:courier:${ip}`, SITE_LIMITS.courierApply.perIp, SITE_LIMITS.courierApply.windowSeconds);
+      return json(await courierApply(ctx, (body.application ?? {}) as Body, deps));
+    }
     default:
       throw new HttpError(400, "Bilinmeyen işlem");
   }
+}
+
+export const APPLICATION_DOCS = {
+  ehliyet_on: "Ehliyet (ön yüz)",
+  ehliyet_arka: "Ehliyet (arka yüz)",
+  ruhsat: "Motosiklet ruhsatı",
+  vesikalik: "Vesikalık fotoğraf",
+} as const;
+const DOC_EXT = ["jpg", "jpeg", "png", "webp", "heic", "pdf"];
+
+/** Kurye başvurusu: kaydı oluşturur ve belgeler için tek kullanımlık imzalı yükleme adresleri döner. */
+async function courierApply(ctx: Ctx, a: Body, deps: { env: Env; fetchFn?: typeof fetch }) {
+  if (typeof a.website === "string" && a.website.trim()) return { id: null, uploads: [] }; // bal küpü
+  if (a.kvkkConsent !== true) throw new HttpError(400, "Aydınlatma metnini onaylamanız gerekiyor", "kvkkConsent");
+  const year = new Date().getUTCFullYear();
+  const birthYear = a.birthYear == null || a.birthYear === "" ? null : Number(a.birthYear);
+  if (birthYear != null && (!Number.isInteger(birthYear) || birthYear < 1940 || birthYear > year - 18)) {
+    throw new HttpError(400, "Başvuru için 18 yaşını doldurmuş olmalısınız", "birthYear");
+  }
+  const exp = a.experienceYears == null || a.experienceYears === "" ? null : Number(a.experienceYears);
+  if (exp != null && (!Number.isInteger(exp) || exp < 0 || exp > 60)) throw new HttpError(400, "Deneyim yılı geçersiz", "experienceYears");
+  const availability = ["tam_zamanli", "yari_zamanli", "hafta_sonu"].includes(a.availability) ? a.availability : null;
+  const email = text(a.email, 200, "email");
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new HttpError(400, "Geçerli bir e-posta girin", "email");
+
+  const docs = (Array.isArray(a.documents) ? a.documents : []).slice(0, 4) as Body[];
+  const documents = docs.map((d) => {
+    if (!(d?.kind in APPLICATION_DOCS)) throw new HttpError(400, "Belge türü geçersiz", "documents");
+    const ext = String(d.ext ?? "").toLowerCase();
+    if (!DOC_EXT.includes(ext)) throw new HttpError(400, "Belge JPG, PNG veya PDF olmalı", "documents");
+    return { kind: d.kind as keyof typeof APPLICATION_DOCS, path: "", ext };
+  });
+  if (new Set(documents.map((d) => d.kind)).size !== documents.length) throw new HttpError(400, "Aynı belge iki kez yüklenemez", "documents");
+
+  const row = {
+    full_name: text(a.fullName, 120, "fullName", true),
+    phone: `+${phoneKey(String(a.phone ?? ""))}`,
+    email,
+    district: text(a.district, 60, "district"),
+    birth_year: birthYear,
+    license_class: text(a.licenseClass, 20, "licenseClass"),
+    has_motorcycle: a.hasMotorcycle === true,
+    plate: text(a.plate, 20, "plate")?.toLocaleUpperCase("tr-TR") ?? null,
+    vehicle_model: text(a.vehicleModel, 80, "vehicleModel"),
+    experience_years: exp,
+    availability,
+    message: text(a.message, 2000, "message"),
+    kvkk_consent_at: new Date().toISOString(),
+  };
+  const { data: created, error } = await ctx.admin.from("courier_applications").insert(row).select("id").single();
+  if (error) {
+    if ((error as { code?: string }).code === "23505") {
+      throw new HttpError(409, "Bu numarayla değerlendirmede olan bir başvurunuz var; sizi arayacağız", "phone");
+    }
+    throw new Error(`Başvuru kaydedilemedi: ${error.message}`);
+  }
+  const id = (created as { id: string }).id;
+
+  const uploads: Array<{ kind: string; signedUrl: string; path: string }> = [];
+  for (const d of documents) {
+    const path = `${id}/${d.kind}-${crypto.randomUUID().slice(0, 8)}.${d.ext}`;
+    const { data, error: upErr } = await ctx.admin.storage.from("basvuru").createSignedUploadUrl(path);
+    if (upErr || !data) throw new Error(`Yükleme adresi oluşturulamadı: ${upErr?.message}`);
+    d.path = path;
+    uploads.push({ kind: d.kind, signedUrl: data.signedUrl, path });
+  }
+  if (documents.length) {
+    await ctx.admin
+      .from("courier_applications")
+      .update({ documents: documents.map(({ kind, path }) => ({ kind, path })) })
+      .eq("id", id);
+  }
+  await alertAdmins(
+    "Yeni kurye başvurusu",
+    `Kurye başvurusu: ${row.full_name}, ${row.phone}${row.district ? `, ${row.district}` : ""}${row.has_motorcycle ? ", motoru var" : ""}`,
+    deps,
+  ).catch((e) => console.error("courier alert", e));
+  return { id, uploads };
 }

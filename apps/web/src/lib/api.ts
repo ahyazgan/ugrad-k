@@ -100,3 +100,53 @@ export async function submitLead(lead: LeadInput): Promise<void> {
   }
   await call("lead", { lead });
 }
+
+export const APPLICATION_DOCS = {
+  ehliyet_on: "Ehliyet (ön yüz)",
+  ehliyet_arka: "Ehliyet (arka yüz)",
+  ruhsat: "Motosiklet ruhsatı",
+  vesikalik: "Vesikalık fotoğraf",
+} as const;
+export type DocKind = keyof typeof APPLICATION_DOCS;
+export const MAX_DOC_BYTES = 5 * 1024 * 1024;
+
+export interface CourierApplicationInput {
+  fullName: string;
+  phone: string;
+  email?: string;
+  district?: string;
+  birthYear?: string;
+  licenseClass?: string;
+  hasMotorcycle: boolean;
+  plate?: string;
+  vehicleModel?: string;
+  experienceYears?: string;
+  availability?: string;
+  message?: string;
+  kvkkConsent: boolean;
+  website?: string;
+}
+
+const extOf = (f: File) => (f.name.split(".").pop() ?? "").toLowerCase();
+
+/** Başvuruyu gönderir, ardından belgeleri imzalı adreslere doğrudan yükler. */
+export async function applyCourier(app: CourierApplicationInput, files: Partial<Record<DocKind, File>>): Promise<void> {
+  const entries = Object.entries(files).filter((e): e is [DocKind, File] => !!e[1]);
+  for (const [, f] of entries) {
+    if (f.size > MAX_DOC_BYTES) throw new SiteApiError(`${f.name} 5 MB'tan büyük`, "documents");
+  }
+  if (demoMode) {
+    if (!app.kvkkConsent) throw new SiteApiError("Aydınlatma metnini onaylamanız gerekiyor", "kvkkConsent");
+    if (!/^0?5\d{9}$/.test(app.phone.replace(/\D/g, "").replace(/^90/, ""))) throw new SiteApiError("Geçerli bir cep telefonu numarası girin", "phone");
+    await new Promise((r) => setTimeout(r, 300));
+    return;
+  }
+  const res = await call<{ uploads: Array<{ kind: DocKind; signedUrl: string }> }>("courier-apply", {
+    application: { ...app, documents: entries.map(([kind, f]) => ({ kind, ext: extOf(f) })) },
+  });
+  for (const u of res.uploads) {
+    const f = files[u.kind]!;
+    const r = await fetch(u.signedUrl, { method: "PUT", headers: { "Content-Type": f.type || "application/octet-stream", "x-upsert": "false" }, body: f });
+    if (!r.ok) throw new SiteApiError(`${APPLICATION_DOCS[u.kind]} yüklenemedi; başvurunuz alındı, belgeyi görüşmede getirebilirsiniz.`);
+  }
+}

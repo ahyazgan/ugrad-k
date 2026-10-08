@@ -75,3 +75,60 @@ Deno.test("site: telefon normalizasyonu", () => {
   }
   assert(threw);
 });
+
+function withStorage(f: ReturnType<typeof setup>) {
+  const signed: string[] = [];
+  (f.ctx.admin as Json).storage = {
+    from: (bucket: string) => ({
+      createSignedUploadUrl: (path: string) => {
+        signed.push(`${bucket}/${path}`);
+        return Promise.resolve({ data: { signedUrl: `https://s/${bucket}/${path}?token=t`, path, token: "t" }, error: null });
+      },
+    }),
+  };
+  return signed;
+}
+
+const application = {
+  fullName: "Can Kurye",
+  phone: "0555 111 22 33",
+  birthYear: 1995,
+  licenseClass: "A2",
+  hasMotorcycle: true,
+  plate: "34 abc 12",
+  availability: "tam_zamanli",
+  kvkkConsent: true,
+  documents: [
+    { kind: "ehliyet_on", ext: "JPG" },
+    { kind: "ruhsat", ext: "pdf" },
+  ],
+};
+
+Deno.test("site: kurye başvurusu kaydedilir, belgeler için imzalı yükleme adresi döner", async () => {
+  const f = setup();
+  const signed = withStorage(f);
+  const res = await f.run({ action: "courier-apply", application });
+  assertEquals(res.status, 200);
+  const data = await res.json();
+  assertEquals(data.uploads.length, 2);
+  assert(data.uploads[0].signedUrl.startsWith("https://s/basvuru/new-id/ehliyet_on-"));
+  assert(signed[0]!.endsWith(".jpg"));
+  const row = f.inserted.courier_applications![0]!;
+  assertEquals(row.phone, "+905551112233");
+  assertEquals(row.plate, "34 ABC 12");
+  assertEquals((f.updated.courier_applications![0]!.documents as Json[]).map((d) => d.kind), ["ehliyet_on", "ruhsat"]);
+});
+
+Deno.test("site: kurye başvurusu doğrulamaları", async () => {
+  const f = setup();
+  withStorage(f);
+  const young = await f.run({ action: "courier-apply", application: { ...application, birthYear: new Date().getUTCFullYear() - 16 } });
+  assertEquals((await young.json()).field, "birthYear");
+  const badDoc = await f.run({ action: "courier-apply", application: { ...application, documents: [{ kind: "adli_sicil", ext: "pdf" }] } });
+  assertEquals(badDoc.status, 400);
+  const exe = await f.run({ action: "courier-apply", application: { ...application, documents: [{ kind: "ruhsat", ext: "exe" }] } });
+  assertEquals((await exe.json()).error, "Belge JPG, PNG veya PDF olmalı");
+  const landline = await f.run({ action: "courier-apply", application: { ...application, phone: "0216 555 44 33" } });
+  assertEquals((await landline.json()).field, "phone");
+  assertEquals(f.inserted.courier_applications, undefined);
+});

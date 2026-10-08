@@ -209,6 +209,44 @@ export interface OrderFilter {
   limit?: number;
 }
 
+export type LeadStatus = "yeni" | "arandi" | "kazanildi" | "kaybedildi";
+export interface Lead {
+  id: string;
+  kind: "kurumsal" | "iletisim";
+  companyName: string | null;
+  contactName: string;
+  phone: string;
+  email: string | null;
+  monthlyVolume: string | null;
+  message: string | null;
+  sourcePage: string | null;
+  status: LeadStatus;
+  adminNote: string | null;
+  createdAt: string;
+}
+
+export type ApplicationStatus = "yeni" | "gorusme" | "onaylandi" | "reddedildi";
+export interface CourierApplication {
+  id: string;
+  fullName: string;
+  phone: string;
+  email: string | null;
+  district: string | null;
+  birthYear: number | null;
+  licenseClass: string | null;
+  hasMotorcycle: boolean;
+  plate: string | null;
+  vehicleModel: string | null;
+  experienceYears: number | null;
+  availability: "tam_zamanli" | "yari_zamanli" | "hafta_sonu" | null;
+  message: string | null;
+  documents: Array<{ kind: string; path: string }>;
+  status: ApplicationStatus;
+  adminNote: string | null;
+  courierId: string | null;
+  createdAt: string;
+}
+
 export interface AdminRepo {
   readonly mode: "supabase" | "demo";
   // Kimlik
@@ -225,7 +263,7 @@ export interface AdminRepo {
   podUrl(path: string): Promise<string | null>;
   // Kuryeler
   listCouriers(): Promise<Courier[]>;
-  createCourier(input: { fullName: string; phone: string; plate: string; vehicleModel?: string }): Promise<void>;
+  createCourier(input: { fullName: string; phone: string; plate: string; vehicleModel?: string }): Promise<{ id: string }>;
   updateCourier(id: string, patch: { active?: boolean; plate?: string; vehicleModel?: string }): Promise<void>;
   listShifts(filter: { from: string; to: string; courierId?: string }): Promise<Shift[]>;
   // Müşteriler
@@ -248,6 +286,14 @@ export interface AdminRepo {
   quote(order: OrderRequestInput): Promise<AdminQuote>;
   lookupPhoneCustomer(phone: string): Promise<PhoneCustomer | null>;
   createPhoneOrder(input: { phone: string; fullName: string; verbalConsent: boolean; order: OrderRequestInput }): Promise<{ id: string; orderNo: string }>;
+  // Başvurular (web sitesi)
+  listLeads(): Promise<Lead[]>;
+  updateLead(id: string, patch: { status?: LeadStatus; adminNote?: string | null }): Promise<void>;
+  listCourierApplications(): Promise<CourierApplication[]>;
+  updateCourierApplication(id: string, patch: { status?: ApplicationStatus; adminNote?: string | null }): Promise<void>;
+  /** Başvuruyu onaylar: kurye hesabı açılır, başvuru "onaylandı" olur */
+  approveCourierApplication(id: string, input: { plate: string; vehicleModel?: string }): Promise<{ courierId: string }>;
+  applicationDocumentUrl(path: string): Promise<string | null>;
   // Asistan
   listConversations(): Promise<Conversation[]>;
   closeConversation(id: string): Promise<void>;
