@@ -35,11 +35,11 @@ export function SosBanner() {
   }
 
   return (
-    <div className="mb-4 space-y-2" data-testid="sos-banner">
+    <div className="mb-4 space-y-2" data-testid="sos-banner" id="sos-banner">
       {data.map((i) => (
-        <div key={i.id} className="rounded-lg border-2 border-red-600 bg-red-50 p-3 text-sm text-red-950" role="alert">
+        <div key={i.id} className="rounded-card border-2 border-red-600 bg-red-50 p-3 text-sm text-red-950" role="alert">
           <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-            <b className="text-red-800">🚨 ACİL DURUM — {i.courierName ?? "Kurye"}</b>
+            <b className="text-red-800"><span className="mr-1.5 inline-block h-2.5 w-2.5 animate-pulse rounded-full bg-red-600 align-middle" aria-hidden="true" />ACİL DURUM — {i.courierName ?? "Kurye"}</b>
             <span className="font-semibold">{INCIDENT_KINDS[i.kind]}</span>
             <span className="text-red-800">{ageLabel(i.createdAt)}</span>
             {i.acknowledgedAt ? (
@@ -52,7 +52,7 @@ export function SosBanner() {
           <div className="mt-2 flex flex-wrap items-center gap-2">
             {i.lat != null && i.lng != null ? (
               <a
-                className="rounded-lg border border-red-300 bg-white px-3 py-1.5 font-semibold text-red-800 hover:bg-red-100"
+                className="rounded-control border border-red-300 bg-white px-3 py-1.5 font-semibold text-red-800 hover:bg-red-100"
                 href={`https://maps.google.com/?q=${i.lat},${i.lng}`}
                 target="_blank"
                 rel="noreferrer"
@@ -63,7 +63,7 @@ export function SosBanner() {
               <span className="text-xs">Konum alınamadı</span>
             )}
             {i.courierPhone ? (
-              <a className="rounded-lg border border-red-300 bg-white px-3 py-1.5 font-semibold text-red-800 hover:bg-red-100" href={`tel:${i.courierPhone}`}>
+              <a className="rounded-control border border-red-300 bg-white px-3 py-1.5 font-semibold text-red-800 hover:bg-red-100" href={`tel:${i.courierPhone}`}>
                 Kuryeyi ara
               </a>
             ) : null}

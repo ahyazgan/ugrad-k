@@ -127,7 +127,7 @@ function SystemHealthCard() {
                 ))}
               </ul>
             )}
-            <p className="mt-2 text-xs text-slate-500">
+            <p className="mt-2 text-xs text-muted">
               Vardiyada {data.snapshot.couriers_on_shift} kurye · sorunlar yöneticiye WhatsApp/SMS ile bildirilir (5 dakikada bir denetim).
             </p>
           </div>
@@ -185,14 +185,14 @@ function ReadinessCard() {
             {data.ready ? "✓ Canlıya hazır" : `✗ ${missing} eksik`}
             {warn ? <span className="font-normal text-amber-700"> · {warn} uyarı</span> : null}
           </p>
-          <p className="mt-1 text-xs text-slate-500">
+          <p className="mt-1 text-xs text-muted">
             Eksik servisler sahte (deneme) sağlayıcıyla çalışır; gerçek müşteri almadan önce tamamlayın. Bölüm numaraları docs/kurulum.md&apos;yi gösterir.
           </p>
           {open ? (
             <div className="mt-4 grid gap-4 md:grid-cols-2">
               {groups.map((g) => (
                 <div key={g}>
-                  <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">{g}</h3>
+                  <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted">{g}</h3>
                   <ul className="space-y-1 text-sm">
                     {data.items
                       .filter((i) => i.group === g)
@@ -205,7 +205,7 @@ function ReadinessCard() {
                             </span>
                             <span>
                               <span className="text-slate-900">{JOB_LABELS[i.label] ?? i.label}</span>
-                              <span className="block text-xs text-slate-500">
+                              <span className="block text-xs text-muted">
                                 {i.detail}
                                 {i.doc ? ` · ${i.doc}` : ""}
                               </span>
@@ -272,14 +272,14 @@ function OpsForm({ initial, onSaved }: { initial: OpsSettings; onSaved: () => vo
             <input type="checkbox" checked={form.autoApprove} onChange={(e) => setForm({ ...form, autoApprove: e.target.checked })} data-testid="auto-approve" />
             <span>
               <b>Siparişleri otomatik onayla</b>
-              <span className="block text-slate-500">Kartla ödenecek siparişler ödeme alınınca onaylanır.</span>
+              <span className="block text-muted">Kartla ödenecek siparişler ödeme alınınca onaylanır.</span>
             </span>
           </label>
           <label className="flex items-start gap-3">
             <input type="checkbox" checked={form.autoAssign} onChange={(e) => setForm({ ...form, autoAssign: e.target.checked })} data-testid="auto-assign" />
             <span>
               <b>Kuryeyi otomatik ata</b>
-              <span className="block text-slate-500">
+              <span className="block text-muted">
                 Vardiyadaki, konumu güncel kuryelerden alışa en yakın ve en az yüklü olana; acil siparişler önce. İşi bırakan kuryeye aynı iş
                 tekrar verilmez. Planlı siparişler alıştan 30 dk önce atanır.
               </span>
@@ -289,7 +289,7 @@ function OpsForm({ initial, onSaved }: { initial: OpsSettings; onSaved: () => vo
             <input type="checkbox" checked={form.offerEnabled} onChange={(e) => setForm({ ...form, offerEnabled: e.target.checked })} data-testid="offer-enabled" />
             <span>
               <b>İşi kuryeye teklif olarak gönder</b>
-              <span className="block text-slate-500">
+              <span className="block text-muted">
                 Otomatik atanan iş kuryeye sesli bildirimle teklif edilir; kurye süre içinde kabul etmezse veya reddederse sıradaki kuryeye
                 geçer. Reddeden kuryeye aynı iş tekrar önerilmez. Müşteriye &quot;kurye atandı&quot; mesajı kabulden sonra gider.
               </span>
@@ -304,7 +304,7 @@ function OpsForm({ initial, onSaved }: { initial: OpsSettings; onSaved: () => vo
             />
             <span>
               <b>Belgesi eksik kuryeyi çalıştırma</b>
-              <span className="block text-slate-500">
+              <span className="block text-muted">
                 Ehliyet, kurye faaliyet belgesi, ruhsat veya trafik sigortası eksik ya da süresi dolmuş kurye vardiya başlatamaz ve otomatik iş
                 almaz (Kuryeler → Belgeler).
               </span>
@@ -322,7 +322,7 @@ function OpsForm({ initial, onSaved }: { initial: OpsSettings; onSaved: () => vo
                 value={String(form[n.key])}
                 onChange={(e) => setForm({ ...form, [n.key]: Number(e.target.value.replace(",", ".")) })}
               />
-              <p className="mt-1 text-xs text-slate-500">{n.hint}</p>
+              <p className="mt-1 text-xs text-muted">{n.hint}</p>
             </div>
           ))}
         </div>

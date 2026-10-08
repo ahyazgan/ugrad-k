@@ -78,7 +78,7 @@ function DocumentRow({
     <div className="border-t border-slate-100 py-3 first:border-t-0" data-testid={`doc-${kind}`}>
       <div className="mb-2 flex flex-wrap items-center gap-2">
         <span className="font-semibold">{type.label}</span>
-        {type.required ? <span className="text-xs text-slate-500">zorunlu</span> : null}
+        {type.required ? <span className="text-xs text-muted">zorunlu</span> : null}
         <span className={`rounded px-2 py-0.5 text-xs font-semibold ${state.cls}`}>
           {state.label}
           {item.daysLeft != null && item.daysLeft >= 0 ? ` · ${item.daysLeft} gün` : ""}

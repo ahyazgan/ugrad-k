@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { Button, Card, ErrorText, Input, PageHeader, Select, Table, Td } from "@/components/ui";
+import { Button, Card, Chip, cx, EmptyState, ErrorText, Input, PageHeader, Select, Table, Td } from "@/components/ui";
 import { fmtDateTime } from "@/lib/dates";
 import { repo, type ApplicationStatus, type CourierApplication, type Lead, type LeadStatus } from "@/lib/repo";
 import { useLoad } from "@/lib/use-load";
@@ -45,25 +45,56 @@ function NoteField({ value, onSave }: { value: string | null; onSave: (v: string
   );
 }
 
-function Leads() {
+function Leads({ onChange }: { onChange: () => void }) {
   const { data, error, reload } = useLoad(() => repo.listLeads());
-  const update = (id: string, patch: Parameters<typeof repo.updateLead>[1]) => repo.updateLead(id, patch).then(reload);
+  const [filter, setFilter] = useState<LeadStatus | null>(null);
+  const update = (id: string, patch: Parameters<typeof repo.updateLead>[1]) =>
+    repo.updateLead(id, patch).then(() => {
+      reload();
+      onChange();
+    });
+  const all = data ?? [];
+  const list = all.filter((l) => !filter || l.status === filter);
   return (
-    <>
+    <Card>
       <ErrorText>{error}</ErrorText>
-      <Table head={["Tarih", "Başvuru", "İletişim", "Aylık", "Mesaj", "Durum", "Not"]} empty="Henüz başvuru yok">
-        {(data ?? []).map((l: Lead) => (
+      {/* Status summary doubles as a filter */}
+      <div className="mb-3 flex flex-wrap items-center gap-2" data-testid="lead-summary">
+        <Chip active={!filter} onClick={() => setFilter(null)} count={all.length}>
+          Tümü
+        </Chip>
+        {(Object.keys(LEAD_STATUS) as LeadStatus[]).map((k) => (
+          <Chip key={k} active={filter === k} onClick={() => setFilter(k)} count={all.filter((l) => l.status === k).length} tone={k === "yeni" ? "warn" : "default"}>
+            {LEAD_STATUS[k][0]}
+          </Chip>
+        ))}
+      </div>
+      <Table
+        head={["Tarih", "Başvuru", "İletişim", "Aylık", "Mesaj", "Durum", "Not"]}
+        empty={
+          filter ? (
+            "Bu durumda başvuru yok."
+          ) : (
+            <EmptyState
+              sticker="bina"
+              title="Henüz başvuru yok"
+              description="Web sitesindeki kurumsal başvuru ve iletişim formlarından gelenler burada listelenir."
+            />
+          )
+        }
+      >
+        {list.map((l: Lead) => (
           <tr key={l.id} data-testid={`lead-${l.id}`}>
             <Td className="whitespace-nowrap">{fmtDateTime(l.createdAt)}</Td>
             <Td>
               <div className="font-semibold">{l.companyName ?? l.contactName}</div>
-              <div className="text-xs text-slate-500">{l.kind === "kurumsal" ? `Kurumsal · ${l.contactName}` : "İletişim formu"}</div>
+              <div className="text-xs text-muted">{l.kind === "kurumsal" ? `Kurumsal · ${l.contactName}` : "İletişim formu"}</div>
             </Td>
             <Td className="whitespace-nowrap">
               {tel(l.phone)}
               {l.email ? <div className="text-xs">{l.email}</div> : null}
             </Td>
-            <Td>{l.monthlyVolume ?? "—"}</Td>
+            <Td className="whitespace-nowrap">{l.monthlyVolume ?? "—"}</Td>
             <Td className="max-w-xs text-sm">{l.message ?? "—"}</Td>
             <Td>
               <Select aria-label="Durum" value={l.status} onChange={(e) => update(l.id, { status: e.target.value as LeadStatus })} className="py-1">
@@ -80,7 +111,7 @@ function Leads() {
           </tr>
         ))}
       </Table>
-    </>
+    </Card>
   );
 }
 
@@ -113,29 +144,29 @@ function ApplicationCard({ a, onChange, onApproved }: { a: CourierApplication; o
           {a.fullName} <Badge tone={tone}>{label}</Badge>
         </span>
       }
-      actions={<span className="text-xs text-slate-500">{fmtDateTime(a.createdAt)}</span>}
+      actions={<span className="text-xs text-muted">{fmtDateTime(a.createdAt)}</span>}
     >
       <div data-testid={`application-${a.id}`} className="grid gap-3 text-sm md:grid-cols-2">
         <dl className="grid grid-cols-[120px_1fr] gap-x-2 gap-y-1">
-          <dt className="text-slate-500">Telefon</dt>
+          <dt className="text-muted">Telefon</dt>
           <dd>{tel(a.phone)}</dd>
-          <dt className="text-slate-500">İlçe</dt>
+          <dt className="text-muted">İlçe</dt>
           <dd>{a.district ?? "—"}</dd>
-          <dt className="text-slate-500">Yaş</dt>
+          <dt className="text-muted">Yaş</dt>
           <dd>{age ?? "—"}</dd>
-          <dt className="text-slate-500">Ehliyet</dt>
+          <dt className="text-muted">Ehliyet</dt>
           <dd>{a.licenseClass ?? "—"}</dd>
-          <dt className="text-slate-500">Motosiklet</dt>
+          <dt className="text-muted">Motosiklet</dt>
           <dd>{a.hasMotorcycle ? [a.plate, a.vehicleModel].filter(Boolean).join(" · ") || "Var" : "Yok"}</dd>
-          <dt className="text-slate-500">Deneyim</dt>
+          <dt className="text-muted">Deneyim</dt>
           <dd>{a.experienceYears != null ? `${a.experienceYears} yıl` : "—"}</dd>
-          <dt className="text-slate-500">Çalışma</dt>
+          <dt className="text-muted">Çalışma</dt>
           <dd>{a.availability ? AVAIL[a.availability] : "—"}</dd>
         </dl>
         <div className="space-y-2">
-          {a.message ? <p className="rounded-lg bg-slate-50 p-2">{a.message}</p> : null}
+          {a.message ? <p className="rounded-lg bg-canvas p-2">{a.message}</p> : null}
           <div className="flex flex-wrap gap-2">
-            {a.documents.length === 0 ? <span className="text-slate-500">Belge yüklenmemiş</span> : null}
+            {a.documents.length === 0 ? <span className="text-muted">Belge yüklenmemiş</span> : null}
             {a.documents.map((d) => (
               <Button
                 key={d.path}
@@ -187,8 +218,13 @@ function ApplicationCard({ a, onChange, onApproved }: { a: CourierApplication; o
   );
 }
 
-function Applications() {
-  const { data, error, reload } = useLoad(() => repo.listCourierApplications());
+function Applications({ onChange }: { onChange: () => void }) {
+  const { data: loaded, error, reload: reloadList } = useLoad(() => repo.listCourierApplications());
+  const data = loaded;
+  const reload = () => {
+    reloadList();
+    onChange();
+  };
   const [showClosed, setShowClosed] = useState(false);
   // Bu oturumda onaylananlar sonuç mesajıyla görünür kalsın
   const [approved, setApproved] = useState<string[]>([]);
@@ -200,31 +236,53 @@ function Applications() {
         <input type="checkbox" checked={showClosed} onChange={(e) => setShowClosed(e.target.checked)} /> Sonuçlananları da göster
       </label>
       <div className="grid gap-4">
-        {list.length === 0 ? <p className="text-sm text-slate-500">Bekleyen kurye başvurusu yok.</p> : null}
+        {data && list.length === 0 ? (
+          <Card>
+            <EmptyState
+              sticker="kask"
+              title="Bekleyen kurye başvurusu yok"
+              description="Web sitesindeki kurye başvuru formundan gelenler burada; sonuçlananları görmek için yukarıdaki kutuyu işaretleyin."
+            />
+          </Card>
+        ) : null}
         {list.map((a) => (
           // Durum değişince kart sıfırlanır (form alanları güncel veriden gelsin)
           <ApplicationCard key={`${a.id}:${a.status}`} a={a} onChange={reload} onApproved={() => setApproved((x) => [...x, a.id])} />
         ))}
       </div>
-      <p className="mt-4 text-xs text-slate-500">KVKK: işe alınmayan başvurular ve belgeleri 1 yıl sonra silinmelidir.</p>
+      <p className="mt-4 text-xs text-muted">KVKK: işe alınmayan başvurular ve belgeleri 1 yıl sonra silinmelidir.</p>
     </>
+  );
+}
+
+function TabCount({ n, active }: { n: number | null; active: boolean }) {
+  if (!n) return null;
+  return (
+    <span className={cx("rounded-full px-1.5 text-[11px] font-bold leading-5 tabular-nums", active ? "bg-accent text-brand" : "bg-brand-light text-brand")} title={`${n} yeni`}>
+      {n}
+    </span>
   );
 }
 
 export default function BasvurularPage() {
   const [tab, setTab] = useState<"musteri" | "kurye">("musteri");
+  // Tab counters: new (unhandled) items per list
+  const counts = useLoad(async () => {
+    const [leads, apps] = await Promise.all([repo.listLeads(), repo.listCourierApplications()]);
+    return { leads: leads.filter((l) => l.status === "yeni").length, apps: apps.filter((a) => a.status === "yeni").length };
+  });
   return (
     <>
       <PageHeader title="Başvurular" subtitle="Web sitesinden gelen kurumsal hesap / iletişim başvuruları ve kurye başvuruları." />
       <div className="mb-4 flex gap-2" role="tablist">
         <Button role="tab" aria-selected={tab === "musteri"} variant={tab === "musteri" ? "primary" : "secondary"} onClick={() => setTab("musteri")}>
-          Müşteri başvuruları
+          Müşteri başvuruları <TabCount n={counts.data?.leads ?? null} active={tab === "musteri"} />
         </Button>
         <Button role="tab" aria-selected={tab === "kurye"} variant={tab === "kurye" ? "primary" : "secondary"} onClick={() => setTab("kurye")}>
-          Kurye başvuruları
+          Kurye başvuruları <TabCount n={counts.data?.apps ?? null} active={tab === "kurye"} />
         </Button>
       </div>
-      {tab === "musteri" ? <Leads /> : <Applications />}
+      {tab === "musteri" ? <Leads onChange={counts.reload} /> : <Applications onChange={counts.reload} />}
     </>
   );
 }

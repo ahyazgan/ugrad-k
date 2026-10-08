@@ -46,6 +46,7 @@ export function LeafletMap({
   focus,
   className,
   onPinClick,
+  interactive = true,
 }: {
   pins: MapPin[];
   lines?: MapLine[];
@@ -53,6 +54,8 @@ export function LeafletMap({
   focus?: { lat: number; lng: number; seq: number } | null;
   className?: string;
   onPinClick?: (id: string) => void;
+  /** false: static preview without pan/zoom or controls (dashboard mini map) */
+  interactive?: boolean;
 }) {
   const el = useRef<HTMLDivElement>(null);
   const map = useRef<LMap | null>(null);
@@ -60,6 +63,7 @@ export function LeafletMap({
   const L = useRef<typeof import("leaflet") | null>(null);
   const fitted = useRef<string | null>(null);
   const latest = useRef({ pins, lines, fitKey, onPinClick });
+  const live = useRef(interactive);
 
   function draw() {
     const lib = L.current;
@@ -87,7 +91,7 @@ export function LeafletMap({
     if (fitted.current !== key) {
       fitted.current = key;
       const pts = [...ps.map((p) => [p.lat, p.lng] as [number, number]), ...ls.flatMap((l) => l.points)];
-      if (pts.length > 1) m.fitBounds(lib.latLngBounds(pts), { padding: [40, 40], maxZoom: 15 });
+      if (pts.length > 1) m.fitBounds(lib.latLngBounds(pts), { padding: live.current ? [40, 40] : [24, 24], maxZoom: 15 });
       else if (pts.length === 1) m.setView(pts[0]!, 15);
     }
   }
@@ -97,13 +101,29 @@ export function LeafletMap({
     import("leaflet").then((lib) => {
       if (cancelled || !el.current || map.current) return;
       L.current = lib;
-      map.current = lib.map(el.current, { zoomControl: true, attributionControl: true }).setView(ISTANBUL, 11);
+      const on = live.current;
+      map.current = lib
+        .map(el.current, {
+          zoomControl: on,
+          attributionControl: true,
+          dragging: on,
+          scrollWheelZoom: on,
+          doubleClickZoom: on,
+          boxZoom: on,
+          keyboard: on,
+          touchZoom: on,
+        })
+        .setView(ISTANBUL, 11);
       lib.tileLayer(TILE_URL, { attribution: ATTRIBUTION, maxZoom: 19 }).addTo(map.current);
       layer.current = lib.layerGroup().addTo(map.current);
       draw();
     });
+    // Container may change size after first paint (flexible card layouts): keep tiles in sync
+    const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(() => map.current?.invalidateSize()) : null;
+    if (el.current) ro?.observe(el.current);
     return () => {
       cancelled = true;
+      ro?.disconnect();
       map.current?.remove();
       map.current = null;
       layer.current = null;

@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Button, Card, ErrorText, Input, PageHeader, Select, Table, Td } from "@/components/ui";
+import { Button, Card, ErrorText, Input, PageHeader, Select, Stat, Table, Td } from "@/components/ui";
 import { downloadCsv } from "@/lib/csv";
 import { fmtDateTime, hoursBetween, istDate } from "@/lib/dates";
 import { repo, type Shift } from "@/lib/repo";
@@ -33,6 +33,15 @@ export default function VardiyalarPage() {
     }
     return [...m.values()];
   }, [data]);
+  const kpi = useMemo(() => {
+    const list = data ?? [];
+    const net = list.reduce((t, s) => t + hoursBetween(s.startedAt, s.endedAt) - breakHours(s), 0);
+    const closed = list.filter((s) => s.endedAt);
+    const avg = closed.length ? closed.reduce((t, s) => t + hoursBetween(s.startedAt, s.endedAt) - breakHours(s), 0) / closed.length : null;
+    return { net, avg, closedCount: closed.length };
+  }, [data]);
+  // "Now on shift" is independent of the date filter
+  const onShift = (couriers.data ?? []).filter((c) => c.active && c.isOnShift);
 
   function exportCsv() {
     downloadCsv(`kurye_calisma_saatleri_${from}_${to}.csv`, [
@@ -61,7 +70,16 @@ export default function VardiyalarPage() {
           </Button>
         }
       />
-      <div className="mb-4 grid gap-3 rounded-xl border border-slate-200 bg-white p-4 sm:grid-cols-3">
+      <div className="mb-4 grid gap-3 sm:grid-cols-3">
+        <Stat label="Net çalışma (seçili aralık)" value={data ? fmtHours(kpi.net) : "…"} hint="Molalar düşülmüş" />
+        <Stat label="Ortalama vardiya" value={data ? (kpi.avg == null ? "—" : fmtHours(kpi.avg)) : "…"} hint={data ? `${kpi.closedCount} tamamlanan vardiya, net` : undefined} />
+        <Stat
+          label="Şu an vardiyada"
+          value={couriers.data ? onShift.length : "…"}
+          hint={couriers.data ? (onShift.length ? onShift.map((c) => c.fullName).join(", ") : "Kimse vardiyada değil") : undefined}
+        />
+      </div>
+      <div className="mb-4 grid gap-3 rounded-card border border-line bg-white p-4 sm:grid-cols-3">
         <Input label="Başlangıç" type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
         <Input label="Bitiş" type="date" value={to} onChange={(e) => setTo(e.target.value)} />
         <Select label="Kurye" value={courierId} onChange={(e) => setCourierId(e.target.value)}>
@@ -74,30 +92,31 @@ export default function VardiyalarPage() {
         </Select>
       </div>
       <ErrorText>{error}</ErrorText>
-      <Card title="Özet" className="mb-6">
-        <Table head={["Kurye", "Plaka", "Çalışılan gün", "Vardiya", "Toplam süre", "Mola", "Net çalışma"]}>
+      <Card title="Kurye bazında özet" className="mb-6">
+        <Table head={["Kurye", "Plaka", "Çalışılan gün", "Vardiya", "Toplam süre", "Mola", "Net çalışma"]} num={[2, 3, 4, 5, 6]} empty="Bu aralıkta vardiya kaydı yok. Tarih aralığını genişletin.">
           {totals.map((t) => (
             <tr key={t.name}>
               <Td>{t.name}</Td>
               <Td>{t.plate}</Td>
-              <Td>{t.days.size}</Td>
-              <Td>{t.count}</Td>
-              <Td>{fmtHours(t.hours)}</Td>
-              <Td>{fmtHours(t.breakHours)}</Td>
-              <Td className="font-semibold">
+              <Td num>{t.days.size}</Td>
+              <Td num>{t.count}</Td>
+              <Td num>{fmtHours(t.hours)}</Td>
+              <Td num>{fmtHours(t.breakHours)}</Td>
+              <Td num className="font-semibold">
                 <span data-testid="net-hours">{fmtHours(t.hours - t.breakHours)}</span>
               </Td>
             </tr>
           ))}
         </Table>
       </Card>
-      <Table head={["Kurye", "Başlangıç", "Bitiş", "Süre", "Mola"]} empty="Bu aralıkta vardiya kaydı yok">
-        {(data ?? []).map((s) => (
+      <Card title={`Vardiya kayıtları${data ? ` · ${data.length}` : ""}`}>
+      <Table head={["Kurye", "Başlangıç", "Bitiş", "Süre", "Mola"]} num={[3]} empty="Bu aralıkta vardiya kaydı yok. Kuryeler uygulamada vardiya başlattıkça kayıtlar burada birikir.">
+        {[...(data ?? [])].sort((x, y) => y.startedAt.localeCompare(x.startedAt)).map((s) => (
           <tr key={s.id}>
             <Td>{s.courierName}</Td>
             <Td>{fmtDateTime(s.startedAt)}</Td>
             <Td>{s.endedAt ? fmtDateTime(s.endedAt) : <span className="font-semibold text-emerald-700">Devam ediyor</span>}</Td>
-            <Td>{fmtHours(hoursBetween(s.startedAt, s.endedAt))}</Td>
+            <Td num>{fmtHours(hoursBetween(s.startedAt, s.endedAt))}</Td>
             <Td>
               {s.breaks.length ? fmtHours(breakHours(s)) : "—"}
               {s.breaks.some((b) => b.auto) ? <span className="ml-1 text-xs text-amber-700">(otomatik)</span> : null}
@@ -106,6 +125,7 @@ export default function VardiyalarPage() {
           </tr>
         ))}
       </Table>
+      </Card>
     </>
   );
 }

@@ -67,12 +67,12 @@ export function RatingForm({ token, initial, onDone }: { token: string; initial:
             ★
           </button>
         ))}
-        <span className="ml-2 text-sm text-slate-500">{LABELS[shown]}</span>
+        <span className="ml-2 text-sm text-muted">{LABELS[shown]}</span>
       </div>
       {score ? (
         <>
           <textarea
-            className="mt-3 w-full rounded-lg border border-slate-300 p-2 text-sm outline-none focus:border-brand"
+            className="mt-3 w-full rounded-lg border border-line p-2 text-sm outline-none focus:border-brand"
             rows={2}
             maxLength={1000}
             placeholder={score <= 3 ? "Neyi daha iyi yapabilirdik?" : "Eklemek istediğiniz bir şey var mı? (isteğe bağlı)"}

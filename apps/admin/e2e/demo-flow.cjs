@@ -119,10 +119,14 @@ fs.mkdirSync(out, { recursive: true });
   await page.getByTestId("perf-kur-1").getByText(/Teklif kabul: %\d+/).waitFor();
   // Acil durum kayıtları: kapatılan alarm ve çözüm notu
   await page.getByTestId("incident-inc-open").getByText(/lastik değişti/).waitFor();
+  // Yeni kurye formu çekmecede açılır (sayfa sütununu işgal etmez)
+  await page.getByRole("button", { name: "+ Kurye", exact: true }).click();
+  await page.getByTestId("courier-drawer").waitFor();
   await page.getByLabel("Ad Soyad").fill("Can Test");
   await page.getByLabel("Cep telefonu").fill("05551234567");
   await page.getByLabel("Plaka").fill("34 TST 99");
   await page.getByRole("button", { name: "Kurye ekle" }).click();
+  await page.getByTestId("courier-drawer").waitFor({ state: "detached" });
   await page.getByText("Can Test").waitFor();
   // Belgeler: Mehmet'in sigortası yaklaşıyor, Emre'nin kurye faaliyet belgesi eksik
   await page.getByTestId("docs-kur-1").getByText("1 belge yaklaşıyor").waitFor();
@@ -252,6 +256,7 @@ fs.mkdirSync(out, { recursive: true });
     const prev = m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, "0")}`;
     await page.getByLabel("Ay").fill(prev);
   }
+  const invoiceMonth = await page.getByLabel("Ay").inputValue();
   await page.getByRole("button", { name: "Faturayı oluştur" }).click();
   await page.getByText("Fatura kuyruğa alındı").waitFor();
   await shot("06-kurumsal");
@@ -270,13 +275,15 @@ fs.mkdirSync(out, { recursive: true });
   await page.getByText("Webhook kaydedildi").waitFor();
   await shot("06a-kurumsal-api");
   await nav("Faturalar");
-  await page.getByText(/^Aylık \d{4}-\d{2}$/).waitFor();
+  // Demo verisinde geçen ayın başka bir kurumsal faturası da var: yeni oluşturulanı hesap + ayla bul
+  await page.locator("tr", { hasText: "Beykoz Hukuk Bürosu" }).filter({ hasText: `Aylık ${invoiceMonth}` }).first().waitFor();
   await shot("06b-faturalar");
 
   await nav("Asistan konuşmaları");
-  await page.getByText("Temsilci bekliyor").waitFor();
-  await page.getByRole("button", { name: "Yazışma" }).first().click();
-  await page.getByText("köşesi ezilmiş", { exact: false }).waitFor();
+  // İki bölmeli görünüm: solda liste (temsilci bekleyen üstte), sağda seçili yazışma
+  await page.getByText("Temsilci bekliyor").first().waitFor();
+  await page.getByTestId("conv-conv-1").click();
+  await page.getByTestId("conversation").getByText("köşesi ezilmiş", { exact: false }).waitFor();
   await shot("06c-asistan");
 
   // ───── Otomasyon: şimdi dağıt → bekleyen siparişler onaylanır, vardiyadaki kuryeye atanır
@@ -293,7 +300,8 @@ fs.mkdirSync(out, { recursive: true });
   await page.getByTestId("ready-cost").getByText("§23", { exact: false }).waitFor();
   // İş teklifi: otomatik atanan sipariş kuryeye teklif olarak gider, detayda teklif kaydı görünür
   await page.getByTestId("dispatch-result").locator("..").getByRole("link", { name: "Sipariş" }).first().click();
-  await page.getByTestId("offers").getByText("Mehmet Kaya").waitFor();
+  // Demo verisinde vardiyada birden çok uygun kurye var: teklif en yakın olana gider
+  await page.getByTestId("offers").getByText(/Mehmet Kaya|Zeynep Arslan|Serkan Aydın/).first().waitFor();
   await page.getByTestId("offers").getByText(/Yanıt bekleniyor|Kabul etti/).waitFor();
   // Yazışma: yönetici destek olarak yazar
   await page.getByTestId("admin-chat-input").fill("Merhaba, alıcı 14:00'ten sonra ofiste");

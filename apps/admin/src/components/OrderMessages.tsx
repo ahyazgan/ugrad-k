@@ -46,7 +46,7 @@ export function OrderMessages({ orderId }: { orderId: string }) {
             </span>
           </li>
         ))}
-        {data && !data.length ? <li className="text-slate-500">Henüz yazışma yok.</li> : null}
+        {data && !data.length ? <li className="text-muted">Henüz yazışma yok.</li> : null}
       </ol>
       <form onSubmit={send} className="mt-3 flex items-end gap-2">
         <div className="flex-1">

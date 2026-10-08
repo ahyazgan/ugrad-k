@@ -245,42 +245,42 @@ export default function FiyatlarPage() {
                     inputMode="decimal"
                     onChange={(e) => setValues((v) => ({ ...v, [f.key]: e.target.value }))}
                   />
-                  {f.hint ? <p className="mt-1 text-xs text-slate-500">{f.hint}</p> : null}
+                  {f.hint ? <p className="mt-1 text-xs text-muted">{f.hint}</p> : null}
                 </div>
               ))}
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
               <div>
                 <Input label="Km kademeleri (toplam km'ye kadar : TL/km)" value={kmTiers} onChange={(e) => setKmTiers(e.target.value)} />
-                <p className="mt-1 text-xs text-slate-500">
+                <p className="mt-1 text-xs text-muted">
                   Örn. 10:25, *:18 → açılıştan sonra 10 km&apos;ye kadar 25 TL, üstü 18 TL. Boş bırakılırsa sabit km ücreti kullanılır.
                 </p>
               </div>
               <div>
                 <Input label="Acil + gece toplam ek ücret tavanı (%)" value={cap} inputMode="decimal" onChange={(e) => setCap(e.target.value)} />
-                <p className="mt-1 text-xs text-slate-500">Örn. 75. Boş bırakılırsa tavan yok (acil + gece/Pazar/tatil toplanır).</p>
+                <p className="mt-1 text-xs text-muted">Örn. 75. Boş bırakılırsa tavan yok (acil + gece/Pazar/tatil toplanır).</p>
               </div>
               <div>
                 <Input label="Motosiklet ağırlık sınırı (kg)" value={maxWeight} inputMode="decimal" onChange={(e) => setMaxWeight(e.target.value)} />
-                <p className="mt-1 text-xs text-slate-500">Üzerindeki gönderi kabul edilmez. Boş bırakılırsa sınır yok.</p>
+                <p className="mt-1 text-xs text-muted">Üzerindeki gönderi kabul edilmez. Boş bırakılırsa sınır yok.</p>
               </div>
               <div>
                 <Input label="En yüksek değer beyanı (TL)" value={maxDeclared} inputMode="decimal" onChange={(e) => setMaxDeclared(e.target.value)} />
-                <p className="mt-1 text-xs text-slate-500">Daha değerli gönderi kabul edilmez (sigortacınızın teminat sınırı). Boş = sınırsız.</p>
+                <p className="mt-1 text-xs text-muted">Daha değerli gönderi kabul edilmez (sigortacınızın teminat sınırı). Boş = sınırsız.</p>
               </div>
             </div>
             <div>
               <Input label="Kurumsal kademeler (teslimat:indirim%)" value={tiers} onChange={(e) => setTiers(e.target.value)} />
-              <p className="mt-1 text-xs text-slate-500">Örn. 20:15, 50:25 → ayda 20+ teslimatta %15, 50+ teslimatta %25</p>
+              <p className="mt-1 text-xs text-muted">Örn. 20:15, 50:25 → ayda 20+ teslimatta %15, 50+ teslimatta %25</p>
             </div>
-            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+            <div className="rounded-lg border border-line bg-canvas p-3">
               <div className="flex flex-wrap items-end gap-2">
                 <Input label="Endeks / enflasyon güncellemesi (%)" value={indexPct} inputMode="decimal" onChange={(e) => setIndexPct(e.target.value)} />
                 <Button type="button" variant="secondary" onClick={applyIndex} disabled={!indexPct.trim() || !draft || !!draft.errors.length}>
                   Para alanlarına uygula
                 </Button>
               </div>
-              <p className="mt-1 text-xs text-slate-500">
+              <p className="mt-1 text-xs text-muted">
                 Önerilen: 3 ayda bir TÜFE oranı kadar. Açılış, km kademeleri, bekleme, ağır paket ve uzak alış ücretleri artar; köprü (resmi tarife) ve yüzdeler değişmez.
               </p>
               {indexMsg ? <p className="mt-1 text-xs text-brand">{indexMsg}</p> : null}
@@ -310,7 +310,7 @@ export default function FiyatlarPage() {
 
         <div className="space-y-6 xl:col-span-2">
           <Card title="Önizleme ve marj (kaydetmeden önce)">
-            <Table head={["Senaryo", "Mevcut", "Yeni", "Maliyet", "Marj"]}>
+            <Table head={["Senaryo", "Mevcut", "Yeni", "Maliyet", "Marj"]} num={[1, 2, 3, 4]} empty="Önizleme senaryosu yok.">
               {SCENARIOS.map((sc) => {
                 const cur = data ? tryPrice(sc.input, data.settings) : null;
                 const nextSettings = draft && !draft.errors.length ? draft.settings : null;
@@ -319,19 +319,19 @@ export default function FiyatlarPage() {
                 return (
                   <tr key={sc.label}>
                     <Td>{sc.label}</Td>
-                    <Td className="whitespace-nowrap">{cur ? formatTL(cur.subtotalKurus) : "—"}</Td>
-                    <Td className={`whitespace-nowrap font-semibold ${next && cur && next.subtotalKurus !== cur.subtotalKurus ? "text-brand" : ""}`}>
+                    <Td num>{cur ? formatTL(cur.subtotalKurus) : "—"}</Td>
+                    <Td num className={`font-semibold ${next && cur && next.subtotalKurus !== cur.subtotalKurus ? "text-brand" : ""}`}>
                       {next ? formatTL(next.subtotalKurus) : "—"}
                     </Td>
-                    <Td className="whitespace-nowrap text-slate-600">{c ? formatTL(c.totalKurus) : "—"}</Td>
-                    <Td className={`whitespace-nowrap font-semibold ${c && c.marginPct < 20 ? "text-red-700" : "text-emerald-700"}`}>
+                    <Td className="whitespace-nowrap text-ink-soft">{c ? formatTL(c.totalKurus) : "—"}</Td>
+                    <Td num className={`font-semibold ${c && c.marginPct < 20 ? "text-red-700" : "text-emerald-700"}`}>
                       {c ? `%${c.marginPct.toLocaleString("tr-TR")}` : "—"}
                     </Td>
                   </tr>
                 );
               })}
             </Table>
-            <p className="mt-2 text-xs text-slate-500">
+            <p className="mt-2 text-xs text-muted">
               KDV hariç. Maliyet aşağıdaki kurye ödeme modeliyle tahmindir; %20 altı marj kırmızı. Kart komisyonu dahil değildir.
             </p>
           </Card>
@@ -348,7 +348,7 @@ export default function FiyatlarPage() {
                 />
               ))}
             </div>
-            <p className="mt-2 text-xs text-slate-500">
+            <p className="mt-2 text-xs text-muted">
               Esnaf kurye modeli (paket + km başı, yakıt kuryede; köprü geçişi kuryeye iade). Kurye hakedişi ve yukarıdaki marj bu
               modelle hesaplanır; müşteri fiyatını etkilemez. Önizleme kaydetmeden günceller.
             </p>
@@ -377,7 +377,7 @@ export default function FiyatlarPage() {
               {upcoming.map((h) => (
                 <li key={h.date} className="flex items-center justify-between gap-2">
                   <span>
-                    <span className="font-mono text-slate-500">{h.date}</span> {h.name}
+                    <span className="font-mono text-muted">{h.date}</span> {h.name}
                     {h.halfDay ? <span className="ml-1 text-xs text-amber-700">{"(13:00'ten itibaren)"}</span> : null}
                   </span>
                   <button className="text-xs text-red-700 underline" onClick={() => repo.deleteHoliday(h.date).then(reload)}>

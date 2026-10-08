@@ -119,7 +119,7 @@ export default function HakedisPage() {
       </div>
 
       <Card title="Ödenmemiş hakedişler" className="mb-6">
-        <Table head={["Kurye", "Teslimat", "Hakediş", "Prim", "Kuryedeki nakit", "Net", ""]} empty="Ödenmemiş hakediş yok">
+        <Table head={["Kurye", "Teslimat", "Hakediş", "Prim", "Kuryedeki nakit", "Net", ""]} num={[1, 2, 3, 4, 5]} empty="Ödenmemiş hakediş yok. Teslimatların hakedişi 5 dakikada bir otomatik yazılır.">
           {byCourier.map((g) => (
             <tr key={g.courierId} data-testid={`balance-${g.courierId}`}>
               <Td>
@@ -127,11 +127,11 @@ export default function HakedisPage() {
                   {g.name}
                 </button>
               </Td>
-              <Td>{g.balance.deliveries}</Td>
-              <Td className="whitespace-nowrap">{formatTL(g.balance.earningsKurus)}</Td>
-              <Td className="whitespace-nowrap">{g.balance.incentiveKurus ? formatTL(g.balance.incentiveKurus) : "—"}</Td>
-              <Td className="whitespace-nowrap">{formatTL(g.balance.cashKurus)}</Td>
-              <Td className="whitespace-nowrap">
+              <Td num>{g.balance.deliveries}</Td>
+              <Td num>{formatTL(g.balance.earningsKurus)}</Td>
+              <Td num>{g.balance.incentiveKurus ? formatTL(g.balance.incentiveKurus) : "—"}</Td>
+              <Td num>{formatTL(g.balance.cashKurus)}</Td>
+              <Td num>
                 <Net kurus={g.balance.netKurus} />
               </Td>
               <Td className="whitespace-nowrap text-right">
@@ -165,7 +165,7 @@ export default function HakedisPage() {
             </tr>
           ))}
         </Table>
-        <p className="mt-2 text-xs text-slate-500">
+        <p className="mt-2 text-xs text-muted">
           Hesaplaş: o ana kadarki teslimatlar ve primler kapatılır. Net artıysa kuryeye ödeme yapın, eksiyse kuryeden elindeki nakdi alın.
         </p>
       </Card>
@@ -181,7 +181,7 @@ export default function HakedisPage() {
           }
         >
           <div className="max-h-96 overflow-y-auto">
-            <Table head={["Sipariş", "Teslim", "Km", "İş + km", "Acil/gece eki", "Bekleme", "Köprü", "Hakediş", "Nakit"]}>
+            <Table head={["Sipariş", "Teslim", "Km", "İş + km", "Acil/gece eki", "Bekleme", "Köprü", "Hakediş", "Nakit"]} num={[2, 3, 4, 5, 6, 7, 8]} empty="Bu kuryenin ödenmemiş teslimatı yok.">
               {detail.rows.map((e) => (
                 <tr key={e.orderId}>
                   <Td>
@@ -190,13 +190,13 @@ export default function HakedisPage() {
                     </Link>
                   </Td>
                   <Td className="whitespace-nowrap">{fmtDateTime(e.deliveredAt)}</Td>
-                  <Td>{e.km.toLocaleString("tr-TR")}</Td>
-                  <Td className="whitespace-nowrap">{formatTL(e.jobKurus + e.kmKurus)}</Td>
-                  <Td className="whitespace-nowrap">{e.bonusKurus ? formatTL(e.bonusKurus) : "—"}</Td>
-                  <Td className="whitespace-nowrap">{e.waitingKurus ? formatTL(e.waitingKurus) : "—"}</Td>
-                  <Td className="whitespace-nowrap">{e.bridgeKurus ? formatTL(e.bridgeKurus) : "—"}</Td>
-                  <Td className="whitespace-nowrap font-semibold">{formatTL(e.totalKurus)}</Td>
-                  <Td className="whitespace-nowrap">{e.cashCollectedKurus ? formatTL(e.cashCollectedKurus) : "—"}</Td>
+                  <Td num>{e.km.toLocaleString("tr-TR")}</Td>
+                  <Td num>{formatTL(e.jobKurus + e.kmKurus)}</Td>
+                  <Td num>{e.bonusKurus ? formatTL(e.bonusKurus) : "—"}</Td>
+                  <Td num>{e.waitingKurus ? formatTL(e.waitingKurus) : "—"}</Td>
+                  <Td num>{e.bridgeKurus ? formatTL(e.bridgeKurus) : "—"}</Td>
+                  <Td num className="font-semibold">{formatTL(e.totalKurus)}</Td>
+                  <Td num>{e.cashCollectedKurus ? formatTL(e.cashCollectedKurus) : "—"}</Td>
                 </tr>
               ))}
             </Table>
@@ -204,13 +204,13 @@ export default function HakedisPage() {
           {detail.awards.length ? (
             <div className="mt-4">
               <div className="mb-1 text-sm font-semibold text-slate-700">Primler</div>
-              <Table head={["Dönem", "Kampanya", "Gerçekleşen", "Prim"]}>
+              <Table head={["Dönem", "Kampanya", "Gerçekleşen", "Prim"]} num={[3]} empty="Prim yok.">
                 {detail.awards.map((a) => (
                   <tr key={a.id}>
                     <Td className="whitespace-nowrap">{a.periodStart === a.periodEnd ? a.periodStart : `${a.periodStart} – ${a.periodEnd}`}</Td>
                     <Td>{a.incentiveTitle}</Td>
                     <Td>{a.detail ?? `${a.achieved} iş`}</Td>
-                    <Td className="whitespace-nowrap font-semibold">{formatTL(a.amountKurus)}</Td>
+                    <Td num className="font-semibold">{formatTL(a.amountKurus)}</Td>
                   </tr>
                 ))}
               </Table>
@@ -221,7 +221,7 @@ export default function HakedisPage() {
 
       <div className="space-y-6">
         <Card title="Tahsil edilecekler">
-          <Table head={["Sipariş", "Müşteri", "Kurye", "Tutar", "Durum", ""]} empty="Bekleyen tahsilat yok">
+          <Table head={["Sipariş", "Müşteri", "Kurye", "Tutar", "Durum", ""]} num={[3]} empty="Bekleyen tahsilat yok. Kuryeye ödemeli teslimatlar tahsil edilene kadar burada görünür.">
             {(data?.receivables ?? []).map((r) => (
               <tr key={r.orderId} data-testid={`receivable-${r.orderNo}`}>
                 <Td>
@@ -231,10 +231,10 @@ export default function HakedisPage() {
                 </Td>
                 <Td>
                   {r.customerName ?? "—"}
-                  {r.customerPhone ? <div className="text-xs text-slate-500">{r.customerPhone}</div> : null}
+                  {r.customerPhone ? <div className="text-xs text-muted">{r.customerPhone}</div> : null}
                 </Td>
                 <Td>{r.courierName ?? "—"}</Td>
-                <Td className="whitespace-nowrap">{formatTL(r.totalKurus)}</Td>
+                <Td num>{formatTL(r.totalKurus)}</Td>
                 <Td className={r.cashCollection === "alinmadi" ? "font-semibold text-red-700" : ""}>
                   {r.cashCollection ? COLLECTION[r.cashCollection] : "Bilinmiyor"}
                 </Td>
@@ -255,23 +255,23 @@ export default function HakedisPage() {
               </tr>
             ))}
           </Table>
-          <p className="mt-2 text-xs text-slate-500">Kuryeye ödemeli olup nakit alınmayan teslimatlar: IBAN ödemesini hesabınızda görünce veya ödeme gelince işaretleyin.</p>
+          <p className="mt-2 text-xs text-muted">Kuryeye ödemeli olup nakit alınmayan teslimatlar: IBAN ödemesini hesabınızda görünce veya ödeme gelince işaretleyin.</p>
         </Card>
 
         <Card title="Hesaplaşma geçmişi">
-          <Table head={["Tarih", "Kurye", "Teslimat", "Hakediş", "Prim", "Nakit", "Net", ""]} empty="Henüz hesaplaşma yok">
+          <Table head={["Tarih", "Kurye", "Teslimat", "Hakediş", "Prim", "Nakit", "Net", ""]} num={[2, 3, 4, 5, 6]} empty="Henüz hesaplaşma yok. Yukarıdaki listeden “Hesaplaş” ile ilk ödemeyi kaydedin.">
             {(data?.payouts ?? []).map((p) => (
               <tr key={p.id} className={p.cancelledAt ? "text-slate-400 line-through" : ""}>
                 <Td className="whitespace-nowrap">{fmtDateTime(p.createdAt)}</Td>
                 <Td>
                   {p.courierName ?? "—"}
-                  {p.note ? <div className="text-xs text-slate-500">{p.note}</div> : null}
+                  {p.note ? <div className="text-xs text-muted">{p.note}</div> : null}
                 </Td>
-                <Td>{p.deliveryCount}</Td>
-                <Td className="whitespace-nowrap">{formatTL(p.earningsKurus)}</Td>
-                <Td className="whitespace-nowrap">{p.incentiveKurus ? formatTL(p.incentiveKurus) : "—"}</Td>
-                <Td className="whitespace-nowrap">{formatTL(p.cashKurus)}</Td>
-                <Td className="whitespace-nowrap">
+                <Td num>{p.deliveryCount}</Td>
+                <Td num>{formatTL(p.earningsKurus)}</Td>
+                <Td num>{p.incentiveKurus ? formatTL(p.incentiveKurus) : "—"}</Td>
+                <Td num>{formatTL(p.cashKurus)}</Td>
+                <Td num>
                   <Net kurus={p.netKurus} />
                 </Td>
                 <Td className="whitespace-nowrap text-right">

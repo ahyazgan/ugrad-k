@@ -66,17 +66,17 @@ export function AddressPicker({
         <div className="relative">
           <Input placeholder="Adres veya işyeri ara…" value={query} onChange={(e) => setQuery(e.target.value)} data-testid={`${testId}-search`} />
           {items.length > 0 && query.trim().length >= 3 ? (
-            <ul className="absolute z-10 mt-1 max-h-64 w-full overflow-auto rounded-lg border border-slate-200 bg-white shadow-lg">
+            <ul className="absolute z-10 mt-1 max-h-64 w-full overflow-auto rounded-lg border border-line bg-white shadow-lg">
               {items.map((s, i) => (
                 <li key={s.placeId}>
                   <button
                     type="button"
                     data-testid={`${testId}-suggestion-${i}`}
-                    className="block w-full px-3 py-2 text-left text-sm hover:bg-slate-50"
+                    className="block w-full px-3 py-2 text-left text-sm hover:bg-canvas"
                     onClick={() => pick(s)}
                   >
                     <div className="font-medium">{s.title}</div>
-                    <div className="text-xs text-slate-500">{s.subtitle}</div>
+                    <div className="text-xs text-muted">{s.subtitle}</div>
                   </button>
                 </li>
               ))}
@@ -88,7 +88,7 @@ export function AddressPicker({
                 <button
                   key={r.address}
                   type="button"
-                  className="rounded-full border border-slate-300 px-2.5 py-1 text-xs hover:bg-slate-50"
+                  className="rounded-full border border-line px-2.5 py-1 text-xs hover:bg-canvas"
                   onClick={() =>
                     onChange({
                       address: r.address,

@@ -90,12 +90,12 @@ export default function PrimlerPage() {
       <div className="grid gap-6 xl:grid-cols-3">
         <div className="space-y-6 xl:col-span-2">
           <Card title="Kampanyalar">
-            <Table head={["Kampanya", "Ödül", "Kapsam", "Tarih", "Durum", ""]} empty="Henüz prim kampanyası yok">
+            <Table head={["Kampanya", "Ödül", "Kapsam", "Tarih", "Durum", ""]} empty="Henüz prim kampanyası yok. Sağdaki formdan ilk hedefi tanımlayın.">
               {(data?.incentives ?? []).map((i: CourierIncentive) => (
                 <tr key={i.id} className={i.active ? "" : "opacity-50"} data-testid={`incentive-${i.id}`}>
                   <Td>
                     <div className="font-semibold">{i.title}</div>
-                    <div className="text-xs text-slate-500">{INCENTIVE_PERIODS[i.period]}</div>
+                    <div className="text-xs text-muted">{INCENTIVE_PERIODS[i.period]}</div>
                   </Td>
                   <Td className="whitespace-nowrap text-sm">
                     {ruleLines(i).map((l) => (
@@ -103,7 +103,7 @@ export default function PrimlerPage() {
                     ))}
                   </Td>
                   <Td className="whitespace-nowrap text-sm">{incentiveScope(i)}</Td>
-                  <Td className="whitespace-nowrap text-xs text-slate-600">
+                  <Td className="whitespace-nowrap text-xs text-ink-soft">
                     {fmtDay(i.startsOn)}
                     {i.endsOn ? ` – ${fmtDay(i.endsOn)}` : " – süresiz"}
                   </Td>
@@ -116,14 +116,14 @@ export default function PrimlerPage() {
                 </tr>
               ))}
             </Table>
-            <p className="mt-2 text-xs text-slate-500">
+            <p className="mt-2 text-xs text-muted">
               Durdurulan kampanyanın kapanmamış dönemi için ödül yazılmaz; daha önce kazanılan primler hesaplaşmada kalır.
             </p>
           </Card>
 
           <Card title={`Kazanılan primler${unpaid.length ? ` · ödenmemiş ${formatTL(unpaid.reduce((t, a) => t + a.amountKurus, 0))}` : ""}`}>
             <div className="max-h-96 overflow-y-auto">
-              <Table head={["Dönem", "Kurye", "Kampanya", "Gerçekleşen", "Prim", "Durum"]} empty="Henüz kazanılan prim yok">
+              <Table head={["Dönem", "Kurye", "Kampanya", "Gerçekleşen", "Prim", "Durum"]} num={[4]} empty="Henüz kazanılan prim yok. Dönem kapanınca hedefe ulaşan kuryelerin primi otomatik hesaplanır.">
                 {(data?.awards ?? []).map((a) => (
                   <tr key={a.id} data-testid="incentive-award">
                     <Td className="whitespace-nowrap">
@@ -133,7 +133,7 @@ export default function PrimlerPage() {
                     <Td>{a.courierName ?? "Kurye"}</Td>
                     <Td className="text-sm">{a.incentiveTitle}</Td>
                     <Td className="text-sm">{a.detail ?? `${a.achieved} iş`}</Td>
-                    <Td className="whitespace-nowrap font-semibold">{formatTL(a.amountKurus)}</Td>
+                    <Td num className="font-semibold">{formatTL(a.amountKurus)}</Td>
                     <Td className="text-sm">{a.payoutId ? "Hesaplaşıldı" : <span className="text-amber-700">Ödenecek</span>}</Td>
                   </tr>
                 ))}
@@ -196,7 +196,7 @@ export default function PrimlerPage() {
                     type="button"
                     onClick={() => toggleDay(d)}
                     data-testid={`incentive-day-${d}`}
-                    className={`rounded-md border px-2 py-1 text-sm ${form.days.includes(d) ? "border-brand bg-brand text-white" : "border-slate-300 text-slate-600"}`}
+                    className={`rounded-md border px-2 py-1 text-sm ${form.days.includes(d) ? "border-brand bg-brand text-white" : "border-line text-ink-soft"}`}
                   >
                     {WEEKDAY_SHORT[d]}
                   </button>
@@ -223,7 +223,7 @@ export default function PrimlerPage() {
               <Input label="Başlangıç günü" type="date" value={form.startsOn} onChange={(e) => setForm({ ...form, startsOn: e.target.value })} required />
               <Input label="Bitiş günü (isteğe bağlı)" type="date" value={form.endsOn} onChange={(e) => setForm({ ...form, endsOn: e.target.value })} />
             </div>
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-muted">
               Yalnız seçili gün ve saatlerde tamamlanan işler sayılır (İstanbul saati). İade edilen iş de tamamlanmış sayılır. Örnek: yağmurlu
               günde 16:00–20:00 arasına %25 ek; hafta sonu 15 iş → 300 TL.
             </p>

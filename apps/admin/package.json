@@ -12,6 +12,7 @@
     "e2e:web": "next start -p 3100 & SERVER=$!; sleep 3; node e2e/demo-flow.cjs e2e/shots; CODE=$?; kill $SERVER; exit $CODE"
   },
   "dependencies": {
+    "@fontsource-variable/archivo": "^5.3.0",
     "@supabase/supabase-js": "2.117.2",
     "@yazgan/shared": "workspace:*",
     "leaflet": "1.9.4",

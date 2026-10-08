@@ -57,18 +57,18 @@ export default function KampanyalarPage() {
       <div className="grid gap-6 xl:grid-cols-3">
         <div className="space-y-6 xl:col-span-2">
           <Card title="Kodlar">
-            <Table head={["Kod", "İndirim", "Koşullar", "Kullanım", "Durum", ""]} empty="Henüz kampanya yok">
+            <Table head={["Kod", "İndirim", "Koşullar", "Kullanım", "Durum", ""]} empty="Henüz kampanya yok. Sağdaki formdan ilk indirim kodunu oluşturun.">
               {(data ?? []).map((p) => (
                 <tr key={p.code} className={p.active ? "" : "opacity-50"} data-testid={`promo-${p.code}`}>
                   <Td>
                     <div className="font-mono font-semibold">{p.code}</div>
-                    <div className="text-xs text-slate-500">{p.source === "geri_kazanma" ? "Geri kazanma (kişiye özel)" : p.description}</div>
+                    <div className="text-xs text-muted">{p.source === "geri_kazanma" ? "Geri kazanma (kişiye özel)" : p.description}</div>
                   </Td>
                   <Td className="whitespace-nowrap">
                     {p.kind === "yuzde" ? `%${p.value.toLocaleString("tr-TR")}` : formatTL(p.value)}
-                    {p.maxDiscountKurus ? <div className="text-xs text-slate-500">en fazla {formatTL(p.maxDiscountKurus)}</div> : null}
+                    {p.maxDiscountKurus ? <div className="text-xs text-muted">en fazla {formatTL(p.maxDiscountKurus)}</div> : null}
                   </Td>
-                  <Td className="text-xs text-slate-600">
+                  <Td className="text-xs text-ink-soft">
                     {[
                       p.newCustomersOnly ? "yalnız ilk sipariş" : null,
                       p.minSubtotalKurus ? `en az ${formatTL(p.minSubtotalKurus)}` : null,
@@ -80,7 +80,7 @@ export default function KampanyalarPage() {
                   </Td>
                   <Td className="whitespace-nowrap">
                     {p.redemptions}
-                    {p.discountKurus ? <div className="text-xs text-slate-500">{formatTL(p.discountKurus)} indirim</div> : null}
+                    {p.discountKurus ? <div className="text-xs text-muted">{formatTL(p.discountKurus)} indirim</div> : null}
                   </Td>
                   <Td>{p.active ? <span className="font-semibold text-emerald-700">Açık</span> : "Kapalı"}</Td>
                   <Td>
@@ -116,7 +116,7 @@ export default function KampanyalarPage() {
               <input type="checkbox" checked={form.newOnly} onChange={(e) => setForm({ ...form, newOnly: e.target.checked })} />
               Yalnız ilk siparişte
             </label>
-            <p className="text-xs text-slate-500">Her müşteri bir kodu bir kez kullanabilir. İptal edilen siparişte kullanım geri alınır.</p>
+            <p className="text-xs text-muted">Her müşteri bir kodu bir kez kullanabilir. İptal edilen siparişte kullanım geri alınır.</p>
             <ErrorText>{formError}</ErrorText>
             {msg ? <p className="text-sm text-emerald-700">{msg}</p> : null}
             <Button type="submit" className="w-full" data-testid="create-promo">
@@ -161,7 +161,7 @@ function GrowthSettings({ initial, onSaved }: { initial: OpsSettings; onSaved: (
       <form onSubmit={save} className="grid gap-4 md:grid-cols-2">
         <div>
           <Input label="Davet ödülü (TL)" inputMode="decimal" value={form.referral} onChange={(e) => setForm({ ...form, referral: e.target.value })} />
-          <p className="mt-1 text-xs text-slate-500">
+          <p className="mt-1 text-xs text-muted">
             Yeni müşteri ilk siparişinde davet koduyla bu kadar indirim alır; davet eden, o gönderi teslim edilince aynı tutarda kredi kazanır
             (sonraki siparişinden düşülür). 0 = kapalı.
           </p>
@@ -171,7 +171,7 @@ function GrowthSettings({ initial, onSaved }: { initial: OpsSettings; onSaved: (
             <input type="checkbox" checked={form.winbackEnabled} onChange={(e) => setForm({ ...form, winbackEnabled: e.target.checked })} data-testid="winback-enabled" />
             <span>
               <b>Geri kazanma mesajı gönder</b>
-              <span className="block text-slate-500">
+              <span className="block text-muted">
                 Ticari ileti onayı veren ve bir süredir sipariş vermeyen müşteriye günde bir kez kişiye özel, 14 gün geçerli kod gider. İYS kaydı
                 gerekir (docs/kurulum.md §27).
               </span>

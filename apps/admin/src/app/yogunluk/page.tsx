@@ -34,7 +34,7 @@ const fill = (v: number, max: number) => {
 
 const VERDICT: Record<StaffingAdvice["verdict"], { label: string; cls: string }> = {
   artir: { label: "▲ Artır", cls: "font-semibold text-amber-700" },
-  azalt: { label: "▼ Azalt", cls: "text-slate-600" },
+  azalt: { label: "▼ Azalt", cls: "text-ink-soft" },
   uygun: { label: "✓ Uygun", cls: "text-emerald-700" },
 };
 
@@ -128,7 +128,7 @@ export default function YogunlukPage() {
           ) : null
         }
       >
-        <p className="mb-2 min-h-5 text-sm text-slate-600" data-testid="demand-hover">
+        <p className="mb-2 min-h-5 text-sm text-ink-soft" data-testid="demand-hover">
           {shown && matrix
             ? `${WEEKDAY_LABELS[shown.w]} ${hh(shown.h)}–${hh(shown.h + 1)} · haftada ort. ${num(matrix[shown.w - 1]![shown.h]!)} sipariş`
             : `${total} sipariş, ${data ? num(data.weeks) : "–"} hafta. Bir hücreye tıklayınca harita o gün ve saate süzülür.`}
@@ -139,7 +139,7 @@ export default function YogunlukPage() {
               <tr>
                 <th />
                 {HOURS.map((h) => (
-                  <th key={h} className="w-6 text-center text-[10px] font-normal text-slate-500">
+                  <th key={h} className="w-6 text-center text-[10px] font-normal text-muted">
                     {h % 3 === 0 ? String(h).padStart(2, "0") : ""}
                   </th>
                 ))}
@@ -148,7 +148,7 @@ export default function YogunlukPage() {
             <tbody>
               {DAYS.map((w) => (
                 <tr key={w}>
-                  <th className="pr-2 text-left text-xs font-medium text-slate-600">
+                  <th className="pr-2 text-left text-xs font-medium text-ink-soft">
                     <button
                       className={day === w ? "text-brand underline" : ""}
                       onClick={() => {
@@ -187,10 +187,10 @@ export default function YogunlukPage() {
             </tbody>
           </table>
         </div>
-        <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-slate-600" aria-hidden>
+        <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-ink-soft" aria-hidden>
           <span>Haftalık ortalama sipariş:</span>
           <span className="inline-flex items-center gap-1">
-            <span className="inline-block h-3 w-4 rounded-sm border border-slate-200" style={{ background: ZERO }} /> 0
+            <span className="inline-block h-3 w-4 rounded-sm border border-line" style={{ background: ZERO }} /> 0
           </span>
           {RAMP.map((c, i) => (
             <span key={c} className="inline-flex items-center gap-1">
@@ -206,17 +206,17 @@ export default function YogunlukPage() {
           <LeafletMap pins={pins} fitKey={`${weeks}-${day}-${hour}-${hotspots.length}`} className="h-[420px] w-full rounded-lg" />
         </Card>
         <Card title="Sıralama">
-          <Table head={["#", "Bölge", "Haftada", "Pay"]} empty="Bu seçimde sipariş yok">
+          <Table head={["#", "Bölge", "Haftada", "Pay"]} num={[2, 3]} empty="Bu seçimde sipariş yok. Başka bir gün/saat hücresi seçin veya seçimi temizleyin.">
             {hotspots.map((h, i) => (
               <tr key={`${h.lat}-${h.lng}`} data-testid="hotspot-row">
                 <Td>{i + 1}</Td>
                 <Td>{h.district ?? "Bölge"}</Td>
-                <Td className="whitespace-nowrap">{num(h.perWeek)}</Td>
-                <Td>%{Math.round(h.share * 100)}</Td>
+                <Td num>{num(h.perWeek)}</Td>
+                <Td num>%{Math.round(h.share * 100)}</Td>
               </tr>
             ))}
           </Table>
-          <p className="mt-2 text-xs text-slate-500">Hücre ~1 km; ilçe, hücredeki alış adreslerinde en sık geçen ilçedir.</p>
+          <p className="mt-2 text-xs text-muted">Hücre ~1 km; ilçe, hücredeki alış adreslerinde en sık geçen ilçedir.</p>
         </Card>
       </div>
 
@@ -225,7 +225,7 @@ export default function YogunlukPage() {
           <div className="w-48">
             <Input label="Kurye başına saatlik iş" inputMode="decimal" value={rate} onChange={(e) => setRate(e.target.value)} data-testid="demand-rate" />
           </div>
-          <p className="max-w-xl text-xs text-slate-500">
+          <p className="max-w-xl text-xs text-muted">
             Öneri = dilimin en yoğun saatindeki haftalık ortalama sipariş ÷ kurye başına saatlik iş (yukarı yuvarlanır; talep varsa en az 1).
             Ortalama teslim ~1 saat sürdüğünden 1–1,5 makuldür. <b>Uygula</b> vardiya planındaki gereken kurye sayısını değiştirir.
           </p>

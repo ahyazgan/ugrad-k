@@ -3,6 +3,7 @@
 /**
  * DEMO veri kaynağı: Supabase bağlanmadan paneli denemek için.
  * Giriş: admin@yazgankurye.com / demo1234. Veriler tarayıcı belleğinde tutulur.
+ * Tüm tarihler "şimdi"ye göre göreli üretilir (her açılışta bugün dolu görünür).
  */
 import {
   DEFAULT_PRICING_SETTINGS,
@@ -15,6 +16,7 @@ import {
   aggregateDemand,
   closedIncentivePeriods,
   DEFAULT_COST_MODEL,
+  economyAvailableAt,
   formatTL,
   inIncentiveScope,
   incentiveAwardKurus,
@@ -30,9 +32,10 @@ import {
   type Holiday,
   type OrderStatus,
   type PricingSettings,
+  type ServiceLevel,
 } from "@yazgan/shared";
 import holidaysJson from "../../../../../docs/resmi-tatiller.json";
-import { istDayEndUtc, istDayStartUtc, istMonthRangeUtc } from "../dates";
+import { istDate, istDayEndUtc, istDayStartUtc, istMonthRangeUtc } from "../dates";
 import {
   RepoError,
   type AdminOrder,
@@ -107,7 +110,13 @@ function demoSla(urgent: boolean, createdAt: string, deliveredAt: string | null)
 }
 
 const dayOffset = (days: number) => istanbulDay(new Date(Date.now() + days * 86_400_000));
-/** Mehmet'in belgeleri tam (sigortası 12 gün içinde bitiyor); Emre'nin kurye faaliyet belgesi eksik */
+
+/**
+ * Kurye belgeleri:
+ * Mehmet tam (sigortası 12 gün içinde bitiyor), Emre'nin kurye faaliyet belgesi eksik,
+ * Zeynep ve Burak tam, Serkan'ın ehliyeti 6 gün içinde doluyor, Hakan'ın sigortası 3 gün önce doldu,
+ * Ali (pasif) yalnız ehliyetini yüklemiş.
+ */
 function demoDocuments(): CourierDocumentRecord[] {
   const doc = (courierId: string, kind: CourierDocumentRecord["kind"], expiresAt: string | null, docNumber: string | null = null): CourierDocumentRecord => ({
     courierId,
@@ -118,6 +127,15 @@ function demoDocuments(): CourierDocumentRecord[] {
     note: null,
     updatedAt: hoursAgo(200),
   });
+  const full = (courierId: string, overrides: Partial<Record<CourierDocumentRecord["kind"], string | null>> = {}) =>
+    (
+      [
+        ["ehliyet", dayOffset(1600)],
+        ["kurye_faaliyet_belgesi", dayOffset(420)],
+        ["ruhsat", null],
+        ["trafik_sigortasi", dayOffset(240)],
+      ] as Array<[CourierDocumentRecord["kind"], string | null]>
+    ).map(([kind, exp]) => doc(courierId, kind, kind in overrides ? (overrides[kind] ?? null) : exp));
   return [
     doc("kur-1", "ehliyet", dayOffset(1400), "A2-348812"),
     doc("kur-1", "kurye_faaliyet_belgesi", dayOffset(500), "KFB-2026-11873"),
@@ -127,6 +145,11 @@ function demoDocuments(): CourierDocumentRecord[] {
     doc("kur-2", "ehliyet", dayOffset(2000)),
     doc("kur-2", "ruhsat", null),
     doc("kur-2", "trafik_sigortasi", dayOffset(200)),
+    ...full("kur-3"),
+    ...full("kur-4"),
+    ...full("kur-5", { ehliyet: dayOffset(6) }),
+    ...full("kur-6", { trafik_sigortasi: dayOffset(-3) }),
+    doc("kur-7", "ehliyet", dayOffset(700)),
   ];
 }
 
@@ -154,6 +177,33 @@ function earningFor(o: AdminOrderDetail, model: CostModel, settings: PricingSett
 const phoneDigits = (p: string) => p.replace(/\D/g, "").replace(/^(90|0)/, "");
 const hoursAgo = (h: number) => new Date(Date.now() - h * 3_600_000).toISOString();
 
+/** Demo sipariş tanımı (seed içinde gerçek siparişe dönüştürülür) */
+interface Spec {
+  customerId: string;
+  from: string;
+  to: string;
+  status: OrderStatus;
+  /** Kaç saat önce oluşturuldu */
+  ago: number;
+  level: ServiceLevel;
+  courierId: string | null;
+  /** Oluşturmadan teslime dakika (teslim edilenler) */
+  deliveryMin?: number;
+  payment?: { method: "kart" | "nakit" | "cari"; status: string };
+  problemNote?: string;
+}
+
+const spec = (
+  customerId: string,
+  from: string,
+  to: string,
+  status: OrderStatus,
+  ago: number,
+  urgent: boolean,
+  courierId: string | null,
+  extra: Partial<Spec> = {},
+): Spec => ({ customerId, from, to, status, ago, level: urgent ? "acil" : "standart", courierId, ...extra });
+
 async function seed(): Promise<State> {
   const maps = mockMapsProvider();
   const corporate: CorporateAccount[] = [
@@ -166,71 +216,145 @@ async function seed(): Promise<State> {
       billingEmail: "muhasebe@ornek-hukuk.com",
       notes: null,
     },
+    {
+      id: "corp-2",
+      companyName: "Ataşehir Dental Klinik",
+      taxOffice: "Kozyatağı",
+      taxNumber: "4567890123",
+      billingAddress: "Barbaros Mah., Ataşehir/İstanbul",
+      billingEmail: "fatura@ornek-dental.com",
+      notes: "Laboratuvar ölçü ve protez teslimleri",
+    },
+    {
+      id: "corp-3",
+      companyName: "Kozyatağı Mimarlık Ofisi",
+      taxOffice: "Erenköy",
+      taxNumber: "7890123456",
+      billingAddress: "Kozyatağı Mah., Kadıköy/İstanbul",
+      billingEmail: "ofis@ornek-mimarlik.com",
+      notes: null,
+    },
   ];
   const customers: Customer[] = [
     { id: "cus-1", fullName: "Ayşe Yılmaz", phone: "+905321112233", email: null, corporateAccountId: null, createdAt: hoursAgo(400), orderCount: 0 },
     { id: "cus-3", fullName: "Kaan Öztürk", phone: "+905367778899", email: null, corporateAccountId: null, createdAt: hoursAgo(800), orderCount: 0 },
     { id: "cus-2", fullName: "Av. Murat Demir", phone: "+905334445566", email: "murat@ornek-hukuk.com", corporateAccountId: "corp-1", createdAt: hoursAgo(900), orderCount: 0 },
+    { id: "cus-4", fullName: "Elif Koç", phone: "+905301010101", email: "elif@ornek-dental.com", corporateAccountId: "corp-2", createdAt: hoursAgo(1500), orderCount: 0 },
+    { id: "cus-5", fullName: "Dr. Selim Aksoy", phone: "+905302020202", email: "selim@ornek-dental.com", corporateAccountId: "corp-2", createdAt: hoursAgo(1300), orderCount: 0 },
+    { id: "cus-6", fullName: "Gizem Tan", phone: "+905303030303", email: "gizem@ornek-mimarlik.com", corporateAccountId: "corp-3", createdAt: hoursAgo(1100), orderCount: 0 },
+    { id: "cus-7", fullName: "Ozan Er", phone: "+905304040404", email: null, corporateAccountId: "corp-3", createdAt: hoursAgo(1000), orderCount: 0 },
+    { id: "cus-8", fullName: "Melis Kurt", phone: "+905305050505", email: "melis@example.com", corporateAccountId: null, createdAt: hoursAgo(80), orderCount: 0 },
+    { id: "cus-9", fullName: "Tarık Bulut", phone: "+905306060606", email: null, corporateAccountId: null, createdAt: hoursAgo(30), orderCount: 0 },
+    { id: "cus-10", fullName: "Nur Şen", phone: "+905307070707", email: "nur@example.com", corporateAccountId: null, createdAt: hoursAgo(1200), orderCount: 0 },
+    { id: "cus-11", fullName: "Barış Güneş", phone: "+905308080808", email: "baris@example.com", corporateAccountId: null, createdAt: hoursAgo(150), orderCount: 0 },
+    { id: "cus-12", fullName: "Hande Yurt", phone: "+905309090909", email: null, corporateAccountId: null, createdAt: hoursAgo(500), orderCount: 0 },
+    { id: "cus-13", fullName: "Volkan Erdem", phone: "+905310101010", email: "volkan@ornek-hukuk.com", corporateAccountId: "corp-1", createdAt: hoursAgo(1400), orderCount: 0 },
+    { id: "cus-14", fullName: "Pelin Çınar", phone: "+905311111111", email: "pelin@example.com", corporateAccountId: null, createdAt: hoursAgo(60), orderCount: 0 },
   ];
   const couriers: Courier[] = [
     { id: "kur-1", fullName: "Mehmet Kaya", phone: "+905551110001", plate: "34 YZG 01", vehicleModel: "Honda PCX 125", active: true, isOnShift: true, onBreak: false, lastLat: 41.08, lastLng: 29.06, lastLocationAt: hoursAgo(0.05), activeOrderCount: 0 },
     { id: "kur-2", fullName: "Emre Şahin", phone: "+905551110002", plate: "34 YZG 02", vehicleModel: "Yamaha NMAX", active: true, isOnShift: false, onBreak: false, lastLat: null, lastLng: null, lastLocationAt: null, activeOrderCount: 0 },
+    { id: "kur-3", fullName: "Zeynep Arslan", phone: "+905551110003", plate: "34 YZG 03", vehicleModel: "Honda PCX 125", active: true, isOnShift: true, onBreak: false, lastLat: 40.995, lastLng: 29.04, lastLocationAt: hoursAgo(0.03), activeOrderCount: 0 },
+    { id: "kur-4", fullName: "Burak Yıldırım", phone: "+905551110004", plate: "34 YZG 04", vehicleModel: "Yamaha NMAX", active: true, isOnShift: true, onBreak: true, lastLat: 41.021, lastLng: 29.11, lastLocationAt: hoursAgo(0.35), activeOrderCount: 0 },
+    { id: "kur-5", fullName: "Serkan Aydın", phone: "+905551110005", plate: "34 YZG 05", vehicleModel: "Kymco Agility 125", active: true, isOnShift: true, onBreak: false, lastLat: 40.99, lastLng: 29.115, lastLocationAt: hoursAgo(0.04), activeOrderCount: 0 },
+    { id: "kur-6", fullName: "Hakan Polat", phone: "+905551110006", plate: "34 YZG 06", vehicleModel: "Honda Activa", active: true, isOnShift: false, onBreak: false, lastLat: null, lastLng: null, lastLocationAt: null, activeOrderCount: 0 },
+    { id: "kur-7", fullName: "Ali Kurt", phone: "+905551110007", plate: "34 YZG 07", vehicleModel: "Yamaha NMAX", active: false, isOnShift: false, onBreak: false, lastLat: null, lastLng: null, lastLocationAt: null, activeOrderCount: 0 },
   ];
   const place = (id: string) => MOCK_PLACES.find((p) => p.placeId === id)!;
-  const specs: Array<[string, string, string, OrderStatus, number, boolean, string | null]> = [
-    ["cus-2", "mock-beykoz", "mock-levent", "beklemede", 0.2, true, null],
-    ["cus-1", "mock-kadikoy", "mock-atasehir", "onaylandi", 0.6, false, null],
-    ["cus-2", "mock-beykoz", "mock-sisli", "yolda", 1.5, false, "kur-1"],
-    ["cus-1", "mock-uskudar", "mock-kartal", "teslim_edildi", 26, false, "kur-1"],
-    ...Array.from({ length: 21 }, (_, i): [string, string, string, OrderStatus, number, boolean, string | null] => [
-      "cus-2",
-      "mock-beykoz",
-      i % 2 ? "mock-taksim" : "mock-umraniye",
-      "teslim_edildi",
-      30 + i * 5,
-      i % 5 === 0,
-      i % 2 ? "kur-1" : "kur-2",
-    ]),
+  // İlk dört sipariş ve Beykoz Hukuk Bürosu'nun teslimatları e2e testinin dayandığı kayıtlardır (YK-1001 … YK-1025)
+  const COURIER_CYCLE = ["kur-2", "kur-1", "kur-3", "kur-5"];
+  const specs: Spec[] = [
+    spec("cus-2", "mock-beykoz", "mock-levent", "beklemede", 0.2, true, null),
+    spec("cus-1", "mock-kadikoy", "mock-atasehir", "onaylandi", 0.6, false, null),
+    spec("cus-2", "mock-beykoz", "mock-sisli", "yolda", 1.5, false, "kur-1"),
+    spec("cus-1", "mock-uskudar", "mock-kartal", "teslim_edildi", 26, false, "kur-1"),
+    ...Array.from({ length: 21 }, (_, i) =>
+      spec("cus-2", "mock-beykoz", i % 2 ? "mock-taksim" : "mock-umraniye", "teslim_edildi", 30 + i * 5, i % 5 === 0, COURIER_CYCLE[i % 4]!),
+    ),
   ];
-  // Raporlar için ~4 haftalık geçmiş: sabit tohumlu sözde rastgele (her açılışta aynı veri)
+  // Raporlar için ~30 günlük geçmiş: sabit tohumlu sözde rastgele (her açılışta aynı dağılım)
   let rnd = 7;
   const next = () => ((rnd = (rnd * 1103515245 + 12345) % 2 ** 31) / 2 ** 31);
   const pick = <T,>(xs: T[]) => xs[Math.floor(next() * xs.length)]!;
   const HOURS = [8, 9, 9, 10, 10, 10, 11, 11, 12, 13, 14, 14, 15, 15, 16, 16, 17, 18, 19, 21, 23];
   const ANADOLU = ["mock-beykoz", "mock-kadikoy", "mock-uskudar", "mock-atasehir", "mock-umraniye", "mock-kartal"];
   const ALL = [...ANADOLU, "mock-levent", "mock-sisli", "mock-taksim", "mock-bakirkoy"];
-  const deliveryMin = new Map<number, number>();
-  for (let day = 7; day <= 28; day++) {
+  const HISTORY_CUSTOMERS = ["cus-3", "cus-3", "cus-1", "cus-4", "cus-5", "cus-6", "cus-7", "cus-8", "cus-11", "cus-12", "cus-13", "cus-14"];
+  for (let day = 1; day <= 30; day++) {
     const dow = new Date(Date.now() - day * 86_400_000).getUTCDay();
-    const n = dow === 0 ? 0 : dow === 6 ? 1 : 1 + Math.floor(next() * 3);
+    const n = dow === 0 ? Math.floor(next() * 2) : dow === 6 ? 1 + Math.floor(next() * 2) : 2 + Math.floor(next() * 4);
     for (let k = 0; k < n; k++) {
       const at = new Date(Date.now() - day * 86_400_000);
       at.setUTCHours(pick(HOURS) - 3, Math.floor(next() * 60), 0, 0);
       const cancelled = next() < 0.08;
       const urgent = next() < 0.3;
-      deliveryMin.set(specs.length, urgent ? 32 + Math.floor(next() * 40) : 45 + Math.floor(next() * 75));
-      specs.push([
-        next() < 0.6 ? "cus-3" : "cus-1",
-        pick(ANADOLU),
-        pick(ALL),
-        cancelled ? "iptal" : "teslim_edildi",
-        (Date.now() - at.getTime()) / 3_600_000,
-        urgent,
-        cancelled ? null : next() < 0.55 ? "kur-1" : "kur-2",
-      ]);
+      let customerId = pick(HISTORY_CUSTOMERS);
+      // Kayıttan önce sipariş olmasın
+      if (customers.find((c) => c.id === customerId)!.createdAt > at.toISOString()) customerId = "cus-3";
+      // Bireysel müşterilerin bir kısmı kartla öder
+      const card = ["cus-11", "cus-14", "cus-8"].includes(customerId);
+      const r = next();
+      // Ekonomi yalnız hafta içi gündüz alışta (fiyat kuralı); uygun değilse standart
+      const level: ServiceLevel = urgent ? "acil" : r > 0.8 && economyAvailableAt(at, DEFAULT_PRICING_SETTINGS) ? "ekonomi" : "standart";
+      specs.push({
+        customerId,
+        from: pick(ANADOLU),
+        to: pick(ALL),
+        status: cancelled ? "iptal" : "teslim_edildi",
+        ago: (Date.now() - at.getTime()) / 3_600_000,
+        level,
+        courierId: cancelled ? null : r < 0.3 ? "kur-1" : r < 0.5 ? "kur-3" : r < 0.75 ? "kur-2" : "kur-5",
+        deliveryMin: urgent ? 32 + Math.floor(next() * 40) : 45 + Math.floor(next() * 75),
+        payment: card ? { method: "kart", status: "odendi" } : undefined,
+      });
     }
   }
+  // Geçen ay: Ataşehir Dental ve Kozyatağı Mimarlık teslimatları (ay sonu faturası örnekleri)
+  const [monthStartIso] = istMonthRangeUtc(istDate().slice(0, 7));
+  const monthStart = new Date(monthStartIso).getTime();
+  for (const [i, customerId] of ["cus-4", "cus-5", "cus-4", "cus-6", "cus-5", "cus-7", "cus-4", "cus-6", "cus-5", "cus-7", "cus-4"].entries()) {
+    const at = monthStart - (3 + i * 2) * 86_400_000 + (8 + (i % 6)) * 3_600_000; // 11:00–16:00 İstanbul
+    specs.push({
+      customerId,
+      from: customerId === "cus-6" || customerId === "cus-7" ? "mock-kadikoy" : "mock-atasehir",
+      to: pick(ALL),
+      status: "teslim_edildi",
+      ago: (Date.now() - at) / 3_600_000,
+      level: i % 4 === 0 ? "acil" : "standart",
+      courierId: COURIER_CYCLE[i % 4]!,
+      deliveryMin: 50,
+    });
+  }
+  // Bugünün canlı işleri: SLA riski, gecikme, sorunlu, ödeme bekleyen, atama bekleyen ve yeni teslimler
+  specs.push(
+    spec("cus-4", "mock-atasehir", "mock-levent", "kuryeye_atandi", 0.78, true, "kur-5"),
+    spec("cus-6", "mock-kadikoy", "mock-sisli", "alindi", 0.4, true, "kur-3"),
+    spec("cus-13", "mock-beykoz", "mock-taksim", "yolda", 1.15, true, "kur-1"),
+    spec("cus-12", "mock-uskudar", "mock-kadikoy", "sorunlu", 2.2, false, "kur-3", { problemNote: "Alıcı adreste yok, telefonu kapalı" }),
+    spec("cus-11", "mock-kadikoy", "mock-uskudar", "beklemede", 0.35, false, null, { payment: { method: "kart", status: "odenmedi" } }),
+    spec("cus-8", "mock-umraniye", "mock-atasehir", "onaylandi", 0.9, false, null),
+    spec("cus-5", "mock-atasehir", "mock-kadikoy", "teslim_edildi", 0.95, false, "kur-5", { deliveryMin: 38 }),
+    spec("cus-14", "mock-uskudar", "mock-levent", "teslim_edildi", 0.7, true, "kur-3", { deliveryMin: 30, payment: { method: "kart", status: "odendi" } }),
+    spec("cus-7", "mock-kadikoy", "mock-umraniye", "teslim_edildi", 3.2, false, "kur-1", { deliveryMin: 52 }),
+    spec("cus-2", "mock-beykoz", "mock-uskudar", "teslim_edildi", 5.5, false, "kur-5", { deliveryMin: 47 }),
+    spec("cus-12", "mock-kartal", "mock-atasehir", "iptal", 4, false, null),
+  );
+
   const orders: AdminOrderDetail[] = [];
   let no = 1000;
-  for (const [idx, [customerId, from, to, status, ago, urgent, courierId]] of specs.entries()) {
-    const p = place(from);
-    const d = place(to === from ? "mock-levent" : to);
-    const createdAt = hoursAgo(ago);
+  const flow: OrderStatus[] = ["beklemede", "onaylandi", "kuryeye_atandi", "alindi", "yolda", "teslim_edildi"];
+  for (const s of specs) {
+    const p = place(s.from);
+    const d = place(s.to === s.from ? "mock-levent" : s.to);
+    const createdAt = hoursAgo(s.ago);
+    const urgent = s.level === "acil";
+    const cust = customers.find((c) => c.id === s.customerId)!;
+    const paymentMethod = s.payment?.method ?? (cust.corporateAccountId ? "cari" : "nakit");
     const q = await buildQuote(
       {
         pickup: p,
         dropoff: d,
-        serviceLevel: urgent ? "acil" : "standart",
+        serviceLevel: s.level,
         urgent,
         roundTrip: false,
         weightKg: null,
@@ -238,21 +362,29 @@ async function seed(): Promise<State> {
         declaredValueKurus: null,
         deliveryCode: false,
         scheduledPickupAt: null,
-        paymentMethod: customerId === "cus-2" ? "cari" : "nakit",
+        paymentMethod,
       },
       { maps, settings: DEFAULT_PRICING_SETTINGS, holidays: [], now: new Date(createdAt) },
     );
-    const cust = customers.find((c) => c.id === customerId)!;
     cust.orderCount++;
-    const flow: OrderStatus[] = ["beklemede", "onaylandi", "kuryeye_atandi", "alindi", "yolda", "teslim_edildi"];
-    const reached = status === "iptal" ? (["beklemede", "iptal"] as OrderStatus[]) : flow.slice(0, flow.indexOf(status) + 1);
+    const reached: OrderStatus[] =
+      s.status === "iptal"
+        ? ["beklemede", "iptal"]
+        : s.status === "sorunlu"
+          ? ["beklemede", "onaylandi", "kuryeye_atandi", "alindi", "sorunlu"]
+          : flow.slice(0, flow.indexOf(s.status) + 1);
+    const deliveryMin = s.deliveryMin ?? 60;
+    const deliveredAt = s.status === "teslim_edildi" ? hoursAgo(s.ago - deliveryMin / 60) : null;
+    // Geçmiş adımları oluşturma ile teslim (veya şimdi) arasına yayılır; gelecek zaman üretilmez
+    const span = deliveredAt ? deliveryMin : Math.min(10 * (reached.length - 1), s.ago * 60 * 0.9);
+    const step = reached.length > 1 ? span / (reached.length - 1) : 0;
     orders.push({
       id: `ord-${++no}`,
       orderNo: `YK-${no}`,
-      status,
+      status: s.status,
       createdAt,
       urgent,
-      serviceLevel: urgent ? "acil" : "standart",
+      serviceLevel: s.level,
       roundTrip: false,
       pickupAddress: p.address,
       pickupSide: p.side,
@@ -262,22 +394,22 @@ async function seed(): Promise<State> {
       dropoffLng: d.lng,
       dropoffAddress: d.address,
       dropoffSide: d.side,
-      customerId,
+      customerId: s.customerId,
       customerName: cust.fullName,
       customerPhone: cust.phone,
       corporateAccountId: cust.corporateAccountId,
-      courierId,
-      courierName: couriers.find((c) => c.id === courierId)?.fullName ?? null,
+      courierId: s.courierId,
+      courierName: couriers.find((c) => c.id === s.courierId)?.fullName ?? null,
       totalKurus: q.quote.totalKurus,
       subtotalKurus: q.quote.subtotalKurus,
-      paymentMethod: cust.corporateAccountId ? "cari" : "nakit",
-      paymentStatus: cust.corporateAccountId ? "cari_hesap" : "odenmedi",
-      paidKurus: null,
+      paymentMethod,
+      paymentStatus: s.payment?.status ?? (cust.corporateAccountId ? "cari_hesap" : "odenmedi"),
+      paidKurus: s.payment?.status === "odendi" ? q.quote.totalKurus : null,
       cashCollection: null,
-      ...demoSla(urgent, createdAt, status === "teslim_edildi" ? hoursAgo(ago - (deliveryMin.get(idx) ?? 60) / 60) : null),
+      ...demoSla(urgent, createdAt, deliveredAt),
       distanceMeters: q.distanceMeters,
       scheduledPickupAt: null,
-      deliveredAt: status === "teslim_edildi" ? hoursAgo(ago - (deliveryMin.get(idx) ?? 60) / 60) : null,
+      deliveredAt,
       failedReason: null,
       returnedAt: null,
       failedAt: null,
@@ -293,7 +425,7 @@ async function seed(): Promise<State> {
       dropoffDetails: "Resepsiyon",
       dropoffContactName: "Alıcı",
       dropoffContactPhone: "+905000000000",
-      packageDescription: "Evrak",
+      packageDescription: cust.corporateAccountId === "corp-2" ? "Ölçü / protez kutusu" : "Evrak",
       weightKg: null,
       customerNote: null,
       waitingMinutes: 0,
@@ -308,18 +440,18 @@ async function seed(): Promise<State> {
       offerExpiresAt: null,
       offers: [],
       trackingToken: `demo${no}`.padEnd(32, "0"),
-      cancelReason: status === "iptal" ? "Müşteri vazgeçti" : null,
-      problemNote: null,
+      cancelReason: s.status === "iptal" ? "Müşteri vazgeçti" : null,
+      problemNote: s.problemNote ?? null,
       paymentRef: null,
       paymentError: null,
-      podPhotoPath: status === "teslim_edildi" ? "demo/foto.jpg" : null,
+      podPhotoPath: s.status === "teslim_edildi" ? "demo/foto.jpg" : null,
       podSignaturePath: null,
-      podReceiverName: status === "teslim_edildi" ? "Resepsiyon" : null,
-      history: reached.map((s, i) => ({
+      podReceiverName: s.status === "teslim_edildi" ? "Resepsiyon" : null,
+      history: reached.map((st, i) => ({
         fromStatus: i ? reached[i - 1]! : null,
-        toStatus: s,
-        at: new Date(new Date(createdAt).getTime() + i * 10 * 60_000).toISOString(),
-        note: null,
+        toStatus: st,
+        at: new Date(new Date(createdAt).getTime() + i * step * 60_000).toISOString(),
+        note: st === "sorunlu" ? (s.problemNote ?? null) : null,
       })),
     });
   }
@@ -402,32 +534,26 @@ async function seed(): Promise<State> {
     });
     for (const e of old) e.payoutId = "pay-1";
   }
-  const shifts: Shift[] = Array.from({ length: 10 }, (_, i) => {
-    const c = couriers[i % 2]!;
-    const start = new Date(Date.now() - (Math.floor(i / 2) + 1) * 86_400_000);
-    start.setUTCHours(6, 0, 0, 0); // 09:00 İstanbul
-    return {
-      id: `sh-${i}`,
-      courierId: c.id,
-      courierName: c.fullName,
-      courierPhone: c.phone,
-      plate: c.plate,
-      startedAt: start.toISOString(),
-      endedAt: new Date(start.getTime() + (8 + (i % 3)) * 3_600_000).toISOString(),
-      // Öğle molası 13:00 (İstanbul), 30–50 dk
-      breaks: [{ startedAt: new Date(start.getTime() + 4 * 3_600_000).toISOString(), endedAt: new Date(start.getTime() + (4 * 60 + 30 + (i % 3) * 10) * 60_000).toISOString(), auto: false }],
-    };
-  });
-  shifts.push({
-    id: "sh-open",
-    courierId: "kur-1",
-    courierName: "Mehmet Kaya",
-    courierPhone: "+905551110001",
-    plate: "34 YZG 01",
-    startedAt: hoursAgo(3),
+  // BTK çalışma saatleri: son 6 günün vardiyaları + şu an vardiyada olanların açık kayıtları
+  const shifts: Shift[] = [];
+  const openShift = (c: Courier, startedHoursAgo: number, breaks: Shift["breaks"] = []): Shift => ({
+    id: `sh-open-${c.id}`,
+    courierId: c.id,
+    courierName: c.fullName,
+    courierPhone: c.phone,
+    plate: c.plate,
+    startedAt: hoursAgo(startedHoursAgo),
     endedAt: null,
-    breaks: [],
+    breaks,
   });
+  const byId = (id: string) => couriers.find((c) => c.id === id)!;
+  shifts.push(
+    { ...openShift(byId("kur-1"), 3), id: "sh-open" },
+    openShift(byId("kur-3"), 5),
+    // Burak molada: açık mola şimdiye kadar sayılır
+    openShift(byId("kur-4"), 4, [{ startedAt: hoursAgo(0.4), endedAt: null, auto: false }]),
+    openShift(byId("kur-5"), 2),
+  );
   const incidents: Incident[] = [
     {
       id: "inc-open",
@@ -465,6 +591,24 @@ async function seed(): Promise<State> {
       resolvedAt: hoursAgo(119),
       resolutionNote: "Kurye arandı, yaralanma yok; iş yeniden atandı",
     },
+    {
+      id: "inc-older",
+      courierId: "kur-4",
+      courierName: "Burak Yıldırım",
+      courierPhone: "+905551110004",
+      kind: "arac_ariza",
+      note: "Zincir attı",
+      lat: 41.01,
+      lng: 29.1,
+      accuracyM: 15,
+      orderId: null,
+      orderNo: null,
+      createdAt: hoursAgo(300),
+      alertCount: 1,
+      acknowledgedAt: hoursAgo(299.9),
+      resolvedAt: hoursAgo(299),
+      resolutionNote: "Servise bırakıldı, yedek motorla devam etti",
+    },
   ];
   // Örnek yazışma: teklif geçmişi olan son teslimatta
   const chatOrder = orders.filter((o) => o.offers.length).at(-1);
@@ -474,7 +618,7 @@ async function seed(): Promise<State> {
         { id: "msg-2", orderId: chatOrder.id, senderRole: "musteri", body: "Resepsiyona bırakabilirsiniz", createdAt: chatOrder.arrivedDropoffAt ?? chatOrder.createdAt, readAt: chatOrder.arrivedDropoffAt },
       ]
     : [];
-  // Vardiya planı: veritabanı varsayılanlarıyla aynı şablon; bu hafta ve gelecek hafta örnek seçimler
+  // Vardiya planı: veritabanı varsayılanlarıyla aynı şablon; geçen hafta, bu hafta ve gelecek hafta örnek seçimler
   const shiftTemplates: ShiftTemplate[] = [];
   for (let d = 1; d <= 7; d++) {
     const blocks: [string, string, number][] =
@@ -491,20 +635,125 @@ async function seed(): Promise<State> {
   for (let off = -6; off <= 7; off++) {
     const day = new Date(Date.now() + 3 * 3_600_000 + off * 86_400_000).toISOString().slice(0, 10);
     const dow = ((new Date(`${day}T12:00:00Z`).getUTCDay() + 6) % 7) + 1;
+    const even = off % 2 === 0;
     for (const t of shiftTemplates.filter((x) => x.weekday === dow)) {
-      const who = t.startTime === "08:00" || t.startTime === "12:00" || t.startTime === "10:00" ? "kur-1" : t.startTime === "16:00" && off % 2 === 0 ? "kur-2" : null;
-      if (!who) continue;
-      shiftBookings.push({
-        id: `bk-${day}-${t.id}`,
-        courierId: who,
-        courierName: who === "kur-1" ? "Mehmet Kaya" : "Emre Şahin",
-        templateId: t.id,
-        startsAt: istTs(day, t.startTime),
-        endsAt: istTs(day, t.endTime),
-        cancelledAt: off === -2 && who === "kur-2" ? hoursAgo(60) : null,
-        lateCancel: off === -2 && who === "kur-2",
+      // Emre yalnız 16:00 diliminde (e2e: gelecek haftanın ilk dilimine Emre eklenebilmeli)
+      const who: string[] = [];
+      if (["08:00", "12:00", "10:00"].includes(t.startTime)) who.push("kur-1");
+      // Gelecek günlerin 08:00 dilimi yarım kalsın (e2e: eklenen kurye özeti değiştirmeli)
+      if (t.startTime === "08:00" && !even && off <= 0) who.push("kur-5");
+      if ((t.startTime === "12:00" || t.startTime === "14:00") && off % 3 !== 2) who.push("kur-3");
+      if (t.startTime === "16:00" && even) who.push("kur-2");
+      if (t.startTime === "16:00" && off % 3 !== 1) who.push("kur-3");
+      if (t.startTime === "18:00") who.push("kur-5");
+      if (t.startTime === "20:00") who.push(even ? "kur-5" : "kur-4");
+      for (const id of who) {
+        const late = off === -2 && id === "kur-2";
+        shiftBookings.push({
+          id: `bk-${day}-${t.id}-${id}`,
+          courierId: id,
+          courierName: byId(id).fullName,
+          templateId: t.id,
+          startsAt: istTs(day, t.startTime),
+          endsAt: istTs(day, t.endTime),
+          cancelledAt: late ? hoursAgo(60) : null,
+          lateCancel: late,
+        });
+      }
+    }
+  }
+  // Geçmiş vardiya kayıtları seçilen dilimlerden türetilir (plan ile BTK kayıtları tutarlı); arada bir "gelmedi" örneği
+  const nowMs = Date.now();
+  const blocks = new Map<string, Array<{ start: number; end: number }>>();
+  for (const bk of [...shiftBookings].filter((x) => !x.cancelledAt).sort((x, y) => x.startsAt.localeCompare(y.startsAt))) {
+    const key = `${bk.courierId}|${istDate(bk.startsAt)}`;
+    const list = blocks.get(key) ?? [];
+    const st = new Date(bk.startsAt).getTime();
+    const en = new Date(bk.endsAt).getTime();
+    const last = list.at(-1);
+    if (last && last.end === st) last.end = en;
+    else list.push({ start: st, end: en });
+    blocks.set(key, list);
+  }
+  let blockNo = 0;
+  for (const [key, list] of blocks) {
+    const courierId = key.split("|")[0]!;
+    const c = byId(courierId);
+    const open = shifts.find((x) => x.courierId === courierId && !x.endedAt);
+    for (const blk of list) {
+      blockNo++;
+      if (blk.end > nowMs || blockNo % 11 === 5) continue; // henüz bitmedi / gelmedi örneği
+      if (open && new Date(open.startedAt).getTime() < blk.end) continue;
+      const start = blk.start + (blockNo % 3) * 4 * 60_000;
+      const end = blk.end - (blockNo % 2) * 5 * 60_000;
+      const long = end - start >= 6 * 3_600_000;
+      const mid = start + Math.floor((end - start) / 2 / 60_000) * 60_000;
+      shifts.push({
+        id: `sh-${shifts.length}`,
+        courierId,
+        courierName: c.fullName,
+        courierPhone: c.phone,
+        plate: c.plate,
+        startedAt: new Date(start).toISOString(),
+        endedAt: new Date(end).toISOString(),
+        breaks: long ? [{ startedAt: new Date(mid).toISOString(), endedAt: new Date(mid + (30 + (blockNo % 3) * 10) * 60_000).toISOString(), auto: false }] : [],
       });
     }
+  }
+  // Faturalar: bireysel teslimlerin e-arşivi; en yeniler kuyrukta, biri entegratörden döndü, gerisi kesildi
+  const individual = orders
+    .filter((o) => o.status === "teslim_edildi" && !o.corporateAccountId)
+    .sort((a, b) => (b.deliveredAt ?? "").localeCompare(a.deliveredAt ?? ""));
+  const invoices: Invoice[] = individual.map((o, i): Invoice => {
+    const status: Invoice["status"] = i < 2 ? "pending" : i === 2 ? "failed" : "issued";
+    return {
+      id: `inv-${o.id}`,
+      kind: "order",
+      orderId: o.id,
+      orderNo: o.orderNo,
+      corporateAccountId: null,
+      period: null,
+      status,
+      attempts: status === "failed" ? 5 : status === "issued" ? 1 : 0,
+      lastError: status === "failed" ? "Entegratör: alıcı TCKN doğrulanamadı (422)" : null,
+      buyerName: o.customerName ?? "Nihai Tüketici",
+      description: `Kurye hizmeti ${o.orderNo}`,
+      totalKurus: o.totalKurus,
+      docType: status === "issued" ? "e_arsiv" : null,
+      pdfUrl: null,
+      issuedAt: status === "issued" ? new Date(new Date(o.deliveredAt!).getTime() + 4 * 60_000).toISOString() : null,
+      createdAt: o.deliveredAt ?? o.createdAt,
+    };
+  });
+  // Geçen ayın kurumsal faturası: Ataşehir Dental kesildi; Kozyatağı Mimarlık'ınki henüz oluşturulmadı
+  const prevMonth = istDate(new Date(monthStart - 86_400_000)).slice(0, 7);
+  const [pmStart, pmEnd] = istMonthRangeUtc(prevMonth);
+  const dentalPrev = orders.filter(
+    (o) => o.corporateAccountId === "corp-2" && o.status === "teslim_edildi" && o.deliveredAt! >= pmStart && o.deliveredAt! < pmEnd,
+  );
+  if (dentalPrev.length) {
+    const inv = calculateMonthlyInvoice(
+      dentalPrev.map((o) => monthlyInvoiceItem(o.subtotalKurus, o.priceQuote)),
+      DEFAULT_PRICING_SETTINGS,
+    );
+    invoices.unshift({
+      id: `inv-corp-2-${prevMonth}`,
+      kind: "monthly",
+      orderId: null,
+      orderNo: null,
+      corporateAccountId: "corp-2",
+      period: prevMonth,
+      status: "issued",
+      attempts: 1,
+      lastError: null,
+      buyerName: "Ataşehir Dental Klinik",
+      description: `${prevMonth} kurye hizmetleri (${inv.deliveryCount} teslimat)`,
+      totalKurus: inv.totalKurus,
+      docType: "e_fatura",
+      pdfUrl: null,
+      issuedAt: new Date(monthStart + 26 * 3_600_000).toISOString(),
+      createdAt: new Date(monthStart + 25 * 3_600_000).toISOString(),
+    });
   }
   return {
     signedIn: false,
@@ -535,7 +784,7 @@ async function seed(): Promise<State> {
       offerAutoBreakAfter: 3,
       failedDeliveryMinWaitMinutes: 10,
     },
-    consented: new Set(["cus-1", "cus-2", "cus-3"]),
+    consented: new Set(customers.map((c) => c.id)),
     apiKeys: [],
     webhooks: new Map(),
     leads: [
@@ -554,6 +803,20 @@ async function seed(): Promise<State> {
         createdAt: hoursAgo(2),
       },
       {
+        id: "lead-3",
+        kind: "kurumsal",
+        companyName: "Üsküdar Noterlik Hizmetleri",
+        contactName: "Cem Aksu",
+        phone: "+902165556677",
+        email: "cem@ornek-noter.com",
+        monthlyVolume: "50+",
+        message: "Günde birkaç kez Avrupa yakasına evrak gidiyor; aylık fatura istiyoruz.",
+        sourcePage: "/ilce/uskudar",
+        status: "yeni",
+        adminNote: null,
+        createdAt: hoursAgo(9),
+      },
+      {
         id: "lead-2",
         kind: "iletisim",
         companyName: null,
@@ -566,6 +829,34 @@ async function seed(): Promise<State> {
         status: "arandi",
         adminNote: "Cumartesi de çalıştığımızı söyledim.",
         createdAt: hoursAgo(30),
+      },
+      {
+        id: "lead-4",
+        kind: "kurumsal",
+        companyName: "Ataşehir Dental Klinik",
+        contactName: "Elif Koç",
+        phone: "+905301010101",
+        email: "elif@ornek-dental.com",
+        monthlyVolume: "10-20",
+        message: "Laboratuvara günlük ölçü gönderimi.",
+        sourcePage: "/kurumsal",
+        status: "kazanildi",
+        adminNote: "Kurumsal hesap açıldı.",
+        createdAt: hoursAgo(1550),
+      },
+      {
+        id: "lead-5",
+        kind: "iletisim",
+        companyName: null,
+        contactName: "Fatma Uçar",
+        phone: "+905329998877",
+        email: null,
+        monthlyVolume: null,
+        message: "Şehirlerarası gönderi yapıyor musunuz?",
+        sourcePage: "/iletisim",
+        status: "kaybedildi",
+        adminNote: "Yalnız İstanbul içi; yönlendirildi.",
+        createdAt: hoursAgo(200),
       },
     ],
     applications: [
@@ -593,6 +884,29 @@ async function seed(): Promise<State> {
         createdAt: hoursAgo(5),
       },
       {
+        id: "app-3",
+        fullName: "Sinan Doğan",
+        phone: "+905442223344",
+        email: "sinan@example.com",
+        district: "Maltepe",
+        birthYear: 1999,
+        licenseClass: "A2",
+        hasMotorcycle: true,
+        plate: "34 SND 99",
+        vehicleModel: "Honda PCX 125",
+        experienceYears: 1,
+        availability: "hafta_sonu",
+        message: null,
+        documents: [
+          { kind: "vesikalik", path: "app-3/vesikalik.jpg" },
+          { kind: "ruhsat", path: "app-3/ruhsat.jpg" },
+        ],
+        status: "yeni",
+        adminNote: null,
+        courierId: null,
+        createdAt: hoursAgo(20),
+      },
+      {
         id: "app-2",
         fullName: "Murat Ak",
         phone: "+905467778899",
@@ -611,6 +925,46 @@ async function seed(): Promise<State> {
         adminNote: "Perşembe 14:00 görüşme",
         courierId: null,
         createdAt: hoursAgo(50),
+      },
+      {
+        id: "app-4",
+        fullName: "Kerem Işık",
+        phone: "+905443334455",
+        email: null,
+        district: "Sancaktepe",
+        birthYear: 2006,
+        licenseClass: "B",
+        hasMotorcycle: false,
+        plate: null,
+        vehicleModel: null,
+        experienceYears: 0,
+        availability: "yari_zamanli",
+        message: null,
+        documents: [{ kind: "ehliyet_on", path: "app-4/ehliyet_on.jpg" }],
+        status: "reddedildi",
+        adminNote: "A sınıfı ehliyet yok",
+        courierId: null,
+        createdAt: hoursAgo(260),
+      },
+      {
+        id: "app-5",
+        fullName: "Zeynep Arslan",
+        phone: "+905551110003",
+        email: null,
+        district: "Kadıköy",
+        birthYear: 1994,
+        licenseClass: "A2",
+        hasMotorcycle: true,
+        plate: "34 YZG 03",
+        vehicleModel: "Honda PCX 125",
+        experienceYears: 4,
+        availability: "tam_zamanli",
+        message: null,
+        documents: [],
+        status: "onaylandi",
+        adminNote: null,
+        courierId: "kur-3",
+        createdAt: hoursAgo(900),
       },
     ],
     settings: { ...DEFAULT_PRICING_SETTINGS },
@@ -711,29 +1065,58 @@ async function seed(): Promise<State> {
           { role: "assistant", text: "Beykoz → Levent acil teslimat KDV dahil 1.146,00 TL. Sipariş oluşturalım mı?" },
         ],
       },
+      {
+        id: "conv-3",
+        channel: "voice",
+        externalId: "+905308080808",
+        status: "closed",
+        handoffReason: null,
+        lastMessageAt: hoursAgo(3.5),
+        transcript: [
+          { role: "user", text: "Kadıköy'den Üsküdar'a bir zarf göndermek istiyorum." },
+          { role: "assistant", text: "Kadıköy → Üsküdar standart teslimat KDV dahil 420,00 TL. Kartla mı ödemek istersiniz?" },
+          { role: "user", text: "Evet, kartla." },
+          { role: "assistant", text: "Ödeme bağlantısını SMS ile gönderdim. Ödeme gelince kuryemiz yola çıkacak." },
+        ],
+      },
+      {
+        id: "conv-4",
+        channel: "email",
+        externalId: "ofis@ornek-mimarlik.com",
+        status: "active",
+        handoffReason: null,
+        lastMessageAt: hoursAgo(6),
+        transcript: [
+          { role: "user", text: "Yarın 10:00'da Kozyatağı'ndan Şişli'ye proje dosyası alınabilir mi?" },
+          { role: "assistant", text: "Elbette. Yarın 10:00 için planlı alış oluşturdum: YK siparişiniz cari hesabınıza yazılacak." },
+        ],
+      },
+      {
+        id: "conv-5",
+        channel: "whatsapp",
+        externalId: "905311111111",
+        status: "closed",
+        handoffReason: null,
+        lastMessageAt: hoursAgo(26),
+        transcript: [
+          { role: "user", text: "Kuryem nerede?" },
+          { role: "assistant", text: "Kuryeniz Zeynep yolda, tahmini varış 12 dakika. Takip bağlantınızı tekrar gönderdim." },
+        ],
+      },
+      {
+        id: "conv-6",
+        channel: "app",
+        externalId: "cus-8",
+        status: "closed",
+        handoffReason: null,
+        lastMessageAt: hoursAgo(50),
+        transcript: [
+          { role: "user", text: "Fatura bilgilerimi nasıl değiştiririm?" },
+          { role: "assistant", text: "Profil → Fatura bilgileri bölümünden güncelleyebilirsiniz; sonraki siparişlerden itibaren geçerli olur." },
+        ],
+      },
     ],
-    invoices: orders
-      .filter((o) => o.status === "teslim_edildi" && !o.corporateAccountId)
-      .map(
-        (o): Invoice => ({
-          id: `inv-${o.id}`,
-          kind: "order",
-          orderId: o.id,
-          orderNo: o.orderNo,
-          corporateAccountId: null,
-          period: null,
-          status: "pending",
-          attempts: 0,
-          lastError: "Paraşüt yapılandırılmamış (demo)",
-          buyerName: o.customerName ?? "Nihai Tüketici",
-          description: `Kurye hizmeti ${o.orderNo}`,
-          totalKurus: o.totalKurus,
-          docType: null,
-          pdfUrl: null,
-          issuedAt: null,
-          createdAt: o.deliveredAt ?? o.createdAt,
-        }),
-      ),
+    invoices,
   };
 }
 
@@ -863,10 +1246,14 @@ export function createDemoRepo(): AdminRepo {
       return () => orderListeners.delete(cb);
     },
     async courierPerformanceStats() {
-      // Demo: Mehmet istikrarlı, Emre geç iptal ve yanıtsız tekliflerle orta seviye
+      // Demo: Mehmet ve Zeynep istikrarlı, Emre geç iptal ve yanıtsız tekliflerle orta seviye, Hakan riskli
       return {
         "kur-1": { offersAccepted: 46, offersDeclined: 2, offersTimedOut: 1, delivered: 52, urgentDelivered: 14, urgentOnTime: 13, ratingCount: 21, ratingAvg: 4.81, released: 0, failedDeliveries: 1, shiftsBooked: 18, shiftsAttended: 18, lateCancels: 0 },
         "kur-2": { offersAccepted: 19, offersDeclined: 4, offersTimedOut: 5, delivered: 22, urgentDelivered: 6, urgentOnTime: 4, ratingCount: 9, ratingAvg: 4.2, released: 2, failedDeliveries: 1, shiftsBooked: 9, shiftsAttended: 6, lateCancels: 1 },
+        "kur-3": { offersAccepted: 38, offersDeclined: 3, offersTimedOut: 1, delivered: 41, urgentDelivered: 12, urgentOnTime: 11, ratingCount: 17, ratingAvg: 4.7, released: 0, failedDeliveries: 0, shiftsBooked: 16, shiftsAttended: 15, lateCancels: 0 },
+        "kur-4": { offersAccepted: 12, offersDeclined: 2, offersTimedOut: 3, delivered: 14, urgentDelivered: 3, urgentOnTime: 2, ratingCount: 5, ratingAvg: 4.4, released: 1, failedDeliveries: 0, shiftsBooked: 8, shiftsAttended: 7, lateCancels: 0 },
+        "kur-5": { offersAccepted: 27, offersDeclined: 6, offersTimedOut: 2, delivered: 30, urgentDelivered: 8, urgentOnTime: 7, ratingCount: 11, ratingAvg: 4.5, released: 1, failedDeliveries: 1, shiftsBooked: 12, shiftsAttended: 11, lateCancels: 1 },
+        "kur-6": { offersAccepted: 6, offersDeclined: 5, offersTimedOut: 6, delivered: 8, urgentDelivered: 2, urgentOnTime: 1, ratingCount: 4, ratingAvg: 3.6, released: 2, failedDeliveries: 1, shiftsBooked: 6, shiftsAttended: 3, lateCancels: 2 },
       };
     },
     async getDemand(days) {
@@ -1329,7 +1716,7 @@ export function createDemoRepo(): AdminRepo {
         offerExpiresAt: null,
         offers: [],
         trackingToken: `demo${n}`.padEnd(32, "0"),
-        cancelReason: status === "iptal" ? "Müşteri vazgeçti" : null,
+        cancelReason: null,
         problemNote: null,
         paymentRef: null,
         paymentError: null,
@@ -1454,7 +1841,7 @@ export function createDemoRepo(): AdminRepo {
     },
     async applicationDocumentUrl(path) {
       // Demo: gerçek dosya yok, yer tutucu görsel
-      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="480" height="300"><rect width="100%" height="100%" fill="#e7eef6"/><text x="50%" y="50%" text-anchor="middle" font-family="sans-serif" font-size="18" fill="#0f3d6e">Demo belge: ${path}</text></svg>`;
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="480" height="300"><rect width="100%" height="100%" fill="#ece6fd"/><text x="50%" y="50%" text-anchor="middle" font-family="sans-serif" font-size="18" fill="#111114">Demo belge: ${path}</text></svg>`;
       return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
     },
     async listConversations() {

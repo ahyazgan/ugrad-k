@@ -19,10 +19,10 @@ const COVER: Record<string, string> = {
   tamam: "bg-emerald-50 border-emerald-200",
   eksik: "bg-amber-50 border-amber-300",
   bos: "bg-red-50 border-red-300",
-  gereksiz: "bg-slate-50 border-slate-200",
+  gereksiz: "bg-canvas border-line",
 };
 const ATT: Record<AttendanceStatus, string> = {
-  bekliyor: "text-slate-500",
+  bekliyor: "text-muted",
   geldi: "text-emerald-700",
   gelmedi: "font-semibold text-red-700",
   iptal: "text-slate-400 line-through",
@@ -105,15 +105,15 @@ export default function VardiyaPlaniPage() {
         {new Date(`${week}T12:00:00Z`).toLocaleDateString("tr-TR", { day: "numeric", month: "long", timeZone: "UTC" })} haftası ·{" "}
         {missing ? <b className="text-red-700">{missing} kurye-dilim eksik</b> : <b className="text-emerald-700">tüm dilimler dolu</b>}
       </p>
-      <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
+      <div className="overflow-x-auto rounded-card border border-line bg-white">
         <table className="min-w-[900px] w-full table-fixed text-xs">
           <thead>
             <tr>
-              <th className="w-24 p-2 text-left text-slate-500">Saat</th>
+              <th className="w-24 p-2 text-left text-muted">Saat</th>
               {days.map((d) => (
                 <th key={d} className="p-2 text-left text-slate-700">
                   {WEEKDAY_LABELS[((new Date(`${d}T12:00:00Z`).getUTCDay() + 6) % 7) + 1]}
-                  <span className="block font-normal text-slate-500">{d.slice(8)}.{d.slice(5, 7)}</span>
+                  <span className="block font-normal text-muted">{d.slice(8)}.{d.slice(5, 7)}</span>
                 </th>
               ))}
             </tr>
@@ -182,7 +182,7 @@ export default function VardiyaPlaniPage() {
           </tbody>
         </table>
       </div>
-      <p className="mt-2 text-xs text-slate-500">
+      <p className="mt-2 text-xs text-muted">
         Yeşil: dolu · sarı: eksik · kırmızı: boş. Geçmiş dilimlerde gerçek vardiya kaydına göre &quot;geldi / gelmedi&quot;; 2 saatten az kala bırakılan &quot;geç iptal&quot;.
       </p>
       {data ? <TemplateEditor templates={data.templates} onSaved={reload} /> : null}
@@ -226,7 +226,7 @@ function TemplateEditor({ templates, onSaved }: { templates: ShiftTemplate[]; on
                     {t.startTime}–{t.endTime}
                   </span>
                   <input
-                    className="w-16 rounded border border-slate-300 px-2 py-1 text-right"
+                    className="w-16 rounded border border-line px-2 py-1 text-right"
                     inputMode="numeric"
                     value={draft[t.id] ?? ""}
                     onChange={(e) => setDraft({ ...draft, [t.id]: e.target.value })}

@@ -38,7 +38,7 @@ const MANUAL: OrderStatus[] = ["onaylandi", "alindi", "yolda", "teslim_edildi", 
 function Info({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</div>
+      <div className="text-xs font-semibold uppercase tracking-wide text-muted">{label}</div>
       <div className="mt-0.5 text-sm text-slate-900">{children || "—"}</div>
     </div>
   );
@@ -88,7 +88,7 @@ export default function SiparisDetayPage() {
   }
 
   if (error) return <ErrorText>{error}</ErrorText>;
-  if (!order) return <p className="text-slate-500">Yükleniyor…</p>;
+  if (!order) return <p className="text-muted">Yükleniyor…</p>;
 
   const allowed = ORDER_TRANSITIONS[order.status].filter((s) => MANUAL.includes(s));
   // Vardiyadaki kuryeler, otomatik atamayla aynı algoritmaya göre sıralı
@@ -193,7 +193,7 @@ export default function SiparisDetayPage() {
                   </div>
                 </div>
               ) : (
-                <p className="text-sm text-slate-500">Bu sipariş son durumda.</p>
+                <p className="text-sm text-muted">Bu sipariş son durumda.</p>
               )}
               {order.status === "yolda" || order.status === "sorunlu" ? (
                 <div className="flex flex-wrap items-end gap-2 border-t border-slate-100 pt-3">
@@ -214,7 +214,7 @@ export default function SiparisDetayPage() {
                   >
                     Göndericiye iade başlat
                   </Button>
-                  <span className="text-xs text-slate-500">Dönüş ayağı ücreti (gidişin %50&apos;si) eklenir; müşteriye bildirilir.</span>
+                  <span className="text-xs text-muted">Dönüş ayağı ücreti (gidişin %50&apos;si) eklenir; müşteriye bildirilir.</span>
                 </div>
               ) : null}
               <ErrorText>{actionError}</ErrorText>
@@ -225,11 +225,11 @@ export default function SiparisDetayPage() {
             <div className="grid gap-4 sm:grid-cols-2">
               <Info label={`Alış (${order.pickupSide ?? "?"})`}>
                 {order.pickupAddress}
-                {order.pickupDetails ? <div className="text-slate-500">{order.pickupDetails}</div> : null}
+                {order.pickupDetails ? <div className="text-muted">{order.pickupDetails}</div> : null}
               </Info>
               <Info label={`Teslim (${order.dropoffSide ?? "?"})`}>
                 {order.dropoffAddress}
-                {order.dropoffDetails ? <div className="text-slate-500">{order.dropoffDetails}</div> : null}
+                {order.dropoffDetails ? <div className="text-muted">{order.dropoffDetails}</div> : null}
               </Info>
               <Info label="Teslim eden">
                 {order.pickupContactName} {order.pickupContactPhone}
@@ -248,7 +248,7 @@ export default function SiparisDetayPage() {
                   {order.deliveryCodeFailedAttempts ? (
                     <span className="ml-2 text-red-700">{order.deliveryCodeFailedAttempts} yanlış deneme</span>
                   ) : null}
-                  <span className="block text-xs text-slate-500">Alıcıya SMS ile gider; kurye kodu almadan teslim edemez (yönetici kodsuz kapatabilir).</span>
+                  <span className="block text-xs text-muted">Alıcıya SMS ile gider; kurye kodu almadan teslim edemez (yönetici kodsuz kapatabilir).</span>
                 </Info>
               ) : null}
               <Info label="Müşteri notu">{order.customerNote}</Info>
@@ -338,13 +338,13 @@ export default function SiparisDetayPage() {
               <Info label="Telefon">{order.customerPhone}</Info>
               <Info label="Ödeme">
                 {PAYMENT_METHOD[order.paymentMethod]} · {PAYMENT_STATUS[order.paymentStatus] ?? order.paymentStatus}
-                {order.paidKurus != null ? <div className="text-slate-500">Ödenen: {formatTL(order.paidKurus)}</div> : null}
+                {order.paidKurus != null ? <div className="text-muted">Ödenen: {formatTL(order.paidKurus)}</div> : null}
                 {order.paidKurus != null && order.totalKurus > order.paidKurus ? (
                   <div className="font-semibold text-amber-700">Ek tahsilat: {formatTL(order.totalKurus - order.paidKurus)}</div>
                 ) : null}
                 {order.paymentError ? <div className="text-red-700">{order.paymentError}</div> : null}
                 {order.cashCollection ? (
-                  <div className={order.cashCollection === "alinmadi" ? "font-semibold text-red-700" : "text-slate-500"}>
+                  <div className={order.cashCollection === "alinmadi" ? "font-semibold text-red-700" : "text-muted"}>
                     Teslimde: {order.cashCollection === "nakit" ? "nakit alındı (kuryede)" : order.cashCollection === "iban" ? "müşteri IBAN'a gönderdiğini bildirdi" : "ödeme alınamadı"}
                   </div>
                 ) : null}
@@ -389,13 +389,13 @@ export default function SiparisDetayPage() {
                   <li key={i} className="flex justify-between gap-3">
                     <span>
                       {o.courierName ?? "Kurye"}
-                      <span className="block text-xs text-slate-500">
+                      <span className="block text-xs text-muted">
                         {o.response ? OFFER_RESPONSE_LABELS[o.response] : "Yanıt bekleniyor"}
                         {o.reason ? ` · ${o.reason}` : ""}
                         {o.respondedAt ? ` · ${Math.max(0, Math.round((new Date(o.respondedAt).getTime() - new Date(o.offeredAt).getTime()) / 1000))} sn` : ""}
                       </span>
                     </span>
-                    <span className="whitespace-nowrap text-slate-500">{fmtDateTime(o.offeredAt)}</span>
+                    <span className="whitespace-nowrap text-muted">{fmtDateTime(o.offeredAt)}</span>
                   </li>
                 ))}
               </ol>
@@ -408,9 +408,9 @@ export default function SiparisDetayPage() {
                 <li key={i} className="flex justify-between gap-3">
                   <span>
                     {ORDER_STATUS_LABELS[h.toStatus]}
-                    {h.note ? <span className="block text-xs text-slate-500">{h.note}</span> : null}
+                    {h.note ? <span className="block text-xs text-muted">{h.note}</span> : null}
                   </span>
-                  <span className="whitespace-nowrap text-slate-500">{fmtDateTime(h.at)}</span>
+                  <span className="whitespace-nowrap text-muted">{fmtDateTime(h.at)}</span>
                 </li>
               ))}
             </ol>

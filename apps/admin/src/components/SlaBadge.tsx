@@ -13,7 +13,7 @@ export function SlaBadge({ o, now }: { o: Pick<AdminOrder, "slaDueAt" | "slaMiss
   if (left < 0) return <div className="text-xs font-bold text-red-700">GECİKTİ ({-left} dk)</div>;
   return (
     <div className={`text-xs font-semibold ${left <= 15 ? "text-amber-700" : "text-slate-600"}`} title={`Taahhüt ${istanbulTime(o.slaDueAt)}`}>
-      ⏱ {left} dk kaldı
+      {left} dk kaldı
     </div>
   );
 }
