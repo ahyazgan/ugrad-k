@@ -117,7 +117,7 @@ export function buildNotifications(event: OrderStatus, o: NotificationOrder, cfg
         to: customer,
         channels: ["push", "sms"],
         title: "Teslim edildi",
-        text: `${BRAND.name}: ${o.orderNo} teslim edildi${o.podReceiverName ? ` (teslim alan: ${o.podReceiverName})` : ""}. Teşekkürler!`,
+        text: `${BRAND.name}: ${o.orderNo} teslim edildi${o.podReceiverName ? ` (teslim alan: ${o.podReceiverName})` : ""}. Teşekkürler! Hizmetimizi puanlayın: ${url}`,
         whatsappTemplate: { name: "teslim_edildi", params: [o.orderNo, o.podReceiverName ?? "-"] },
       });
       break;

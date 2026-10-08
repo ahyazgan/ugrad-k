@@ -236,6 +236,17 @@ export interface WebhookDelivery {
   deliveredAt: string | null;
 }
 
+export interface OrderRating {
+  orderId: string;
+  orderNo: string;
+  score: number;
+  comment: string | null;
+  courierId: string | null;
+  courierName: string | null;
+  customerName: string | null;
+  createdAt: string;
+}
+
 export type LeadStatus = "yeni" | "arandi" | "kazanildi" | "kaybedildi";
 export interface Lead {
   id: string;
@@ -313,6 +324,8 @@ export interface AdminRepo {
   quote(order: OrderRequestInput): Promise<AdminQuote>;
   lookupPhoneCustomer(phone: string): Promise<PhoneCustomer | null>;
   createPhoneOrder(input: { phone: string; fullName: string; verbalConsent: boolean; order: OrderRequestInput }): Promise<{ id: string; orderNo: string }>;
+  /** Tarih aralığındaki değerlendirmeler (YYYY-MM-DD, İstanbul) */
+  listRatings(filter: { from: string; to: string }): Promise<OrderRating[]>;
   // Kurumsal API
   listApiKeys(corporateAccountId: string): Promise<ApiKeyInfo[]>;
   /** Anahtarı üretir; düz metin yalnız bu dönüşte görülür */

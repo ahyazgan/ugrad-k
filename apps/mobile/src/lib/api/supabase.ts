@@ -177,7 +177,7 @@ export function createSupabaseApi(url: string, anonKey: string): Api & { client:
         // Kurye bilgisi RLS gereği yalnızca aktif teslimat sırasında döner
         client
           .from("orders")
-          .select("*, courier:couriers(plate, profile:profiles(full_name, phone)), invoice:invoices(pdf_url)")
+          .select("*, courier:couriers(plate, profile:profiles(full_name, phone)), invoice:invoices(pdf_url), rating:order_ratings(score)")
           .eq("id", id)
           .single(),
         client.from("order_status_history").select("to_status, created_at, note").eq("order_id", id).order("created_at"),
@@ -208,6 +208,7 @@ export function createSupabaseApi(url: string, anonKey: string): Api & { client:
         paidKurus: r!.paid_kurus ?? null,
         invoicePdfUrl: (Array.isArray(r!.invoice) ? r!.invoice[0] : r!.invoice)?.pdf_url ?? null,
         trackingToken: r!.tracking_token,
+        rating: (Array.isArray(r!.rating) ? r!.rating[0] : r!.rating)?.score ?? null,
         courierName: r!.courier?.profile?.full_name ?? null,
         courierPhone: r!.courier?.profile?.phone ?? null,
         cancelReason: r!.cancel_reason,
@@ -222,6 +223,16 @@ export function createSupabaseApi(url: string, anonKey: string): Api & { client:
     },
     async startPayment(orderId, returnUrl) {
       return invoke<{ paymentPageUrl: string }>("payment-init", { orderId, ...(returnUrl ? { returnUrl } : {}) });
+    },
+    async rateOrder(order, score, comment) {
+      const r = await invoke<{ googleReviewUrl: string | null }>("site-api", {
+        action: "rate",
+        token: order.trackingToken,
+        score,
+        comment: comment?.trim() || undefined,
+        source: "uygulama",
+      });
+      return { googleReviewUrl: r.googleReviewUrl ?? null };
     },
     subscribeOrder(id, onChange) {
       const channel = client

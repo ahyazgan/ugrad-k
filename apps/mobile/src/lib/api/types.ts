@@ -86,6 +86,8 @@ export interface OrderDetail extends OrderSummary {
   paidKurus: number | null;
   invoicePdfUrl: string | null;
   trackingToken: string;
+  /** Müşterinin verdiği puan (1–5); verilmediyse null */
+  rating: number | null;
   courierName: string | null;
   courierPhone: string | null;
   cancelReason: string | null;
@@ -158,6 +160,8 @@ export interface Api {
   /** Kartla ödeme sayfasını başlatır; demo modunda ödeme anında onaylanır (null döner) */
   startPayment(orderId: string, returnUrl?: string): Promise<{ paymentPageUrl: string } | null>;
   subscribeOrder(id: string, onChange: () => void): () => void;
+  /** Teslim edilen siparişi puanlar; 5 puanda Google yorum bağlantısı dönebilir */
+  rateOrder(order: { id: string; trackingToken: string }, score: number, comment?: string): Promise<{ googleReviewUrl: string | null }>;
   /**
    * Siparişin kurye konumunu izler: hemen ve her değişimde `cb` çağrılır (konum yoksa null).
    * Konum yalnız kurye atandıktan teslime kadar görülebilir (RLS).

@@ -4,6 +4,7 @@ import { BRAND, COMPANY, ORDER_STATUS_LABELS, type OrderStatus } from "@yazgan/s
 import { useParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { LeafletMap, type MapPin } from "@/components/LeafletMap";
+import { RatingForm } from "@/components/RatingForm";
 import { fmtTime } from "@/lib/dates";
 import { fetchTracking, type Tracking } from "@/lib/tracking";
 
@@ -90,6 +91,12 @@ export default function TakipPage() {
             <p className="px-4 py-2 text-xs text-slate-500">
               {loc ? `🛵 Kurye konumu · son güncelleme ${fmtTime(loc.recorded_at)}` : "T: teslim noktası"} · sayfa 15 sn&apos;de bir yenilenir
             </p>
+          </section>
+        ) : null}
+
+        {data.status === "teslim_edildi" && (data.can_rate || data.rating) ? (
+          <section className="rounded-xl border border-slate-200 bg-white p-4">
+            <RatingForm token={token} initial={data.rating ?? null} />
           </section>
         ) : null}
 

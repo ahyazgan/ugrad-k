@@ -31,6 +31,8 @@ export const BRAND = {
   phone: "" as string,
   /** WhatsApp Business numarası (E.164, + olmadan wa.me için kullanılır). Boşsa gizlenir. */
   whatsapp: "" as string,
+  /** Google İşletme Profili "yorum yaz" bağlantısı (5 puan verenler yönlendirilir). Boşsa yönlendirme yapılmaz. */
+  googleReviewUrl: "" as string,
   colors: { primary: "#0f3d6e", accent: "#f59e0b" },
 } as const;
 

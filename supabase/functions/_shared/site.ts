@@ -1,6 +1,6 @@
 // Tanıtım sitesi API'si (giriş gerektirmez): fiyat hesaplama, adres arama, kurumsal başvuru.
 // Google maliyetini korumak için IP başına ve günlük toplam hız sınırı uygulanır.
-import { buildQuote, parseOrderRequest } from "../../../packages/shared/index.ts";
+import { BRAND, buildQuote, parseOrderRequest } from "../../../packages/shared/index.ts";
 import { alertAdmins } from "./alerts.ts";
 import type { Env } from "./channels.ts";
 import type { Ctx } from "./context.ts";
@@ -16,6 +16,7 @@ export const SITE_LIMITS = {
   places: { perIp: 150, windowSeconds: 600 },
   lead: { perIp: 5, windowSeconds: 3600 },
   courierApply: { perIp: 3, windowSeconds: 3600 },
+  rate: { perIp: 10, windowSeconds: 3600 },
   /** Tüm ziyaretçiler için günlük üst sınır (Google faturasını sınırlar) */
   quotePerDay: 3000,
 };
@@ -112,6 +113,10 @@ export async function handleSite(req: Request, ctx: Ctx, deps: { env: Env; fetch
       await rateLimit(ctx, `site:courier:${ip}`, SITE_LIMITS.courierApply.perIp, SITE_LIMITS.courierApply.windowSeconds);
       return json(await courierApply(ctx, (body.application ?? {}) as Body, deps));
     }
+    case "rate": {
+      await rateLimit(ctx, `site:rate:${ip}`, SITE_LIMITS.rate.perIp, SITE_LIMITS.rate.windowSeconds);
+      return json(await rateOrder(ctx, body, deps));
+    }
     default:
       throw new HttpError(400, "Bilinmeyen işlem");
   }
@@ -193,4 +198,43 @@ async function courierApply(ctx: Ctx, a: Body, deps: { env: Env; fetchFn?: typeo
     deps,
   ).catch((e) => console.error("courier alert", e));
   return { id, uploads };
+}
+
+/** Düşük puan eşiği: bu ve altı yöneticiye anında bildirilir */
+export const LOW_RATING = 3;
+
+/** Teslim sonrası değerlendirme (takip sayfası ve uygulama) */
+async function rateOrder(ctx: Ctx, b: Body, deps: { env: Env; fetchFn?: typeof fetch }) {
+  const token = typeof b.token === "string" ? b.token : "";
+  const score = Number(b.score);
+  if (!Number.isInteger(score) || score < 1 || score > 5) throw new HttpError(400, "1 ile 5 arasında puan verin", "score");
+  const comment = text(b.comment, 1000, "comment");
+  const { data: r, error } = await ctx.admin.rpc("submit_rating", {
+    p_token: token,
+    p_score: score,
+    p_comment: comment,
+    p_source: b.source === "uygulama" ? "uygulama" : "takip",
+  });
+  if (error) throw new Error(`Değerlendirme kaydedilemedi: ${error.message}`);
+  if (r === "not_found") throw new HttpError(404, "Sipariş bulunamadı");
+  if (r === "not_delivered") throw new HttpError(409, "Sipariş teslim edildikten sonra değerlendirebilirsiniz");
+  if (r === "expired") throw new HttpError(410, "Değerlendirme süresi doldu");
+  if (r === "exists") throw new HttpError(409, "Bu sipariş zaten değerlendirildi");
+
+  if (score <= LOW_RATING) {
+    const { data: o } = await ctx.admin
+      .from("orders")
+      .select("order_no, courier:couriers(profile:profiles(full_name)), customer:profiles!orders_customer_id_fkey(full_name, phone)")
+      .eq("tracking_token", token)
+      .maybeSingle();
+    const row = (o ?? {}) as { order_no?: string; courier?: { profile?: { full_name?: string } }; customer?: { full_name?: string; phone?: string } };
+    const courierName = row.courier?.profile?.full_name;
+    await alertAdmins(
+      "Düşük puan",
+      `${row.order_no ?? "Sipariş"} ${score}/5${courierName ? ` (kurye ${courierName})` : ""}${comment ? `: ${comment}` : ""} — müşteri ${row.customer?.full_name ?? ""} ${row.customer?.phone ?? ""}`.trim(),
+      deps,
+    ).catch((e) => console.error("rating alert", e));
+  }
+  const googleReviewUrl = score === 5 ? deps.env("GOOGLE_REVIEW_URL") || BRAND.googleReviewUrl || null : null;
+  return { ok: true, googleReviewUrl };
 }

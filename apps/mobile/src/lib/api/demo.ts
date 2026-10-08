@@ -105,6 +105,7 @@ export function createDemoApi(): Api {
     paymentStatus: "odenmedi",
     paidKurus: null,
     invoicePdfUrl: null,
+    rating: null,
     trackingToken: "demo".padEnd(32, "0"),
     courierName: null,
     courierPhone: null,
@@ -302,6 +303,15 @@ export function createDemoApi(): Api {
       o.paidKurus = o.totalKurus;
       notify(orderId);
       return null;
+    },
+    async rateOrder(order, score) {
+      const o = orders.get(order.id);
+      if (!o) throw new ApiError("Sipariş bulunamadı", undefined, 404);
+      if (o.status !== "teslim_edildi") throw new ApiError("Sipariş teslim edildikten sonra değerlendirebilirsiniz");
+      if (o.rating) throw new ApiError("Bu sipariş zaten değerlendirildi");
+      o.rating = score;
+      notify(o.id);
+      return { googleReviewUrl: score === 5 ? "https://www.google.com/maps" : null };
     },
     subscribeOrder(id, onChange) {
       const set = orderListeners.get(id) ?? new Set();

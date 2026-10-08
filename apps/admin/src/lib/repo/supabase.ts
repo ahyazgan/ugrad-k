@@ -26,6 +26,7 @@ import {
   type Lead,
   type PhoneCustomer,
   type ApiKeyInfo,
+  type OrderRating,
   type WebhookDelivery,
 } from "./types";
 import { toTranscript } from "./transcript";
@@ -431,6 +432,32 @@ export function createSupabaseRepo(url: string, anonKey: string): AdminRepo & { 
     async createPhoneOrder(input) {
       const r = await invoke<{ order: { id: string; order_no: string } }>("admin-order", { action: "create", ...input });
       return { id: r.order.id, orderNo: r.order.order_no };
+    },
+
+    async listRatings({ from, to }) {
+      const rows =
+        check(
+          await client
+            .from("order_ratings")
+            .select("*, order:orders(order_no, courier_id, courier:couriers(profile:profiles(full_name)), customer:profiles!orders_customer_id_fkey(full_name))")
+            .gte("created_at", istDayStartUtc(from))
+            .lt("created_at", istDayEndUtc(to))
+            .order("created_at", { ascending: false })
+            .limit(2000),
+          "Değerlendirmeler okunamadı",
+        ) ?? [];
+      return rows.map(
+        (r: Row): OrderRating => ({
+          orderId: r.order_id,
+          orderNo: r.order?.order_no ?? "",
+          score: r.score,
+          comment: r.comment,
+          courierId: r.order?.courier_id ?? null,
+          courierName: r.order?.courier?.profile?.full_name ?? null,
+          customerName: r.order?.customer?.full_name ?? null,
+          createdAt: r.created_at,
+        }),
+      );
     },
 
     // ───────── Kurumsal API

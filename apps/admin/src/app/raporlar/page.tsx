@@ -1,6 +1,7 @@
 "use client";
 
 import { formatTL } from "@yazgan/shared";
+import Link from "next/link";
 import { useMemo, useState, type ReactNode } from "react";
 import { BarChart } from "@/components/BarChart";
 import { Button, Card, ErrorText, Input, PageHeader, Stat, Table, Td } from "@/components/ui";
@@ -55,8 +56,15 @@ function ChartCard({ title, chart, table }: { title: string; chart: ReactNode; t
 export default function RaporlarPage() {
   const [range, setRange] = useState({ from: daysAgo(29), to: istDate() });
   const [draft, setDraft] = useState(range);
-  const { data: orders, error, loading } = useLoad(() => repo.listOrders({ from: range.from, to: range.to, limit: 20_000 }), [range]);
-  const report = useMemo(() => (orders ? buildReport(orders, range.from, range.to) : null), [orders, range]);
+  const { data, error, loading } = useLoad(
+    async () => {
+      const [orders, ratings] = await Promise.all([repo.listOrders({ from: range.from, to: range.to, limit: 20_000 }), repo.listRatings(range)]);
+      return { orders, ratings };
+    },
+    [range],
+  );
+  const orders = data?.orders;
+  const report = useMemo(() => (data ? buildReport(data.orders, range.from, range.to, data.ratings) : null), [data, range]);
   const t = report?.totals;
   const days = report?.daily.length ?? 0;
 
@@ -112,7 +120,7 @@ export default function RaporlarPage() {
       {loading && !report ? <p className="text-sm text-slate-500">Yükleniyor…</p> : null}
       {report && t ? (
         <div className={loading ? "opacity-60" : undefined}>
-          <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4" data-testid="report-totals">
+          <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-3" data-testid="report-totals">
             <Stat label="Ciro (KDV hariç)" value={formatTL(t.revenueKurus)} hint={`${t.delivered} teslimat`} />
             <Stat label="Sipariş" value={t.orders} hint={`${t.cancelled} iptal (${pct(t.cancelRate)})`} />
             <Stat label="Ortalama sipariş" value={t.delivered ? formatTL(t.avgOrderKurus) : "—"} />
@@ -125,6 +133,11 @@ export default function RaporlarPage() {
             <Stat label="Avrupa yakası payı" value={pct(t.crossSideRate)} hint="Alış veya teslimi Avrupa'da olan" />
             <Stat label="Aktif kurye" value={report.couriers.filter((c) => c.courierId).length} hint="Bu dönemde teslimat yapan" />
             <Stat label="Müşteri" value={report.customerCount} hint="Bu dönemde teslimat alan" />
+            <Stat
+              label="Müşteri puanı"
+              value={t.avgRating != null ? `★ ${t.avgRating.toLocaleString("tr-TR")}` : "—"}
+              hint={`${t.ratingCount} değerlendirme${t.ratingRate != null ? ` · teslimatların ${pct(t.ratingRate)}'i` : ""}`}
+            />
           </div>
 
           <div className="mb-6 grid gap-6 xl:grid-cols-2">
@@ -184,13 +197,14 @@ export default function RaporlarPage() {
 
           <div className="grid gap-6 xl:grid-cols-2">
             <Card title="Kurye performansı">
-              <Table head={["Kurye", "Teslimat", "Ciro", "Ort. süre"]} empty="Bu dönemde teslimat yok">
+              <Table head={["Kurye", "Teslimat", "Ciro", "Ort. süre", "Puan"]} empty="Bu dönemde teslimat yok">
                 {report.couriers.map((c) => (
                   <tr key={c.courierId ?? "-"}>
                     <Td>{c.name}</Td>
                     <Td>{c.delivered}</Td>
                     <Td className="whitespace-nowrap">{formatTL(c.revenueKurus)}</Td>
                     <Td>{minutes(c.avgDeliveryMin)}</Td>
+                    <Td>{c.avgRating != null ? `★ ${c.avgRating.toLocaleString("tr-TR")}` : "—"}</Td>
                   </tr>
                 ))}
               </Table>
@@ -210,6 +224,42 @@ export default function RaporlarPage() {
               </Table>
             </Card>
           </div>
+
+          <Card title="Müşteri değerlendirmeleri" className="mt-6">
+            <div className="grid gap-6 md:grid-cols-[260px_1fr]" data-testid="ratings">
+              <div className="space-y-1.5">
+                {[5, 4, 3, 2, 1].map((n) => {
+                  const c = report.ratingDist[n - 1] ?? 0;
+                  const max = Math.max(1, ...report.ratingDist);
+                  return (
+                    <div key={n} className="flex items-center gap-2 text-sm">
+                      <span className="w-8 text-slate-600">{n} ★</span>
+                      <span className="h-3 flex-1 rounded-full bg-slate-100">
+                        <span className="block h-3 rounded-full bg-brand" style={{ width: `${(c / max) * 100}%` }} />
+                      </span>
+                      <span className="w-8 text-right tabular-nums text-slate-700">{c}</span>
+                    </div>
+                  );
+                })}
+              </div>
+              <div>
+                <div className="mb-2 text-sm font-semibold text-slate-700">Düşük puanlar (3 ve altı)</div>
+                {report.lowRatings.length === 0 ? <p className="text-sm text-slate-500">Bu dönemde düşük puan yok.</p> : null}
+                <ul className="divide-y divide-slate-100">
+                  {report.lowRatings.slice(0, 20).map((r) => (
+                    <li key={r.orderId} className="py-2 text-sm">
+                      <Link href={`/siparisler/${r.orderId}`} className="font-semibold text-brand hover:underline">
+                        {r.orderNo}
+                      </Link>{" "}
+                      <span className="text-amber-600">{"★".repeat(r.score)}</span>
+                      <span className="text-slate-500"> · {r.customerName ?? "Müşteri"}{r.courierName ? ` · kurye ${r.courierName}` : ""}</span>
+                      {r.comment ? <div className="text-slate-700">“{r.comment}”</div> : null}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          </Card>
         </div>
       ) : null}
     </>

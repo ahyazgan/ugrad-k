@@ -67,6 +67,14 @@ fs.mkdirSync(out, { recursive: true });
   await tid('delete-account').click();
   await tid('delete-account-confirm').click();
   await page.getByText('Devam eden siparişiniz varken hesap silinemez').waitFor();
+  // Teslimden sonra değerlendirme (Siparişlerim → sipariş)
+  await page.getByText('Siparişlerim').first().click();
+  await page.getByText(/^YK-\d+/).first().click();
+  await page.getByText('Teslimatı nasıl buldunuz?').waitFor({ timeout: 40000 });
+  await tid('star-4').click();
+  await tid('rating-submit').click();
+  await tid('rating-thanks').waitFor();
+  await shot('09b-degerlendirme');
   console.log('✓ müşteri akışı geçti');
 
   // ───────── Kurye akışı

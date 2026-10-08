@@ -1,7 +1,7 @@
 import { ORDER_STATUS_LABELS, ageLabel, formatTL, trackingBaseUrl, type OrderStatus } from "@yazgan/shared";
 import { useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
-import { Linking, Share, Text, TextInput, View } from "react-native";
+import { Linking, Pressable, Share, Text, TextInput, View } from "react-native";
 import { StatusBadge } from "@/components/StatusBadge";
 import { TileMap, type MapMarker } from "@/components/TileMap";
 import { Button, Card, ErrorBox, Loading, Muted, Row, Screen, Title, colors, styles } from "@/components/ui";
@@ -74,6 +74,70 @@ function OrderMap({ order }: { order: OrderDetail }) {
             ? "Kurye konumu bekleniyor…"
             : "A: alış · T: teslim noktası"}
       </Muted>
+    </Card>
+  );
+}
+
+/** Teslim sonrası 1–5 yıldız değerlendirme; 5 puanda Google yorum daveti */
+function RateCard({ order, onRated }: { order: OrderDetail; onRated: () => void }) {
+  const [score, setScore] = useState(order.rating ?? 0);
+  const [comment, setComment] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [google, setGoogle] = useState<string | null>(null);
+  const done = order.rating != null || google !== null;
+
+  if (done) {
+    return (
+      <Card>
+        <Text style={{ fontWeight: "700" }} testID="rating-thanks">
+          Değerlendirmeniz için teşekkürler <Text style={{ color: colors.accent }}>{"★".repeat(order.rating ?? score)}</Text>
+        </Text>
+        {google ? <Button title="Google'da yorum yazın" variant="secondary" onPress={() => Linking.openURL(google)} /> : null}
+      </Card>
+    );
+  }
+  return (
+    <Card>
+      <Text style={{ fontWeight: "700" }}>Teslimatı nasıl buldunuz?</Text>
+      <View style={{ flexDirection: "row", gap: 6 }} accessibilityRole="radiogroup">
+        {[1, 2, 3, 4, 5].map((n) => (
+          <Pressable key={n} onPress={() => setScore(n)} testID={`star-${n}`} accessibilityRole="radio" accessibilityLabel={`${n} yıldız`} hitSlop={6}>
+            <Text style={{ fontSize: 34, color: n <= score ? colors.accent : colors.border }}>★</Text>
+          </Pressable>
+        ))}
+      </View>
+      {score ? (
+        <>
+          <TextInput
+            style={styles.input}
+            value={comment}
+            onChangeText={setComment}
+            placeholder={score <= 3 ? "Neyi daha iyi yapabilirdik?" : "Yorumunuz (isteğe bağlı)"}
+            maxLength={1000}
+            multiline
+          />
+          <Button
+            title="Gönder"
+            testID="rating-submit"
+            loading={busy}
+            onPress={async () => {
+              setBusy(true);
+              setError(null);
+              try {
+                const r = await api.rateOrder(order, score, comment);
+                setGoogle(r.googleReviewUrl ?? "");
+                onRated();
+              } catch (e) {
+                setError(e instanceof ApiError ? e.message : "Gönderilemedi");
+              } finally {
+                setBusy(false);
+              }
+            }}
+          />
+        </>
+      ) : null}
+      <ErrorBox message={error} />
     </Card>
   );
 }
@@ -203,6 +267,8 @@ export default function SiparisDetay() {
           }}
         />
       ) : null}
+
+      {order.status === "teslim_edildi" ? <RateCard order={order} onRated={load} /> : null}
 
       {order.invoicePdfUrl ? (
         <Button title="Faturayı görüntüle" variant="secondary" onPress={() => Linking.openURL(order.invoicePdfUrl!)} />

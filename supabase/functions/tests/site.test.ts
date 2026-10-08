@@ -132,3 +132,35 @@ Deno.test("site: kurye başvurusu doğrulamaları", async () => {
   assertEquals((await landline.json()).field, "phone");
   assertEquals(f.inserted.courier_applications, undefined);
 });
+
+Deno.test("site: değerlendirme — düşük puan yöneticiye, 5 puan Google yorumuna", async () => {
+  const sent: string[] = [];
+  const fetchFn = ((_u: string, init: RequestInit) => {
+    sent.push(String(init.body));
+    return Promise.resolve(Response.json({ code: "00", jobid: "1" }));
+  }) as unknown as typeof fetch;
+  const tables = {
+    "rpc:hit_rate_limit": () => true,
+    "rpc:submit_rating": () => "ok",
+    orders: [{ tracking_token: "t".repeat(32), order_no: "YK-9", courier: { profile: { full_name: "Mehmet Kaya" } }, customer: { full_name: "Ayşe", phone: "905321112233" } }],
+  };
+  const f = fakeCtx({ userId: null, tables });
+  const envR = (k: string) => ({ ADMIN_ALERT_PHONES: "+905550000001", GOOGLE_REVIEW_URL: "https://g.page/r/ornek/review" } as Record<string, string>)[k];
+  const run = (body: unknown) => handler((r) => handleSite(r, f.ctx, { env: envR, fetchFn }))(post(body));
+
+  const low = await (await run({ action: "rate", token: "t".repeat(32), score: 2, comment: "Geç geldi" })).json();
+  assertEquals(low, { ok: true, googleReviewUrl: null });
+  assertEquals(f.rpcCalls.find((c) => c.name === "submit_rating")!.args, { p_token: "t".repeat(32), p_score: 2, p_comment: "Geç geldi", p_source: "takip" });
+  const top = await (await run({ action: "rate", token: "t".repeat(32), score: 5 })).json();
+  assertEquals(top.googleReviewUrl, "https://g.page/r/ornek/review");
+  const bad = await run({ action: "rate", token: "x", score: 9 });
+  assertEquals((await bad.json()).field, "score");
+});
+
+Deno.test("site: değerlendirme — tekrar ve teslim edilmemiş siparişte hata", async () => {
+  for (const [r, status] of [["exists", 409], ["not_delivered", 409], ["expired", 410], ["not_found", 404]] as const) {
+    const f = fakeCtx({ userId: null, tables: { "rpc:hit_rate_limit": () => true, "rpc:submit_rating": () => r } });
+    const res = await handler((q) => handleSite(q, f.ctx, { env }))(post({ action: "rate", token: "t".repeat(32), score: 4 }));
+    assertEquals(res.status, status);
+  }
+});

@@ -1,4 +1,4 @@
-import type { AdminOrder } from "./repo";
+import type { AdminOrder, OrderRating } from "./repo";
 import { istDate } from "./dates";
 
 /** Acil teslimat hedefi (dakika) */
@@ -17,10 +17,18 @@ export interface Report {
     urgentDelivered: number;
     urgentOnTimeRate: number | null; // 0..1
     crossSideRate: number; // Avrupa yakasına dokunan sipariş oranı
+    avgRating: number | null; // 1..5, bir ondalık
+    ratingCount: number;
+    /** Değerlendirme oranı: puan verilen / teslim edilen */
+    ratingRate: number | null;
   };
+  /** Puan dağılımı: index 0 → 1 yıldız … 4 → 5 yıldız */
+  ratingDist: number[];
+  /** 3 ve altı puanlar (en yeni önce) */
+  lowRatings: OrderRating[];
   daily: Array<{ date: string; orders: number; delivered: number; revenueKurus: number }>;
   hourly: Array<{ hour: number; orders: number }>;
-  couriers: Array<{ courierId: string | null; name: string; delivered: number; revenueKurus: number; avgDeliveryMin: number | null }>;
+  couriers: Array<{ courierId: string | null; name: string; delivered: number; revenueKurus: number; avgDeliveryMin: number | null; avgRating: number | null }>;
   customerCount: number;
   customers: Array<{ customerId: string; name: string; phone: string | null; delivered: number; revenueKurus: number }>;
 }
@@ -43,7 +51,9 @@ function daysBetween(from: string, to: string): string[] {
   return out;
 }
 
-export function buildReport(orders: AdminOrder[], from: string, to: string): Report {
+const avg1 = (xs: number[]) => (xs.length ? Math.round((xs.reduce((a, b) => a + b, 0) / xs.length) * 10) / 10 : null);
+
+export function buildReport(orders: AdminOrder[], from: string, to: string, ratings: OrderRating[] = []): Report {
   const delivered = orders.filter((o) => o.status === "teslim_edildi");
   const cancelled = orders.filter((o) => o.status === "iptal");
   const revenueKurus = delivered.reduce((s, o) => s + o.subtotalKurus, 0);
@@ -99,11 +109,20 @@ export function buildReport(orders: AdminOrder[], from: string, to: string): Rep
       urgentDelivered: urgent.length,
       urgentOnTimeRate: urgent.length ? urgentOnTime.length / urgent.length : null,
       crossSideRate: active.length ? active.filter((o) => o.pickupSide === "avrupa" || o.dropoffSide === "avrupa").length / active.length : 0,
+      avgRating: avg1(ratings.map((r) => r.score)),
+      ratingCount: ratings.length,
+      ratingRate: delivered.length ? Math.min(1, ratings.length / delivered.length) : null,
     },
+    ratingDist: [1, 2, 3, 4, 5].map((n) => ratings.filter((r) => r.score === n).length),
+    lowRatings: ratings.filter((r) => r.score <= 3).sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
     daily: [...daily.values()],
     hourly,
     couriers: [...byCourier.values()]
-      .map(({ times: t, ...c }) => ({ ...c, avgDeliveryMin: avg(t) }))
+      .map(({ times: t, ...c }) => ({
+        ...c,
+        avgDeliveryMin: avg(t),
+        avgRating: avg1(ratings.filter((r) => r.courierId === c.courierId).map((r) => r.score)),
+      }))
       .sort((a, b) => b.delivered - a.delivered),
     customerCount: byCustomer.size,
     customers: [...byCustomer.values()].sort((a, b) => b.revenueKurus - a.revenueKurus).slice(0, 10),

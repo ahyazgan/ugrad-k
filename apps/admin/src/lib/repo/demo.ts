@@ -36,6 +36,7 @@ import {
   type CourierApplication,
   type Lead,
   type ApiKeyInfo,
+  type OrderRating,
   type WebhookConfig,
 } from "./types";
 import { generateApiKey, keyPrefix } from "../api-keys";
@@ -787,6 +788,30 @@ export function createDemoRepo(): AdminRepo {
       return { id: o.id, orderNo: o.orderNo };
     },
 
+    async listRatings({ from, to }) {
+      const s = await get();
+      // Demo: teslim edilen siparişlere sabit örnek puanlar (çoğu 5, birkaç düşük)
+      const SCORES = [5, 5, 4, 5, 5, 3, 5, 4, 5, 5, 2, 5, 4, 5];
+      const COMMENTS: Record<number, string> = { 2: "Kurye geç geldi, haber vermedi.", 3: "Paket biraz ezilmişti." };
+      return s.orders
+        .filter((o) => o.status === "teslim_edildi" && o.deliveredAt)
+        .filter((o) => o.deliveredAt! >= istDayStartUtc(from) && o.deliveredAt! < istDayEndUtc(to))
+        .map((o, i): OrderRating | null => {
+          if (i % 3 === 2) return null; // herkes puan vermez
+          const score = SCORES[i % SCORES.length]!;
+          return {
+            orderId: o.id,
+            orderNo: o.orderNo,
+            score,
+            comment: COMMENTS[score] ?? null,
+            courierId: o.courierId,
+            courierName: o.courierName,
+            customerName: o.customerName,
+            createdAt: new Date(new Date(o.deliveredAt!).getTime() + 20 * 60_000).toISOString(),
+          };
+        })
+        .filter((r): r is OrderRating => r !== null);
+    },
     async listApiKeys(accountId) {
       return clone((await get()).apiKeys.filter((k) => k.accountId === accountId));
     },
