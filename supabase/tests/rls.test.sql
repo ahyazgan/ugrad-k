@@ -188,9 +188,17 @@ select status, delivered_at is not null as teslim_zamani from public.set_order_s
 select ended_at is not null as vardiya_kapandi from public.end_shift();
 reset role;
 
--- ───── Yönetici: son durumdan geri dönülemez
+-- ───── Yönetici: kanıtsız teslim kapatabilir; son durumdan geri dönülemez
+insert into public.orders (
+  id, customer_id, pickup_address, pickup_lat, pickup_lng, dropoff_address, dropoff_lat, dropoff_lng,
+  distance_meters, price_quote, subtotal_kurus, vat_kurus, total_kurus, status, courier_id
+) values ('10000000-0000-0000-0000-000000000003', :cust1, 'A', 41, 29, 'B', 41, 29, 1000, '{}', 1, 0, 1, 'onaylandi', null);
+update public.orders set courier_id = :kurye2, status = 'kuryeye_atandi' where id = '10000000-0000-0000-0000-000000000003';
+update public.orders set status = 'alindi' where id = '10000000-0000-0000-0000-000000000003';
+update public.orders set status = 'yolda' where id = '10000000-0000-0000-0000-000000000003';
 select set_config('request.jwt.claim.sub', :admin, false);
 set role authenticated;
+select status as yonetici_kanitsiz_teslim from public.set_order_status('10000000-0000-0000-0000-000000000003', 'teslim_edildi', 'kurye telefonu kapalı');
 do $$ begin
   update public.orders set status = 'yolda' where id = '10000000-0000-0000-0000-000000000001';
   raise exception 'BEKLENMEDİ: teslim edilmiş sipariş geri alındı';

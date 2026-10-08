@@ -175,7 +175,8 @@ begin
     end if;
   end if;
 
-  if p_status = 'teslim_edildi'
+  -- Kurye teslimde kanıt yüklemek zorunda; yönetici (ör. kuryenin telefonu kapandıysa) kanıtsız kapatabilir
+  if p_status = 'teslim_edildi' and not is_adm
      and coalesce(p_pod_photo_path, o.pod_photo_path, p_pod_signature_path, o.pod_signature_path) is null then
     raise exception 'Teslim için fotoğraf veya imza gerekli' using errcode = '22023';
   end if;
