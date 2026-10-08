@@ -25,6 +25,7 @@ export default function KurumsalPage() {
   const [month, setMonth] = useState(istDate().slice(0, 7));
   const [statement, setStatement] = useState<MonthlyStatement | null>(null);
   const [stmtError, setStmtError] = useState<string | null>(null);
+  const [stmtMsg, setStmtMsg] = useState<string | null>(null);
 
   async function save(e: FormEvent) {
     e.preventDefault();
@@ -118,12 +119,31 @@ export default function KurumsalPage() {
                 Hesapla
               </Button>
               {statement ? (
-                <Button variant="secondary" onClick={exportStatement}>
-                  CSV indir
-                </Button>
+                <>
+                  <Button variant="secondary" onClick={exportStatement}>
+                    CSV indir
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    disabled={!statement.orders.length}
+                    onClick={async () => {
+                      setStmtError(null);
+                      setStmtMsg(null);
+                      try {
+                        await repo.createMonthlyInvoice(statement.account.id, statement.month);
+                        setStmtMsg("Fatura kuyruğa alındı. Faturalar sayfasından takip edebilirsiniz.");
+                      } catch (err) {
+                        setStmtError(err instanceof Error ? err.message : "Fatura oluşturulamadı");
+                      }
+                    }}
+                  >
+                    Faturayı oluştur
+                  </Button>
+                </>
               ) : null}
             </div>
             <ErrorText>{stmtError}</ErrorText>
+            {stmtMsg ? <p className="mt-2 text-sm text-emerald-700">{stmtMsg}</p> : null}
             {statement ? (
               <div className="mt-4 space-y-4">
                 <dl className="grid gap-2 text-sm sm:grid-cols-3">

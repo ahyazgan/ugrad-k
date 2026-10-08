@@ -101,6 +101,25 @@ export interface MonthlyStatement {
   invoice: MonthlyInvoice;
 }
 
+export interface Invoice {
+  id: string;
+  kind: "order" | "monthly";
+  orderId: string | null;
+  orderNo: string | null;
+  corporateAccountId: string | null;
+  period: string | null;
+  status: "pending" | "processing" | "issued" | "failed";
+  attempts: number;
+  lastError: string | null;
+  buyerName: string;
+  description: string;
+  totalKurus: number;
+  docType: "e_arsiv" | "e_fatura" | null;
+  pdfUrl: string | null;
+  issuedAt: string | null;
+  createdAt: string;
+}
+
 export interface OrderFilter {
   statuses?: OrderStatus[];
   search?: string;
@@ -134,6 +153,10 @@ export interface AdminRepo {
   listCorporateAccounts(): Promise<CorporateAccount[]>;
   saveCorporateAccount(acc: Omit<CorporateAccount, "id"> & { id?: string }): Promise<CorporateAccount>;
   monthlyStatement(corporateAccountId: string, month: string): Promise<MonthlyStatement>;
+  // Faturalar
+  listInvoices(): Promise<Invoice[]>;
+  createMonthlyInvoice(corporateAccountId: string, month: string): Promise<void>;
+  retryInvoice(id: string): Promise<void>;
   // Fiyatlar
   getPricing(): Promise<{ settings: PricingSettings; holidays: Holiday[]; updatedAt: string | null }>;
   savePricing(settings: PricingSettings): Promise<void>;

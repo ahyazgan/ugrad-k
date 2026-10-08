@@ -74,7 +74,12 @@ fs.mkdirSync(out, { recursive: true });
     const prev = m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, "0")}`;
     await page.getByLabel("Ay").fill(prev);
   }
+  await page.getByRole("button", { name: "Faturayı oluştur" }).click();
+  await page.getByText("Fatura kuyruğa alındı").waitFor();
   await shot("06-kurumsal");
+  await nav("Faturalar");
+  await page.getByText(/^Aylık \d{4}-\d{2}$/).waitFor();
+  await shot("06b-faturalar");
 
   await nav("Fiyatlar");
   const perKm = page.getByLabel("Ek km ücreti (TL)");

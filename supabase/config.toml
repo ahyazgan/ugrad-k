@@ -453,3 +453,9 @@ verify_jwt = true
 # iyzico tarayıcıyı buraya yönlendirir; JWT olmaz. Doğrulama iyzico'dan token sorgusuyla yapılır.
 [functions.payment-callback]
 verify_jwt = false
+
+[functions.invoice-dispatch]
+verify_jwt = false
+
+[functions.invoice-monthly]
+verify_jwt = true

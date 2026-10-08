@@ -25,6 +25,7 @@ import {
   type CorporateAccount,
   type Courier,
   type Customer,
+  type Invoice,
   type Shift,
 } from "./types";
 
@@ -40,6 +41,7 @@ interface State {
   corporate: CorporateAccount[];
   orders: AdminOrderDetail[];
   shifts: Shift[];
+  invoices: Invoice[];
 }
 
 const hoursAgo = (h: number) => new Date(Date.now() - h * 3_600_000).toISOString();
@@ -192,6 +194,28 @@ async function seed(): Promise<State> {
     corporate,
     orders,
     shifts,
+    invoices: orders
+      .filter((o) => o.status === "teslim_edildi" && !o.corporateAccountId)
+      .map(
+        (o): Invoice => ({
+          id: `inv-${o.id}`,
+          kind: "order",
+          orderId: o.id,
+          orderNo: o.orderNo,
+          corporateAccountId: null,
+          period: null,
+          status: "pending",
+          attempts: 0,
+          lastError: "Paraşüt yapılandırılmamış (demo)",
+          buyerName: o.customerName ?? "Nihai Tüketici",
+          description: `Kurye hizmeti ${o.orderNo}`,
+          totalKurus: o.totalKurus,
+          docType: null,
+          pdfUrl: null,
+          issuedAt: null,
+          createdAt: o.deliveredAt ?? o.createdAt,
+        }),
+      ),
   };
 }
 
@@ -384,6 +408,40 @@ export function createDemoRepo(): AdminRepo {
           s.settings,
         ),
       });
+    },
+
+    async listInvoices() {
+      return clone((await get()).invoices);
+    },
+    async createMonthlyInvoice(corporateAccountId, month) {
+      const s = await get();
+      if (s.invoices.some((i) => i.corporateAccountId === corporateAccountId && i.period === month)) {
+        throw new RepoError("Bu ay için fatura zaten oluşturulmuş");
+      }
+      const st = await this.monthlyStatement(corporateAccountId, month);
+      if (!st.orders.length) throw new RepoError("Bu ay teslim edilmiş sipariş yok");
+      s.invoices.unshift({
+        id: `inv-${corporateAccountId}-${month}`,
+        kind: "monthly",
+        orderId: null,
+        orderNo: null,
+        corporateAccountId,
+        period: month,
+        status: "pending",
+        attempts: 0,
+        lastError: null,
+        buyerName: st.account.companyName,
+        description: `${month} kurye hizmetleri (${st.invoice.deliveryCount} teslimat)`,
+        totalKurus: st.invoice.totalKurus,
+        docType: null,
+        pdfUrl: null,
+        issuedAt: null,
+        createdAt: new Date().toISOString(),
+      });
+    },
+    async retryInvoice(id) {
+      const inv = (await get()).invoices.find((i) => i.id === id);
+      if (inv) Object.assign(inv, { status: "pending", attempts: 0, lastError: null });
     },
 
     async getPricing() {

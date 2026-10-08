@@ -28,6 +28,7 @@ export function fakeDb(tables: Record<string, Row[]>) {
         return q;
       },
       gte: () => q,
+      lt: () => q,
       limit: () => q,
       insert: (row: Row) => {
         insertRow = { id: "new-id", order_no: "YK-1000", status: "beklemede", tracking_token: "t".repeat(32), ...row };

@@ -171,6 +171,9 @@ export default function SiparisDetay() {
         />
       ) : null}
 
+      {order.invoicePdfUrl ? (
+        <Button title="Faturayı görüntüle" variant="secondary" onPress={() => Linking.openURL(order.invoicePdfUrl!)} />
+      ) : null}
       <ErrorBox message={error} />
       {order.cancelReason ? <Muted>İptal nedeni: {order.cancelReason}</Muted> : null}
 

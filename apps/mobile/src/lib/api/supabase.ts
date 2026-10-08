@@ -169,7 +169,11 @@ export function createSupabaseApi(url: string, anonKey: string): Api & { client:
     async getOrder(id) {
       const [o, h] = await Promise.all([
         // Kurye bilgisi RLS gereği yalnızca aktif teslimat sırasında döner
-        client.from("orders").select("*, courier:couriers(plate, profile:profiles(full_name, phone))").eq("id", id).single(),
+        client
+          .from("orders")
+          .select("*, courier:couriers(plate, profile:profiles(full_name, phone)), invoice:invoices(pdf_url)")
+          .eq("id", id)
+          .single(),
         client.from("order_status_history").select("to_status, created_at, note").eq("order_id", id).order("created_at"),
       ]);
       fail(o.error, "Sipariş okunamadı");
@@ -196,6 +200,7 @@ export function createSupabaseApi(url: string, anonKey: string): Api & { client:
         paymentMethod: r!.payment_method,
         paymentStatus: r!.payment_status,
         paidKurus: r!.paid_kurus ?? null,
+        invoicePdfUrl: (Array.isArray(r!.invoice) ? r!.invoice[0] : r!.invoice)?.pdf_url ?? null,
         trackingToken: r!.tracking_token,
         courierName: r!.courier?.profile?.full_name ?? null,
         courierPhone: r!.courier?.profile?.phone ?? null,

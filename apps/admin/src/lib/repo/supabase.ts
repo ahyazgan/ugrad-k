@@ -16,6 +16,7 @@ import {
   type AdminRepo,
   type CorporateAccount,
   type Courier,
+  type Invoice,
 } from "./types";
 
 // Supabase'den gelen tipsiz satırlar (şema tipi üretilene kadar)
@@ -301,6 +302,48 @@ export function createSupabaseRepo(url: string, anonKey: string): AdminRepo & { 
         orders,
         invoice: calculateMonthlyInvoice(orders.map((x) => x.subtotalKurus), settings),
       };
+    },
+
+    async listInvoices() {
+      const res = await client
+        .from("invoices")
+        .select("*, order:orders(order_no)")
+        .order("created_at", { ascending: false })
+        .limit(300);
+      return (check(res, "Faturalar okunamadı") ?? []).map(
+        (r: Row): Invoice => ({
+          id: r.id,
+          kind: r.kind,
+          orderId: r.order_id,
+          orderNo: r.order?.order_no ?? null,
+          corporateAccountId: r.corporate_account_id,
+          period: r.period,
+          status: r.status,
+          attempts: r.attempts,
+          lastError: r.last_error,
+          buyerName: r.buyer?.name ?? "",
+          description: r.description,
+          totalKurus: r.total_kurus,
+          docType: r.provider_doc_type,
+          pdfUrl: r.pdf_url,
+          issuedAt: r.issued_at,
+          createdAt: r.created_at,
+        }),
+      );
+    },
+    async createMonthlyInvoice(corporateAccountId, month) {
+      const { error } = await client.functions.invoke("invoice-monthly", { body: { corporateAccountId, month } });
+      if (error) {
+        const ctx = (error as { context?: Response }).context;
+        const payload = ctx ? await ctx.json().catch(() => ({})) : {};
+        throw new RepoError(payload.error ?? "Fatura oluşturulamadı");
+      }
+    },
+    async retryInvoice(id) {
+      check(
+        await client.from("invoices").update({ status: "pending", attempts: 0, last_error: null }).eq("id", id),
+        "Fatura yeniden kuyruğa alınamadı",
+      );
     },
 
     async getPricing() {

@@ -86,6 +86,7 @@ export function createDemoApi(): Api {
     paymentMethod: req.paymentMethod,
     paymentStatus: "odenmedi",
     paidKurus: null,
+    invoicePdfUrl: null,
     trackingToken: "demo".padEnd(32, "0"),
     courierName: null,
     courierPhone: null,

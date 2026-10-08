@@ -84,6 +84,7 @@ export interface OrderDetail extends OrderSummary {
   paymentMethod: OrderInput["paymentMethod"];
   paymentStatus: string;
   paidKurus: number | null;
+  invoicePdfUrl: string | null;
   trackingToken: string;
   courierName: string | null;
   courierPhone: string | null;
