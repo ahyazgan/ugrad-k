@@ -9,12 +9,15 @@ import {
   ORDER_TRANSITIONS,
   buildQuote,
   calculateMonthlyInvoice,
+  courierEarning,
+  DEFAULT_COST_MODEL,
   monthlyInvoiceItem,
   mockMapsProvider,
   MOCK_PLACES,
   parseOrderRequest,
   planAssignments,
   ValidationError,
+  type CostModel,
   type Holiday,
   type OrderStatus,
   type PricingSettings,
@@ -28,6 +31,8 @@ import {
   type AdminRepo,
   type CorporateAccount,
   type Courier,
+  type CourierPayout,
+  type EarningRow,
   type Conversation,
   type Customer,
   type Invoice,
@@ -63,6 +68,30 @@ interface State {
   applications: CourierApplication[];
   apiKeys: Array<ApiKeyInfo & { accountId: string }>;
   webhooks: Map<string, WebhookConfig>;
+  costModel: CostModel;
+  earnings: EarningRow[];
+  payouts: CourierPayout[];
+}
+
+/** Teslim edilmiş siparişin hakediş satırı (Edge Function courier-earnings ile aynı hesap) */
+function earningFor(o: AdminOrderDetail, model: CostModel, settings: PricingSettings): EarningRow {
+  const e = courierEarning(o.priceQuote, model, settings);
+  return {
+    orderId: o.id,
+    orderNo: o.orderNo,
+    courierId: o.courierId!,
+    courierName: o.courierName,
+    deliveredAt: o.deliveredAt ?? new Date().toISOString(),
+    km: e.km,
+    jobKurus: e.jobKurus,
+    kmKurus: e.kmKurus,
+    bonusKurus: e.bonusKurus,
+    waitingKurus: e.waitingKurus,
+    bridgeKurus: e.bridgeKurus,
+    totalKurus: e.totalKurus,
+    cashCollectedKurus: o.paymentMethod === "nakit" && o.cashCollection === "nakit" ? o.totalKurus : 0,
+    payoutId: null,
+  };
 }
 
 const phoneDigits = (p: string) => p.replace(/\D/g, "").replace(/^(90|0)/, "");
@@ -185,6 +214,7 @@ async function seed(): Promise<State> {
       paymentMethod: cust.corporateAccountId ? "cari" : "nakit",
       paymentStatus: cust.corporateAccountId ? "cari_hesap" : "odenmedi",
       paidKurus: null,
+      cashCollection: null,
       distanceMeters: q.distanceMeters,
       scheduledPickupAt: null,
       deliveredAt: status === "teslim_edildi" ? hoursAgo(ago - (deliveryMin.get(idx) ?? 60) / 60) : null,
@@ -214,6 +244,40 @@ async function seed(): Promise<State> {
         note: null,
       })),
     });
+  }
+  // Kuryeye ödemeli teslimatlar: çoğu nakit tahsil edildi; biri IBAN bildirimi, biri tahsil edilemedi (alacak)
+  orders
+    .filter((o) => o.status === "teslim_edildi" && o.paymentMethod === "nakit")
+    .forEach((o, i) => {
+      o.cashCollection = i === 0 ? "iban" : i === 1 ? "alinmadi" : "nakit";
+      if (o.cashCollection === "nakit") {
+        o.paymentStatus = "odendi";
+        o.paidKurus = o.totalKurus;
+      }
+    });
+  // Hakedişler; Emre'nin 14 günden eski teslimatları geçmiş bir hesaplaşmayla ödenmiş
+  const earnings = orders
+    .filter((o) => o.status === "teslim_edildi" && o.courierId)
+    .map((o) => earningFor(o, DEFAULT_COST_MODEL, DEFAULT_PRICING_SETTINGS));
+  const paidUntil = hoursAgo(14 * 24);
+  const old = earnings.filter((e) => e.courierId === "kur-2" && e.deliveredAt <= paidUntil);
+  const payouts: CourierPayout[] = [];
+  if (old.length) {
+    const sum = (f: (e: EarningRow) => number) => old.reduce((a, e) => a + f(e), 0);
+    payouts.push({
+      id: "pay-1",
+      courierId: "kur-2",
+      courierName: "Emre Şahin",
+      untilAt: paidUntil,
+      deliveryCount: old.length,
+      earningsKurus: sum((e) => e.totalKurus),
+      cashKurus: sum((e) => e.cashCollectedKurus),
+      netKurus: sum((e) => e.totalKurus - e.cashCollectedKurus),
+      note: "Havale",
+      createdAt: paidUntil,
+      cancelledAt: null,
+    });
+    for (const e of old) e.payoutId = "pay-1";
   }
   const shifts: Shift[] = Array.from({ length: 10 }, (_, i) => {
     const c = couriers[i % 2]!;
@@ -328,6 +392,9 @@ async function seed(): Promise<State> {
       },
     ],
     settings: { ...DEFAULT_PRICING_SETTINGS },
+    costModel: { ...DEFAULT_COST_MODEL },
+    earnings,
+    payouts,
     holidays: (holidaysJson as Array<{ date: string; name: string; half_day: boolean }>).map((h) => ({
       date: h.date,
       name: h.name,
@@ -792,6 +859,7 @@ export function createDemoRepo(): AdminRepo {
         paymentMethod: req.paymentMethod,
         paymentStatus: req.paymentMethod === "cari" ? "cari_hesap" : "odenmedi",
         paidKurus: null,
+        cashCollection: null,
         distanceMeters: q.distanceMeters,
         scheduledPickupAt: req.scheduledPickupAt,
         deliveredAt: null,
@@ -921,6 +989,85 @@ export function createDemoRepo(): AdminRepo {
     async closeConversation(id) {
       const c = (await get()).conversations.find((x) => x.id === id);
       if (c) c.status = "closed";
+    },
+
+    async getCostModel() {
+      return clone((await get()).costModel);
+    },
+    async saveCostModel(m) {
+      (await get()).costModel = clone(m);
+    },
+    async runCourierEarnings() {
+      const s = await get();
+      const done = new Set(s.earnings.map((e) => e.orderId));
+      const fresh = s.orders
+        .filter((o) => o.status === "teslim_edildi" && o.courierId && !done.has(o.id))
+        .map((o) => earningFor(o, s.costModel, s.settings));
+      s.earnings.unshift(...fresh);
+      return { written: fresh.length };
+    },
+    async listEarnings({ unpaidOnly, courierId, payoutId }) {
+      const s = await get();
+      return clone(
+        s.earnings
+          .filter((e) => (!unpaidOnly || !e.payoutId) && (!courierId || e.courierId === courierId) && (!payoutId || e.payoutId === payoutId))
+          .sort((a, b) => b.deliveredAt.localeCompare(a.deliveredAt)),
+      );
+    },
+    async listPayouts() {
+      return clone((await get()).payouts);
+    },
+    async createPayout(courierId, note) {
+      const s = await get();
+      const now = new Date().toISOString();
+      const rows = s.earnings.filter((e) => e.courierId === courierId && !e.payoutId && e.deliveredAt <= now);
+      if (!rows.length) throw new RepoError("Hesaplaşılacak teslimat yok");
+      const sum = (f: (e: EarningRow) => number) => rows.reduce((a, e) => a + f(e), 0);
+      const p: CourierPayout = {
+        id: `pay-${s.payouts.length + 1}-${Date.now()}`,
+        courierId,
+        courierName: s.couriers.find((c) => c.id === courierId)?.fullName ?? null,
+        untilAt: now,
+        deliveryCount: rows.length,
+        earningsKurus: sum((e) => e.totalKurus),
+        cashKurus: sum((e) => e.cashCollectedKurus),
+        netKurus: sum((e) => e.totalKurus - e.cashCollectedKurus),
+        note: note?.trim() || null,
+        createdAt: now,
+        cancelledAt: null,
+      };
+      for (const e of rows) e.payoutId = p.id;
+      s.payouts.unshift(p);
+      return clone(p);
+    },
+    async cancelPayout(id) {
+      const s = await get();
+      const p = s.payouts.find((x) => x.id === id && !x.cancelledAt);
+      if (!p) throw new RepoError("Hesaplaşma bulunamadı veya zaten iptal");
+      p.cancelledAt = new Date().toISOString();
+      for (const e of s.earnings) if (e.payoutId === id) e.payoutId = null;
+    },
+    async listReceivables() {
+      const s = await get();
+      return s.orders
+        .filter((o) => o.paymentMethod === "nakit" && o.status === "teslim_edildi" && o.paymentStatus !== "odendi")
+        .map((o) => ({
+          orderId: o.id,
+          orderNo: o.orderNo,
+          customerName: o.customerName,
+          customerPhone: o.customerPhone,
+          courierName: o.courierName,
+          deliveredAt: o.deliveredAt,
+          totalKurus: o.totalKurus,
+          cashCollection: o.cashCollection,
+        }));
+    },
+    async markOrderPaid(orderId) {
+      const o = (await get()).orders.find((x) => x.id === orderId);
+      if (!o) throw new RepoError("Sipariş bulunamadı");
+      o.paymentStatus = "odendi";
+      o.paidKurus = o.totalKurus;
+      touchOrders();
     },
 
     async getPricing() {

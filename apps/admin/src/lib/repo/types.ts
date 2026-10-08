@@ -6,6 +6,7 @@ import type {
   PlaceDetails,
   PlaceSuggestion,
   PriceQuote,
+  CostModel,
   PricingSettings,
   ServiceLevel,
 } from "@yazgan/shared";
@@ -37,9 +38,58 @@ export interface AdminOrder {
   paymentMethod: "kart" | "cari" | "nakit";
   paymentStatus: string;
   paidKurus: number | null;
+  /** Kuryeye ödemeli siparişte teslimde bildirilen tahsilat */
+  cashCollection: CashCollection | null;
   distanceMeters: number;
   scheduledPickupAt: string | null;
   deliveredAt: string | null;
+}
+
+export type CashCollection = "nakit" | "iban" | "alinmadi";
+
+/** Teslimat başına kurye hakedişi (courier_earnings) */
+export interface EarningRow {
+  orderId: string;
+  orderNo: string;
+  courierId: string;
+  courierName: string | null;
+  deliveredAt: string;
+  km: number;
+  jobKurus: number;
+  kmKurus: number;
+  bonusKurus: number;
+  waitingKurus: number;
+  bridgeKurus: number;
+  totalKurus: number;
+  cashCollectedKurus: number;
+  payoutId: string | null;
+}
+
+export interface CourierPayout {
+  id: string;
+  courierId: string;
+  courierName: string | null;
+  untilAt: string;
+  deliveryCount: number;
+  earningsKurus: number;
+  cashKurus: number;
+  /** Kuryeye ödenen net; eksi ise kurye şirkete ödedi */
+  netKurus: number;
+  note: string | null;
+  createdAt: string;
+  cancelledAt: string | null;
+}
+
+/** Teslim edilmiş ama ödemesi gelmemiş kuryeye ödemeli sipariş */
+export interface Receivable {
+  orderId: string;
+  orderNo: string;
+  customerName: string | null;
+  customerPhone: string | null;
+  courierName: string | null;
+  deliveredAt: string | null;
+  totalKurus: number;
+  cashCollection: CashCollection | null;
 }
 
 export interface AdminOrderDetail extends AdminOrder {
@@ -363,6 +413,18 @@ export interface AdminRepo {
   // Asistan
   listConversations(): Promise<Conversation[]>;
   closeConversation(id: string): Promise<void>;
+  // Hakediş ve tahsilat
+  getCostModel(): Promise<CostModel>;
+  saveCostModel(m: CostModel): Promise<void>;
+  /** Teslim edilen siparişlerin hakedişlerini hemen yazar (normalde 5 dakikada bir otomatik) */
+  runCourierEarnings(): Promise<{ written: number }>;
+  listEarnings(filter: { unpaidOnly?: boolean; courierId?: string; payoutId?: string }): Promise<EarningRow[]>;
+  listPayouts(): Promise<CourierPayout[]>;
+  createPayout(courierId: string, note?: string): Promise<CourierPayout>;
+  cancelPayout(id: string): Promise<void>;
+  listReceivables(): Promise<Receivable[]>;
+  /** Kuryeye ödemeli siparişin ödemesi (IBAN veya sonradan nakit) alındı */
+  markOrderPaid(orderId: string): Promise<void>;
   // Fiyatlar
   getPricing(): Promise<{ settings: PricingSettings; holidays: Holiday[]; updatedAt: string | null }>;
   savePricing(settings: PricingSettings): Promise<void>;

@@ -54,6 +54,13 @@ export function fakeDb(tables: Record<string, any>) {
         }
         return q;
       },
+      upsert: (row: Row | Row[]) => {
+        for (const r of Array.isArray(row) ? row : [row]) {
+          (inserted[table] ??= []).push(r);
+          (tables[table] ??= []).push(r);
+        }
+        return Promise.resolve({ data: null, error: null });
+      },
       in: (col: string, vals: unknown[]) => {
         rows = rows.filter((r) => vals.includes(r[col]));
         return q;

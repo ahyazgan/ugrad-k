@@ -1,3 +1,4 @@
+import type { CostModel } from "./cost.ts";
 import type { PricingSettings, CorporateTier, Holiday, KmTier } from "./pricing.ts";
 
 /** `pricing_settings` tablosunun satırı (Supabase'den geldiği hâliyle). */
@@ -88,6 +89,32 @@ export function pricingSettingsToRow(s: PricingSettings): PricingSettingsRow {
     out[col] = s[key as keyof PricingSettings];
   }
   return out as unknown as PricingSettingsRow;
+}
+
+/** `cost_settings` (kurye ödeme modeli ve genel gider) sütunları */
+export const COST_COLUMN_MAP = {
+  courierPerJobKurus: "courier_per_job_kurus",
+  courierPerKmKurus: "courier_per_km_kurus",
+  urgentBonusPct: "urgent_bonus_pct",
+  offHoursBonusPct: "off_hours_bonus_pct",
+  economyJobPayPct: "economy_job_pay_pct",
+  waitingSharePct: "waiting_share_pct",
+  overheadPerJobKurus: "overhead_per_job_kurus",
+  cardFeePct: "card_fee_pct",
+} as const satisfies Record<keyof CostModel, string>;
+
+export type CostSettingsRow = Record<(typeof COST_COLUMN_MAP)[keyof CostModel], number | string>;
+
+export function costModelFromRow(row: CostSettingsRow): CostModel {
+  const out = {} as Record<string, number>;
+  for (const [key, col] of Object.entries(COST_COLUMN_MAP)) out[key] = num(row[col]);
+  return out as unknown as CostModel;
+}
+
+export function costModelToRow(m: CostModel): CostSettingsRow {
+  const out = {} as Record<string, number>;
+  for (const [key, col] of Object.entries(COST_COLUMN_MAP)) out[col] = m[key as keyof CostModel];
+  return out as CostSettingsRow;
 }
 
 export interface HolidayRow {

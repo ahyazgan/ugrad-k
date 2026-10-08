@@ -1,10 +1,11 @@
 import * as ImagePicker from "expo-image-picker";
 import { router, useLocalSearchParams } from "expo-router";
-import { useState } from "react";
+import { formatTL } from "@yazgan/shared";
+import { useEffect, useState } from "react";
 import { Image, Text } from "react-native";
 import { SignaturePad } from "@/components/SignaturePad";
-import { Button, Card, ErrorBox, Field, Muted, Screen } from "@/components/ui";
-import { api, ApiError } from "@/lib/api";
+import { Button, Card, ErrorBox, Field, Muted, Screen, Segmented } from "@/components/ui";
+import { api, ApiError, type CashCollection, type OrderDetail } from "@/lib/api";
 import { setActiveOrderForLocation } from "@/lib/location";
 
 export default function Teslim() {
@@ -14,6 +15,14 @@ export default function Teslim() {
   const [receiver, setReceiver] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [order, setOrder] = useState<OrderDetail | null>(null);
+  const [collection, setCollection] = useState<CashCollection | "">("");
+
+  useEffect(() => {
+    api.getOrder(id).then(setOrder, () => undefined);
+  }, [id]);
+  // Kuryeye ödemeli ve henüz ödenmemiş: tahsilat şekli zorunlu
+  const needsCash = order?.paymentMethod === "nakit" && order.paymentStatus !== "odendi";
 
   async function takePhoto() {
     setError(null);
@@ -32,7 +41,7 @@ export default function Teslim() {
     try {
       await api.courierAction(id, {
         type: "deliver",
-        pod: { photoUri, signatureSvg: signature, receiverName: receiver.trim() },
+        pod: { photoUri, signatureSvg: signature, receiverName: receiver.trim(), cashCollection: needsCash ? (collection as CashCollection) : null },
       });
       setActiveOrderForLocation(null);
       router.dismissTo("/(kurye)");
@@ -58,12 +67,28 @@ export default function Teslim() {
         <Text style={{ fontWeight: "600" }}>İmza</Text>
         <SignaturePad onChange={setSignature} />
       </Card>
+      {needsCash ? (
+        <Card>
+          <Text style={{ fontWeight: "600" }}>Tahsilat: {formatTL(order.totalKurus)}</Text>
+          <Muted>Müşteriden ödemeyi nasıl aldınız? Nakit aldıysanız hakedişinizden düşülür.</Muted>
+          <Segmented
+            testIDPrefix="cash"
+            value={collection}
+            onChange={setCollection}
+            options={[
+              { value: "nakit", label: "Nakit aldım" },
+              { value: "iban", label: "IBAN'a gönderdi" },
+              { value: "alinmadi", label: "Alınamadı" },
+            ]}
+          />
+        </Card>
+      ) : null}
       <ErrorBox message={error} />
       <Button
         title="Teslimi tamamla"
         onPress={submit}
         loading={busy}
-        disabled={receiver.trim().length < 2 || (!photoUri && !signature)}
+        disabled={receiver.trim().length < 2 || (!photoUri && !signature) || (needsCash && !collection)}
         testID="complete-delivery"
       />
       <Muted style={{ textAlign: "center" }}>Fotoğraf veya imzadan en az biri zorunludur.</Muted>

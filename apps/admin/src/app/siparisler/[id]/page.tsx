@@ -239,6 +239,16 @@ export default function SiparisDetayPage() {
                   <div className="font-semibold text-amber-700">Ek tahsilat: {formatTL(order.totalKurus - order.paidKurus)}</div>
                 ) : null}
                 {order.paymentError ? <div className="text-red-700">{order.paymentError}</div> : null}
+                {order.cashCollection ? (
+                  <div className={order.cashCollection === "alinmadi" ? "font-semibold text-red-700" : "text-slate-500"}>
+                    Teslimde: {order.cashCollection === "nakit" ? "nakit alındı (kuryede)" : order.cashCollection === "iban" ? "müşteri IBAN'a gönderdiğini bildirdi" : "ödeme alınamadı"}
+                  </div>
+                ) : null}
+                {order.paymentMethod === "nakit" && order.status === "teslim_edildi" && order.paymentStatus !== "odendi" ? (
+                  <Button variant="secondary" className="mt-1" onClick={() => act(() => repo.markOrderPaid(order.id))}>
+                    Ödeme alındı
+                  </Button>
+                ) : null}
                 {order.paymentStatus === "iade_bekliyor" ? (
                   <div className="text-red-700">iyzico panelinden iade yapılmalı (ödeme no: {order.paymentRef})</div>
                 ) : null}

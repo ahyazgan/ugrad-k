@@ -3,6 +3,8 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import {
   calculateMonthlyInvoice,
+  costModelFromRow,
+  costModelToRow,
   monthlyInvoiceItem,
   holidayFromRow,
   pricingSettingsFromRow,
@@ -23,7 +25,10 @@ import {
   type Conversation,
   type Courier,
   type CourierApplication,
+  type CourierPayout,
+  type EarningRow,
   type Invoice,
+  type Receivable,
   type Lead,
   type PhoneCustomer,
   type ApiKeyInfo,
@@ -68,9 +73,41 @@ export const toAdminOrder = (r: Row): AdminOrder => ({
   paymentMethod: r.payment_method,
   paymentStatus: r.payment_status,
   paidKurus: r.paid_kurus ?? null,
+  cashCollection: r.cash_collection ?? null,
   distanceMeters: r.distance_meters,
   scheduledPickupAt: r.scheduled_pickup_at,
   deliveredAt: r.delivered_at,
+});
+
+const toEarning = (r: Row): EarningRow => ({
+  orderId: r.order_id,
+  orderNo: r.order?.order_no ?? "",
+  courierId: r.courier_id,
+  courierName: r.courier?.profile?.full_name ?? null,
+  deliveredAt: r.delivered_at,
+  km: Number(r.km),
+  jobKurus: r.job_kurus,
+  kmKurus: r.km_kurus,
+  bonusKurus: r.bonus_kurus,
+  waitingKurus: r.waiting_kurus,
+  bridgeKurus: r.bridge_kurus,
+  totalKurus: r.total_kurus,
+  cashCollectedKurus: r.cash_collected_kurus,
+  payoutId: r.payout_id,
+});
+
+const toPayout = (r: Row): CourierPayout => ({
+  id: r.id,
+  courierId: r.courier_id,
+  courierName: r.courier?.profile?.full_name ?? null,
+  untilAt: r.until_at,
+  deliveryCount: r.delivery_count,
+  earningsKurus: r.earnings_kurus,
+  cashKurus: r.cash_kurus,
+  netKurus: r.net_kurus,
+  note: r.note,
+  createdAt: r.created_at,
+  cancelledAt: r.cancelled_at,
 });
 
 const toCorporate = (r: Row): CorporateAccount => ({
@@ -632,6 +669,82 @@ export function createSupabaseRepo(url: string, anonKey: string): AdminRepo & { 
     },
     async closeConversation(id) {
       check(await client.from("assistant_conversations").update({ status: "closed" }).eq("id", id), "Kapatılamadı");
+    },
+
+    async getCostModel() {
+      return costModelFromRow(check(await client.from("cost_settings").select("*").eq("id", 1).single(), "Maliyet modeli okunamadı")!);
+    },
+    async saveCostModel(m) {
+      const { data } = await client.auth.getSession();
+      check(
+        await client.from("cost_settings").update({ ...costModelToRow(m), updated_by: data.session?.user.id }).eq("id", 1),
+        "Maliyet modeli kaydedilemedi",
+      );
+    },
+    async runCourierEarnings() {
+      return invoke<{ written: number }>("courier-earnings", {});
+    },
+    async listEarnings({ unpaidOnly, courierId, payoutId }) {
+      let q = client
+        .from("courier_earnings")
+        .select("*, order:orders(order_no), courier:couriers(profile:profiles(full_name))")
+        .order("delivered_at", { ascending: false })
+        .limit(5000);
+      if (unpaidOnly) q = q.is("payout_id", null);
+      if (courierId) q = q.eq("courier_id", courierId);
+      if (payoutId) q = q.eq("payout_id", payoutId);
+      return (check(await q, "Hakedişler okunamadı") ?? []).map(toEarning);
+    },
+    async listPayouts() {
+      const res = await client
+        .from("courier_payouts")
+        .select("*, courier:couriers(profile:profiles(full_name))")
+        .order("created_at", { ascending: false })
+        .limit(200);
+      return (check(res, "Hesaplaşmalar okunamadı") ?? []).map(toPayout);
+    },
+    async createPayout(courierId, note) {
+      const { data, error } = await client.rpc("create_courier_payout", { p_courier_id: courierId, p_note: note ?? null });
+      if (error) throw new RepoError(error.message);
+      return toPayout(data as Row);
+    },
+    async cancelPayout(id) {
+      const { error } = await client.rpc("cancel_courier_payout", { p_payout_id: id });
+      if (error) throw new RepoError(error.message);
+    },
+    async listReceivables() {
+      const res = await client
+        .from("orders")
+        .select(ORDER_SELECT)
+        .eq("payment_method", "nakit")
+        .eq("status", "teslim_edildi")
+        .neq("payment_status", "odendi")
+        .order("delivered_at", { ascending: false })
+        .limit(500);
+      return (check(res, "Tahsilatlar okunamadı") ?? []).map((r: Row): Receivable => {
+        const o = toAdminOrder(r);
+        return {
+          orderId: o.id,
+          orderNo: o.orderNo,
+          customerName: o.customerName,
+          customerPhone: o.customerPhone,
+          courierName: o.courierName,
+          deliveredAt: o.deliveredAt,
+          totalKurus: o.totalKurus,
+          cashCollection: o.cashCollection,
+        };
+      });
+    },
+    async markOrderPaid(orderId) {
+      const res = await client.from("orders").select("total_kurus").eq("id", orderId).single();
+      const total = check(res, "Sipariş okunamadı")!.total_kurus;
+      check(
+        await client
+          .from("orders")
+          .update({ payment_status: "odendi", paid_kurus: total, paid_at: new Date().toISOString() })
+          .eq("id", orderId),
+        "Ödeme kaydedilemedi",
+      );
     },
 
     async getPricing() {

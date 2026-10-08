@@ -120,6 +120,19 @@ export interface ProofOfDelivery {
   photoUri?: string | null;
   signatureSvg?: string | null;
   receiverName: string;
+  /** Kuryeye ödemeli siparişte tahsilat şekli (zorunlu) */
+  cashCollection?: CashCollection | null;
+}
+
+export type CashCollection = "nakit" | "iban" | "alinmadi";
+
+/** Kurye uygulaması → Kazancım */
+export interface CourierEarnings {
+  /** Henüz hesaplaşılmamış teslimatlar */
+  unpaid: { deliveries: number; earningsKurus: number; cashKurus: number; netKurus: number };
+  items: { orderId: string; orderNo: string; deliveredAt: string; km: number; totalKurus: number; cashCollectedKurus: number }[];
+  payouts: { id: string; createdAt: string; deliveryCount: number; netKurus: number; note: string | null }[];
+  rates: { perJobKurus: number; perKmKurus: number } | null;
 }
 
 export interface Session {
@@ -184,5 +197,6 @@ export interface Api {
       | { type: "release"; note: string },
   ): Promise<void>;
   pushLocation(loc: CourierLocation, orderId: string | null): Promise<void>;
+  courierEarnings(): Promise<CourierEarnings>;
   subscribeCourierJobs(onChange: () => void): () => void;
 }

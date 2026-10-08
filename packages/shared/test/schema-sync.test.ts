@@ -3,7 +3,8 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { ORDER_STATUSES, ORDER_TRANSITIONS } from "../orders.ts";
 import { DEFAULT_PRICING_SETTINGS } from "../pricing.ts";
-import { PRICING_COLUMN_MAP, pricingSettingsFromRow, pricingSettingsToRow } from "../db.ts";
+import { DEFAULT_COST_MODEL } from "../cost.ts";
+import { COST_COLUMN_MAP, costModelFromRow, costModelToRow, PRICING_COLUMN_MAP, pricingSettingsFromRow, pricingSettingsToRow } from "../db.ts";
 
 // TypeScript ile SQL migration'larının birbirinden kopmadığını doğrular.
 const migrationsDir = join(import.meta.dirname, "../../../supabase/migrations");
@@ -37,6 +38,16 @@ describe("şema senkronu", () => {
       const inAlter = new RegExp(`add column ${col}\\s`).test(altered);
       expect(inCreate || inAlter, col).toBe(true);
     }
+  });
+
+  it("cost_settings sütunları CostModel ile eşleşir, varsayılanlar aynı", () => {
+    const table = sql.split("create table public.cost_settings (")[1]?.split(");")[0] ?? "";
+    for (const [key, col] of Object.entries(COST_COLUMN_MAP)) {
+      const m = table.match(new RegExp(`\\n\\s+${col}\\s[^\\n]*default ([0-9.]+)`));
+      expect(m, col).not.toBeNull();
+      expect(Number(m![1]), col).toBe(DEFAULT_COST_MODEL[key as keyof typeof DEFAULT_COST_MODEL]);
+    }
+    expect(costModelFromRow({ ...costModelToRow(DEFAULT_COST_MODEL), card_fee_pct: "2.50" })).toEqual(DEFAULT_COST_MODEL);
   });
 
   it("satır ↔ ayar dönüşümü kayıpsız, numeric metinleri sayıya çevirir", () => {

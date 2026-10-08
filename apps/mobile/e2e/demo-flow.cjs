@@ -119,10 +119,22 @@ fs.mkdirSync(out, { recursive: true });
   await kp.mouse.down();
   for (let i = 1; i <= 12; i++) await kp.mouse.move(pad.x + 30 + i * 20, pad.y + 100 + (i % 2 ? -30 : 30), { steps: 3 });
   await kp.mouse.up();
+  // Kuryeye ödemeli sipariş: tahsilat seçilmeden teslim tamamlanamaz
+  await kp.getByText(/^Tahsilat: [\d.,]+ TL$/).waitFor();
+  if (await kt('complete-delivery').isEnabled()) throw new Error('tahsilat seçilmeden teslim açık');
+  await kt('cash-nakit').click();
   await kshot('12-kurye-teslim');
   await kt('complete-delivery').click();
   await kp.getByText(/Bugün teslim edilen \(1\)/).waitFor();
   await kp.getByText(/Aktif işler \(1\)/).waitFor();
+  // Kazancım: teslimat ve elde tutulan nakit
+  await kp.getByRole('tab', { name: /Kazancım/ }).click();
+  await kt('earnings-net').waitFor();
+  const earn = await kp.locator('body').innerText();
+  if (!/Elinizdeki nakit tahsilat/.test(earn) || !/YK-\d+/.test(earn)) throw new Error('kazanç ekranı eksik');
+  console.log('KAZANC:', earn.match(/Hesaplaşılmamış kazanç[\s\S]{0,160}/)?.[0]?.replace(/\n+/g, ' | '));
+  await kshot('12b-kurye-kazanc');
+  await kp.getByRole('tab', { name: /İşlerim/ }).click();
   // Elde paket yokken vardiya kapatılabilir
   await kt('shift-toggle').click();
   await kp.getByText('Vardiya kapalı').waitFor();

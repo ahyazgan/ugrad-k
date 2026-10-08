@@ -55,10 +55,10 @@ const COST_FIELDS: Array<{ key: keyof CostModel; label: string; kind: "tl" | "pc
   { key: "urgentBonusPct", label: "Acil işte kurye primi", kind: "pct" },
   { key: "offHoursBonusPct", label: "Gece/Pazar/tatil kurye primi", kind: "pct" },
   { key: "economyJobPayPct", label: "Ekonomide iş başı ödeme oranı", kind: "pct" },
+  { key: "waitingSharePct", label: "Bekleme ücretinden kurye payı", kind: "pct" },
   { key: "overheadPerJobKurus", label: "İş başı genel gider", kind: "tl" },
   { key: "cardFeePct", label: "Kart komisyonu", kind: "pct" },
 ];
-const COST_STORAGE = "fiyatlar.maliyet.v1";
 
 const toInput = (v: number, kind: Kind) => (kind === "tl" ? (v / 100).toString().replace(".", ",") : String(v));
 const fromInput = (s: string, kind: Kind) => {
@@ -99,15 +99,6 @@ const tryPrice = (input: PriceInput, s: PricingSettings) => {
   }
 };
 
-function loadCostModel(): CostModel {
-  try {
-    const raw = typeof window === "undefined" ? null : window.localStorage.getItem(COST_STORAGE);
-    return raw ? { ...DEFAULT_COST_MODEL, ...(JSON.parse(raw) as Partial<CostModel>) } : DEFAULT_COST_MODEL;
-  } catch {
-    return DEFAULT_COST_MODEL;
-  }
-}
-
 export default function FiyatlarPage() {
   const { data, error, reload } = useLoad(() => repo.getPricing());
   const [values, setValues] = useState<Record<string, string>>({});
@@ -117,8 +108,10 @@ export default function FiyatlarPage() {
   const [maxWeight, setMaxWeight] = useState("");
   const [indexPct, setIndexPct] = useState("");
   const [indexMsg, setIndexMsg] = useState<string | null>(null);
+  const costLoad = useLoad(() => repo.getCostModel());
   const [cost, setCost] = useState<CostModel>(DEFAULT_COST_MODEL);
   const [costText, setCostText] = useState<Record<string, string>>({});
+  const [costMsg, setCostMsg] = useState<string | null>(null);
   const [saveMsg, setSaveMsg] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [holiday, setHoliday] = useState<Holiday>({ date: "", name: "", halfDay: false });
@@ -133,21 +126,26 @@ export default function FiyatlarPage() {
   }, [data]);
 
   useEffect(() => {
-    const m = loadCostModel();
+    const m = costLoad.data;
+    if (!m) return;
     setCost(m);
     setCostText(Object.fromEntries(COST_FIELDS.map((f) => [f.key, toInput(m[f.key], f.kind)])));
-  }, []);
+  }, [costLoad.data]);
 
   function setCostField(key: keyof CostModel, kind: "tl" | "pct", text: string) {
     setCostText((t) => ({ ...t, [key]: text }));
+    setCostMsg(null);
     const v = fromInput(text, kind);
-    if (v == null) return;
-    const next = { ...cost, [key]: v };
-    setCost(next);
+    if (v != null) setCost((c) => ({ ...c, [key]: v }));
+  }
+  const costInvalid = COST_FIELDS.some((f) => fromInput(costText[f.key] ?? "", f.kind) == null);
+
+  async function saveCost() {
     try {
-      window.localStorage.setItem(COST_STORAGE, JSON.stringify(next));
-    } catch {
-      // depolama kapalıysa yalnız bu oturumda geçerli
+      await repo.saveCostModel(cost);
+      setCostMsg("Kaydedildi. Bundan sonraki teslimatların hakedişi bu modelle hesaplanır.");
+    } catch (e) {
+      setCostMsg(e instanceof Error ? e.message : "Kaydedilemedi");
     }
   }
 
@@ -326,7 +324,7 @@ export default function FiyatlarPage() {
             </p>
           </Card>
 
-          <Card title="Maliyet modeli (yalnız tahmin için)">
+          <Card title="Kurye ödeme ve maliyet modeli">
             <div className="grid gap-3 sm:grid-cols-2">
               {COST_FIELDS.map((f) => (
                 <Input
@@ -339,8 +337,16 @@ export default function FiyatlarPage() {
               ))}
             </div>
             <p className="mt-2 text-xs text-slate-500">
-              Esnaf kurye modeli (paket + km başı, yakıt kuryede). Bu tarayıcıda saklanır; fiyatları etkilemez.
+              Esnaf kurye modeli (paket + km başı, yakıt kuryede; köprü geçişi kuryeye iade). Kurye hakedişi ve yukarıdaki marj bu
+              modelle hesaplanır; müşteri fiyatını etkilemez. Önizleme kaydetmeden günceller.
             </p>
+            <div className="mt-3 flex flex-wrap items-center gap-3">
+              <Button type="button" onClick={saveCost} disabled={costInvalid || !costLoad.data} data-testid="save-cost">
+                Ödeme modelini kaydet
+              </Button>
+              {costInvalid ? <ErrorText>Geçersiz değer var</ErrorText> : null}
+              {costMsg ? <span className="text-sm text-emerald-700">{costMsg}</span> : null}
+            </div>
           </Card>
 
           <Card title="Resmi tatiller">

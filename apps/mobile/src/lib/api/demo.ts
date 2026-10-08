@@ -7,6 +7,9 @@
  */
 import {
   applyWaitingFee,
+  courierBalance,
+  courierEarning,
+  DEFAULT_COST_MODEL,
   DEFAULT_PRICING_SETTINGS,
   ORDER_TRANSITIONS,
   buildQuote,
@@ -19,6 +22,7 @@ import {
 import {
   ApiError,
   type Api,
+  type CashCollection,
   type Shift,
   type ConsentType,
   type CourierPosition,
@@ -62,6 +66,8 @@ export function createDemoApi(): Api {
   let shift: Shift | null = null;
   let seq = 1000;
   let courierSeeded = false;
+  /** Teslimde bildirilen tahsilat (yalnız kuryeye ödemeli siparişler) */
+  const cash = new Map<string, CashCollection>();
   const notifyJobs = () => jobListeners.forEach((l) => l());
 
   const emit = () => listeners.forEach((l) => l(session));
@@ -370,16 +376,51 @@ export function createDemoApi(): Api {
           notifyJobs();
           return;
         }
-        case "deliver":
+        case "deliver": {
           if (!action.pod.photoUri && !action.pod.signatureSvg) {
             throw new ApiError("Teslim için fotoğraf veya imza gerekli");
           }
+          const o = orders.get(orderId);
+          if (o?.paymentMethod === "nakit" && o.paymentStatus !== "odendi" && !action.pod.cashCollection) {
+            throw new ApiError("Kuryeye ödemeli siparişte tahsilat bilgisi gerekli");
+          }
+          if (o && action.pod.cashCollection) {
+            cash.set(orderId, action.pod.cashCollection);
+            if (action.pod.cashCollection === "nakit") {
+              o.paymentStatus = "odendi";
+              o.paidKurus = o.totalKurus;
+            }
+          }
           move(orderId, "teslim_edildi");
           return;
+        }
       }
     },
     async pushLocation() {
       // Demo: konum sunucuya gönderilmez
+    },
+    async courierEarnings() {
+      requireSession();
+      const items = [...orders.values()]
+        .filter((o) => o.courierName === "Demo Kurye" && o.status === "teslim_edildi")
+        .map((o) => {
+          const e = courierEarning(o.priceQuote, DEFAULT_COST_MODEL, DEFAULT_PRICING_SETTINGS);
+          return {
+            orderId: o.id,
+            orderNo: o.orderNo,
+            deliveredAt: [...o.history].reverse().find((h) => h.status === "teslim_edildi")?.at ?? new Date().toISOString(),
+            km: e.km,
+            totalKurus: e.totalKurus,
+            cashCollectedKurus: cash.get(o.id) === "nakit" ? o.totalKurus : 0,
+          };
+        })
+        .sort((a, b) => b.deliveredAt.localeCompare(a.deliveredAt));
+      return {
+        unpaid: courierBalance(items),
+        items,
+        payouts: [],
+        rates: { perJobKurus: DEFAULT_COST_MODEL.courierPerJobKurus, perKmKurus: DEFAULT_COST_MODEL.courierPerKmKurus },
+      };
     },
     subscribeCourierJobs(onChange) {
       jobListeners.add(onChange);

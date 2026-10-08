@@ -19,7 +19,7 @@ const healthy: HealthSnapshot = {
   orders_problem: 0,
   couriers_on_shift: 2,
   couriers_stale: 0,
-  heartbeats: { "notify-dispatch": ago(1), "auto-dispatch": ago(1), "webhook-dispatch": ago(2), "invoice-dispatch": ago(3) },
+  heartbeats: { "notify-dispatch": ago(1), "auto-dispatch": ago(1), "webhook-dispatch": ago(2), "invoice-dispatch": ago(3), "courier-earnings": ago(4) },
 };
 const env = (k: string) => ({ NOTIFY_SECRET: "s", ADMIN_ALERT_PHONES: "+905550000001" } as Record<string, string>)[k];
 const cronReq = () => new Request("http://x", { method: "POST", headers: { "x-notify-secret": "s" } });

@@ -29,6 +29,7 @@ const base: AdminOrder = {
   paymentMethod: "nakit",
   paymentStatus: "odenmedi",
   paidKurus: null,
+  cashCollection: null,
   distanceMeters: 5000,
   scheduledPickupAt: null,
   deliveredAt: "2026-10-05T07:45:00Z",

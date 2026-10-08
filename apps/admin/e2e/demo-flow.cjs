@@ -108,6 +108,25 @@ fs.mkdirSync(out, { recursive: true });
   await nav("Kuryeler");
   await page.getByText("Okan Yıldız").waitFor();
 
+  // Kurye hakedişi ve tahsilat
+  await nav("Hakediş ve tahsilat");
+  await page.getByRole("heading", { name: "Kurye hakedişi" }).waitFor();
+  await page.getByTestId("balance-kur-1").waitFor();
+  await page.getByTestId("run-earnings").click();
+  await page.getByTestId("hakedis-msg").filter({ hasText: "hakedişi yazıldı" }).waitFor();
+  const receivable = page.locator('[data-testid^="receivable-"]').first();
+  await receivable.waitFor();
+  await shot("04c-hakedis");
+  await receivable.getByRole("button", { name: "Ödeme alındı" }).click();
+  await page.getByTestId("hakedis-msg").filter({ hasText: "ödendi olarak işaretlendi" }).waitFor();
+  console.log("HAKEDIS", (await page.getByTestId("balance-kur-1").innerText()).replace(/\s+/g, " "));
+  await page.getByTestId("payout-kur-1").click();
+  await page.getByPlaceholder("Not (ör. havale, nakit)").fill("Havale");
+  await page.getByTestId("confirm-payout").click();
+  await page.getByTestId("hakedis-msg").filter({ hasText: "hesaplaşıldı" }).waitFor();
+  await page.getByTestId("balance-kur-1").waitFor({ state: "detached" });
+  await page.getByText("Havale").first().waitFor();
+
   await nav("Çalışma saatleri (BTK)");
   await page.getByRole("heading", { name: "Kurye çalışma saatleri" }).waitFor();
   await page.getByLabel("Başlangıç").fill("2026-01-01");
@@ -216,6 +235,10 @@ fs.mkdirSync(out, { recursive: true });
   if ((await page.getByLabel(/^Açılış ücreti/).inputValue()) !== "385") throw new Error("endeks açılışa uygulanmadı");
   if ((await kmTiers.inputValue()) !== "10:24, *:17.5") throw new Error("endeks kademelere uygulanmadı: " + (await kmTiers.inputValue()));
   if ((await page.getByLabel(/^Köprü geçiş ücreti/).inputValue()) !== "25") throw new Error("köprü endekslenmemeli");
+  // Kurye ödeme modeli kaydedilir
+  await page.getByLabel(/^Kuryeye iş başı/).fill("160");
+  await page.getByTestId("save-cost").click();
+  await page.getByText("Bundan sonraki teslimatların hakedişi").waitFor();
   console.log("MARJ", (await page.locator("table").first().innerText()).replace(/\n/g, " | ").slice(0, 600));
   // Geçersiz kademe kaydı engellenir
   await kmTiers.fill("abc");

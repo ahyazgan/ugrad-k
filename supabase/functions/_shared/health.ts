@@ -34,6 +34,7 @@ export const EXPECTED_JOBS: Record<string, number> = {
   "auto-dispatch": 5,
   "webhook-dispatch": 10,
   "invoice-dispatch": 15,
+  "courier-earnings": 15,
 };
 const REALERT_MS = 6 * 3600_000;
 

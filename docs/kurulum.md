@@ -155,6 +155,15 @@ select cron.schedule('sistem-denetimi', '*/5 * * * *', $$
   );
 $$);
 
+-- Kurye hakedişi: teslim edilen siparişlerin kurye kazancı (§23)
+select cron.schedule('kurye-hakedis', '*/5 * * * *', $$
+  select net.http_post(
+    url := 'https://<ref>.supabase.co/functions/v1/courier-earnings',
+    headers := jsonb_build_object('x-notify-secret',
+      (select decrypted_secret from vault.decrypted_secrets where name = 'notify_secret'))
+  );
+$$);
+
 -- Eski hız sınırı sayaçlarını temizle (günlük)
 select cron.schedule('hiz-siniri-temizlik', '17 4 * * *', 'select public.purge_rate_limits()');
 ```
@@ -358,3 +367,10 @@ Kayıtlı müşteriler `siparis@<alan adı>` adresine yazar; yapay zeka asistan�
   - `https://<alan adı>` ve `https://panel.<alan adı>/giris`
   Bildirim kanalı olarak telefonunuzu (SMS/uygulama) ekleyin. Supabase tamamen erişilemezse iç denetim de çalışamayacağı için bu dış izleyici gereklidir.
 
+## 23. Kurye hakedişi ve nakit tahsilatı
+
+- **Ödeme modeli**: panel → Fiyatlar → *Kurye ödeme ve maliyet modeli* (iş başı, km başı, acil ve gece/Pazar/tatil primi, ekonomide iş başı oranı, bekleme payı). Köprü geçişi kuryeye aynen iade edilir. Varsayılanlar öneridir (esnaf kurye: iş başı 150 TL + km başı 12 TL, yakıt kuryede); kuryelerle anlaştığınız rakamları girip kaydedin. Aynı model Fiyatlar sayfasındaki marj tahminini de besler.
+- **Hakediş**: §6 `kurye-hakedis` görevi teslim edilen her siparişin kurye kazancını 5 dakikada bir yazar (sipariş anındaki teklif ve o anki ödeme modeliyle). Panel → *Hakediş ve tahsilat* → "Hakedişleri güncelle" ile hemen de çalıştırılabilir. Kurye kendi kazancını uygulamada **Kazancım** sekmesinde görür.
+- **Nakit**: kuryeye ödemeli siparişte kurye teslimde "Nakit aldım / IBAN'a gönderdi / Alınamadı" seçer. Nakit kuryede kalır ve hakedişten düşülür; IBAN ve alınamayanlar *Tahsil edilecekler* listesine düşer, para hesaba geçince "Ödeme alındı" işaretlenir. IBAN ile ödeyecek müşterilere şirket IBAN'ını SMS/WhatsApp şablonlarında veya faturada verin.
+- **Hesaplaşma**: *Hesaplaş* o ana kadarki teslimatları kapatır. Net artıysa kuryeye o kadar ödeme yapın; eksiyse kurye elindeki nakitten o kadarını şirkete teslim eder. Yanlış hesaplaşma iptal edilebilir; teslimatlar yeniden ödenmemiş listesine döner. Her hesaplaşmanın dökümü CSV olarak indirilebilir (muhasebeciniz için).
+- **Vergi/SGK**: Esnaf (vergi muafiyetli veya şahıs şirketi) kuryelere yapılan ödemelerin belgelendirmesi (gider pusulası, fatura, stopaj) mali müşavirinizle netleştirilmelidir (docs/fiyat-arastirmasi.md §8.6).

@@ -404,3 +404,11 @@ Varsayımlar:
 - Ek durak (çoklu teslimat): durak başına sabit ücret + gerçek rota km'si.
 - Kurumsal müşterilere sık güzergâh için sabit "rota fiyatı" ve gecikmeye karşı SLA kredisi.
 - 3–5 rakipten aynı senaryolarla gizli müşteri teklifi (§7 madde 1).
+
+### 8.6 Esnaf kurye vergisi ve belgeler (yüksek belirsizlik, mali müşavir teyidi şart)
+
+- **Basit usul:** Moto kurye kazançları basit usulde vergilendiriliyor; basit usul ticari kazancı GVK mükerrer 20/A ile gelir vergisinden istisna ([ekonomim](https://www.ekonomim.com/ekonomi/mehmet-simsek-acikladi-moto-kuryeler-basit-usulde-vergilendirilecek-haberi-750242)). 2024'te önerilen %15 tevkifatın yasalaştığına dair kaynak bulunamadı.
+- **Esnaf muafiyeti (GVK 9):** Motorlu araç kullanımını dışladığı için moto kurye büyük ihtimalle kapsamda değil ([gib.gov.tr](https://www.gib.gov.tr/vergi-konulari/2_isletme_ve_girisimci/3_esnaf_muafligi/3)).
+- **KDV tevkifatı:** İstanbul VDB'nin 16.04.2021 özelgesine göre motosikletli kurye hizmeti tebliğde sayılan alıcılara ve eşiği aşan tutarlarda **2/10 tevkifata** tabi; nihai tüketiciye verilen hizmette yok ([malimusavirturkiye](https://www.malimusavirturkiye.com/kurye-hizmetinde-kdv-tevkifati/)). Kurumsal faturalarda e-fatura entegratörü ayarı kontrol edilmeli.
+- **Belgeler:** 15 Mayıs 2025 yönetmeliğiyle moto kurye için P1 yetki belgesi ve Kurye Faaliyet Belgesi zorunlu; firmalar kuryelerini Bakanlığa bildirmeli ([ekonomim](https://www.ekonomim.com/gundem/bakan-uraloglu-acikladi-motokuryelere-yetki-belgesi-alma-zorunlulugu-getirildi-haberi-818417)).
+- **Uygulama:** Panel → Hakediş, her hesaplaşmanın CSV dökümünü verir; esnaf kuryeden fatura/gider pusulası alınması ve stopaj durumu mali müşavirle netleştirilmelidir.

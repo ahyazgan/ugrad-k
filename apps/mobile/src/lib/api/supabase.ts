@@ -1,6 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { createClient, FunctionsHttpError, type SupabaseClient } from "@supabase/supabase-js";
-import type { OrderStatus } from "@yazgan/shared";
+import { courierBalance, type OrderStatus } from "@yazgan/shared";
 import { Platform } from "react-native";
 import {
   ApiError,
@@ -347,6 +347,7 @@ export function createSupabaseApi(url: string, anonKey: string): Api & { client:
             p_pod_photo_path: photoPath,
             p_pod_signature_path: signaturePath,
             p_pod_receiver_name: action.pod.receiverName,
+            p_cash_collection: action.pod.cashCollection ?? null,
           });
         }
       }
@@ -362,6 +363,36 @@ export function createSupabaseApi(url: string, anonKey: string): Api & { client:
         speed_mps: loc.speed ?? null,
       });
       if (error) throw new ApiError(error.message);
+    },
+    async courierEarnings() {
+      const id = await uid();
+      const [e, p, c] = await Promise.all([
+        client
+          .from("courier_earnings")
+          .select("order_id, delivered_at, km, total_kurus, cash_collected_kurus, order:orders(order_no)")
+          .eq("courier_id", id)
+          .is("payout_id", null)
+          .order("delivered_at", { ascending: false })
+          .limit(500),
+        client.from("courier_payouts").select("*").eq("courier_id", id).is("cancelled_at", null).order("created_at", { ascending: false }).limit(10),
+        client.from("cost_settings").select("courier_per_job_kurus, courier_per_km_kurus").eq("id", 1).maybeSingle(),
+      ]);
+      fail(e.error, "Kazanç okunamadı");
+      fail(p.error, "Hesaplaşmalar okunamadı");
+      const items = (e.data ?? []).map((r: Row) => ({
+        orderId: r.order_id,
+        orderNo: r.order?.order_no ?? "",
+        deliveredAt: r.delivered_at,
+        km: Number(r.km),
+        totalKurus: r.total_kurus,
+        cashCollectedKurus: r.cash_collected_kurus,
+      }));
+      return {
+        unpaid: courierBalance(items),
+        items,
+        payouts: (p.data ?? []).map((r: Row) => ({ id: r.id, createdAt: r.created_at, deliveryCount: r.delivery_count, netKurus: r.net_kurus, note: r.note })),
+        rates: c.data ? { perJobKurus: c.data.courier_per_job_kurus, perKmKurus: c.data.courier_per_km_kurus } : null,
+      };
     },
     subscribeCourierJobs(onChange) {
       let channel: ReturnType<typeof client.channel> | null = null;

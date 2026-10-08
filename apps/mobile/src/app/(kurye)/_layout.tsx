@@ -20,6 +20,10 @@ export default function KuryeLayout() {
         options={{ title: "İşlerim", tabBarIcon: ({ color, size }) => <Ionicons name="bicycle" color={color} size={size} /> }}
       />
       <Tabs.Screen
+        name="kazanc"
+        options={{ title: "Kazancım", tabBarIcon: ({ color, size }) => <Ionicons name="wallet" color={color} size={size} /> }}
+      />
+      <Tabs.Screen
         name="hesap"
         options={{ title: "Hesabım", tabBarIcon: ({ color, size }) => <Ionicons name="person" color={color} size={size} /> }}
       />
