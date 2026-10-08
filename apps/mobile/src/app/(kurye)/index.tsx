@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import { complianceFor, DocumentWarning } from "@/components/CourierDocs";
 import { OfferCard } from "@/components/OfferCard";
+import { StopPlan } from "@/components/StopPlan";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Button, Card, ErrorBox, Muted, Screen, Title, colors } from "@/components/ui";
 import { api, ApiError, type OrderSummary, type Shift } from "@/lib/api";
@@ -40,7 +41,8 @@ export default function KuryeIsler() {
         j.find((x) => x.status === "geri_donuyor") ??
         j.find((x) => x.status === "alindi") ??
         j.find((x) => x.status === "kuryeye_atandi" && !x.offerExpiresAt);
-      if (j.some((x) => x.offerExpiresAt)) lastKnownPosition().then(setMe, () => undefined);
+      // Teklif mesafesi ve durak sırası için kuryenin son konumu
+      if (j.some((x) => ACTIVE.includes(x.status))) lastKnownPosition().then(setMe, () => undefined);
       setActiveOrderForLocation(live?.id ?? null);
       api.courierDocuments().then((d) => setCompliance(complianceFor(d)), () => undefined);
     } catch (e) {
@@ -170,6 +172,8 @@ export default function KuryeIsler() {
       ))}
 
       <DocumentWarning c={compliance} />
+
+      <StopPlan jobs={active} me={me} />
 
       <Title>Aktif işler ({active.length})</Title>
       {active.length === 0 ? <Muted>{shift ? "Şu an atanmış iş yok. Yeni iş atandığında burada görünür." : "—"}</Muted> : null}

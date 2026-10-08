@@ -38,6 +38,7 @@ Kodun tamamı yazıldı ve testlerden geçti. Bu rehber, sistemi **gerçek hesap
 31. [Kurye molası](#31-kurye-molası)
 32. [Acil durum (SOS)](#32-acil-durum-sos)
 33. [Teslim edilemedi → göndericiye iade](#33-teslim-edilemedi--göndericiye-iade)
+34. [Durak sırası](#34-durak-sırası)
 
 ---
 
@@ -484,3 +485,10 @@ Kayıtlı müşteriler `siparis@<alan adı>` adresine yazar; yapay zeka asistan�
 - **Bildirim**: müşteriye neden ve iade bilgisi (WhatsApp şablonu `teslim_edilemedi`, yoksa SMS), alıcıya SMS, yöneticiye uyarı; iade tamamlanınca müşteriye "geri teslim edildi".
 - **Panel**: sipariş detayında *Teslim edilemedi* kartı (neden, arama sayısı, adres fotoğrafı, iade kanıtı). Yönetici yolda/sorunlu siparişte *Göndericiye iade başlat* diyebilir (kanıt şartı yok). Raporlarda "iade" sayısı; ciroya dahildir.
 - **Kurumsal API**: `status` `geri_donuyor` / `geri_teslim`, `failedReason`, `returnedAt` alanları; webhook olayları aynı.
+
+## 34. Durak sırası
+
+- Kurye elinde birden fazla iş varken İşlerim ekranında **Durak sırası** kartı çıkar: alış, teslim ve iade durakları önerilen sırayla, her birine tahmini varış dakikasıyla. Kural: bir işin alışı teslimden önce gelir; acil işin taahhüdü kaçacaksa uzak da olsa önce gidilir (packages/shared/route.ts `planStops`, 8 durağa kadar en iyi sıralama).
+- *Sıradakine git* telefonun haritasında ilk durağı, *Tüm rota* Google Haritalar'da tüm durakları sırayla açar. Kart, sıra bir acil taahhüdü kaçıracaksa uyarır.
+- Panel → Canlı harita'da her kuryenin *Sıradaki* durağı görünür.
+- Sıra öneridir; kurye istediği işi açıp ilerleyebilir. Otomatik atama kurye başına en fazla iş sayısını (Otomasyon → *Kurye başına en fazla aktif iş*) aşmaz.

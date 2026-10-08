@@ -139,6 +139,16 @@ fs.mkdirSync(out, { recursive: true });
   await kt('break-toggle').click();
   await kp.getByText('Vardiyadasınız').waitFor();
   await kp.getByText(/Aktif işler \(2\)/).waitFor();
+  // Durak sırası: iki işin 4 durağı, her işte alış teslimden önce
+  await kp.getByText('Durak sırası').waitFor();
+  const stopTexts = [];
+  for (let i = 0; i < 4; i++) stopTexts.push(await kt(`stop-${i}`).innerText());
+  console.log('DURAKLAR', stopTexts.map((t) => t.replace(/\n+/g, ' ')).join(' | '));
+  for (const no of new Set(stopTexts.map((t) => t.match(/YK-\d+/)[0]))) {
+    const a = stopTexts.findIndex((t) => t.includes(`Alış · ${no}`));
+    const d = stopTexts.findIndex((t) => t.includes(`Teslim · ${no}`));
+    if (a === -1 || d === -1 || a > d) throw new Error('durak sırası hatalı: ' + stopTexts.join(' / '));
+  }
   await kshot('10-kurye-isler');
   await kp.locator('[data-testid^="job-"]').first().click();
   await kt('tile-map').waitFor();

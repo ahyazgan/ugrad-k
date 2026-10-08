@@ -1,6 +1,6 @@
 "use client";
 
-import { ORDER_STATUS_LABELS, ageLabel, type OrderStatus } from "@yazgan/shared";
+import { ORDER_STATUS_LABELS, STOP_LABELS, ageLabel, planStops, type OrderStatus } from "@yazgan/shared";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { escapeHtml as esc, LeafletMap, type MapLine, type MapPin } from "@/components/LeafletMap";
@@ -121,6 +121,27 @@ export default function HaritaPage() {
     [data],
   );
   const onShift = data?.couriers.filter((c) => c.isOnShift) ?? [];
+  // Her kuryenin sıradaki durağı (kurye uygulamasındaki durak sırasıyla aynı hesap)
+  const nextStop = useMemo(() => {
+    const m = new Map<string, { label: string; eta: number; late: boolean }>();
+    for (const c of data?.couriers ?? []) {
+      const jobs = (data?.orders ?? []).filter((o) => o.courierId === c.id && !o.offerExpiresAt);
+      const stops = planStops(
+        jobs.map((o) => ({
+          id: o.id,
+          orderNo: o.orderNo,
+          status: o.status,
+          pickup: { lat: o.pickupLat, lng: o.pickupLng, address: o.pickupAddress },
+          dropoff: { lat: o.dropoffLat, lng: o.dropoffLng, address: o.dropoffAddress },
+          urgent: o.urgent,
+          slaDueAt: o.slaDueAt,
+        })),
+        c.lastLat != null && c.lastLng != null ? { lat: c.lastLat, lng: c.lastLng } : null,
+      );
+      if (stops[0]) m.set(c.id, { label: `${STOP_LABELS[stops[0].kind]} · ${stops[0].orderNo}`, eta: stops[0].etaMinutes, late: stops.some((s) => s.late) });
+    }
+    return m;
+  }, [data]);
   const waiting = data?.orders.filter((o) => UNASSIGNED.includes(o.status)) ?? [];
   const moving = data?.orders.filter((o) => !UNASSIGNED.includes(o.status)) ?? [];
 
@@ -157,6 +178,12 @@ export default function HaritaPage() {
                       <div className={stale ? "text-xs text-red-700" : "text-xs text-slate-500"}>
                         {c.activeOrderCount} aktif iş · konum {c.lastLocationAt ? ageLabel(c.lastLocationAt) : "yok"}
                       </div>
+                      {nextStop.get(c.id) ? (
+                        <div className={`text-xs ${nextStop.get(c.id)!.late ? "font-semibold text-red-700" : "text-slate-600"}`} data-testid={`next-stop-${c.id}`}>
+                          Sıradaki: {nextStop.get(c.id)!.label} (~{nextStop.get(c.id)!.eta} dk)
+                          {nextStop.get(c.id)!.late ? " · taahhüt riski" : ""}
+                        </div>
+                      ) : null}
                     </div>
                     {c.lastLat != null && c.lastLng != null ? (
                       <button className="text-xs font-semibold text-brand hover:underline" onClick={() => flyTo(c.lastLat!, c.lastLng!)}>

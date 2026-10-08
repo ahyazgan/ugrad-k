@@ -73,6 +73,8 @@ export interface OrderSummary {
   /** Kurye iş listesi: alış/teslim konumu (mesafe ve durak sırası için) */
   pickupPoint?: { lat: number; lng: number };
   dropoffPoint?: { lat: number; lng: number };
+  /** Acil teslim taahhüdü (durak sırası için) */
+  slaDueAt?: string | null;
 }
 
 export interface OrderDetail extends OrderSummary {

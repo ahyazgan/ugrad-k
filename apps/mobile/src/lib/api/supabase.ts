@@ -46,6 +46,7 @@ const toSummary = (r: Row): OrderSummary => ({
   offerExpiresAt: r.offer_expires_at && !r.offer_accepted_at && r.status === "kuryeye_atandi" ? r.offer_expires_at : null,
   ...(r.pickup_lat != null ? { pickupPoint: { lat: r.pickup_lat, lng: r.pickup_lng } } : {}),
   ...(r.dropoff_lat != null ? { dropoffPoint: { lat: r.dropoff_lat, lng: r.dropoff_lng } } : {}),
+  slaDueAt: r.sla_due_at ?? null,
 });
 
 export function createSupabaseApi(url: string, anonKey: string): Api & { client: SupabaseClient } {
@@ -335,7 +336,7 @@ export function createSupabaseApi(url: string, anonKey: string): Api & { client:
       const { data, error } = await client
         .from("orders")
         .select(
-          "id, order_no, status, pickup_address, dropoff_address, total_kurus, urgent, created_at, offer_expires_at, offer_accepted_at, pickup_lat, pickup_lng, dropoff_lat, dropoff_lng",
+          "id, order_no, status, pickup_address, dropoff_address, total_kurus, urgent, created_at, offer_expires_at, offer_accepted_at, pickup_lat, pickup_lng, dropoff_lat, dropoff_lng, sla_due_at",
         )
         .eq("courier_id", await uid())
         .or(`status.in.(kuryeye_atandi,alindi,yolda,sorunlu,geri_donuyor),completed_at.gte.${new Date(todayStart).toISOString()}`)

@@ -239,6 +239,8 @@ fs.mkdirSync(out, { recursive: true });
   // ───── Canlı harita: kurye ve sipariş işaretleri, açılır kutu, odaklama
   await nav("Canlı harita");
   await page.locator('[data-pin="kurye:kur-1"]').waitFor();
+  // Kuryenin sıradaki durağı (durak sırası hesabı)
+  await page.getByTestId("next-stop-kur-1").getByText(/^Sıradaki: (Alış|Teslim) · YK-\d+/).waitFor();
   const pinCount = await page.locator("[data-pin]").count();
   console.log("HARITA isaret:", pinCount, "karo:", tiles.count);
   if (pinCount < 4 || !tiles.count) throw new Error("harita eksik çizildi");
