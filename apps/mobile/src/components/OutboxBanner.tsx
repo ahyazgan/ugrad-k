@@ -22,7 +22,7 @@ export function OutboxBanner({ onSent }: { onSent?: () => void }) {
   }
 
   return (
-    <Card style={{ gap: 6, borderColor: failed.length ? colors.danger : colors.accent, backgroundColor: failed.length ? colors.dangerLight : "#FEF3C7" }}>
+    <Card style={{ gap: 6, borderColor: failed.length ? colors.danger : colors.accent, backgroundColor: failed.length ? colors.dangerLight : colors.warnLight }}>
       {pending.length ? (
         <>
           <Text style={{ ...font("extrabold") }} testID="outbox-pending">

@@ -8,6 +8,7 @@ import { TileMap, type MapMarker } from "@/components/TileMap";
 import { Button, Card, ErrorBox, Loading, Muted, Row, Screen, Title, colors, styles, font } from "@/components/ui";
 import { api, ApiError, type CourierPosition, type OrderDetail } from "@/lib/api";
 import { formatDateTime, formatTime } from "@/lib/format";
+import { routeFromOrder, useOrderDraft } from "@/lib/order-draft";
 import { payOrder } from "@/lib/payment";
 
 const TRACKING_BASE = process.env.EXPO_PUBLIC_TRACKING_BASE_URL ?? trackingBaseUrl;
@@ -85,29 +86,30 @@ function OrderMap({ order }: { order: OrderDetail }) {
   const sla = slaState({ slaDueAt: order.slaDueAt, deliveredAt: null, status: order.status }, eta);
   return (
     <Card>
-      {eta ? (
-        <Text style={{ ...font("extrabold"), fontSize: 16, color: colors.text }} testID="eta">
-          Tahmini teslim: {istanbulTime(eta)}
-        </Text>
-      ) : null}
-      {order.slaDueAt && active ? (
-        <Muted style={sla === "riskli" || sla === "gecikti" ? { color: "#B45309", ...font("bold") } : undefined}>
-          Acil teslim taahhüdü: {istanbulTime(order.slaDueAt)}
-          {sla === "riskli" || sla === "gecikti" ? " · gecikme olursa acil ek ücreti sonraki siparişinizden düşülür" : ""}
-        </Muted>
-      ) : null}
-      <TileMap markers={markers} route={!courier} />
-      <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-        <Muted style={{ flex: 1 }}>
-          {courier
-            ? `🛵 Kurye konumu · ${ageLabel(courier.recordedAt)}`
-            : live
-              ? "Kurye konumu bekleniyor…"
-              : "A: alış · T: teslim noktası"}
-        </Muted>
-        <Sticker name="pin" size={40} rotation={-8} style={{ marginBottom: -8 }} />
-        <Sticker name="motor" size={76} rotation={4} style={{ marginBottom: -12 }} />
+      {/* Başlıklar sağ üstten taşan motorun altında kalmasın */}
+      <View style={{ paddingRight: 56, gap: 4 }}>
+        {eta ? (
+          <Text style={{ ...font("extrabold"), fontSize: 16, color: colors.text }} testID="eta">
+            Tahmini teslim: {istanbulTime(eta)}
+          </Text>
+        ) : null}
+        {order.slaDueAt && active ? (
+          <Muted style={sla === "riskli" || sla === "gecikti" ? { color: colors.warn, ...font("bold") } : undefined}>
+            Acil teslim taahhüdü: {istanbulTime(order.slaDueAt)}
+            {sla === "riskli" || sla === "gecikti" ? " · gecikme olursa acil ek ücreti sonraki siparişinizden düşülür" : ""}
+          </Muted>
+        ) : null}
       </View>
+      <TileMap markers={markers} route={!courier} />
+      <Muted>
+        {courier
+          ? `🛵 Kurye konumu · ${ageLabel(courier.recordedAt)}`
+          : live
+            ? "Kurye konumu bekleniyor…"
+            : "A: alış · T: teslim noktası"}
+      </Muted>
+      {/* Süs: kartın sağ üst köşesinden taşar (dokunma yakalamaz) */}
+      <Sticker name="motor" size={56} rotation={6} style={{ position: "absolute", right: -4, top: -20 }} />
     </Card>
   );
 }
@@ -124,9 +126,12 @@ function RateCard({ order, onRated }: { order: OrderDetail; onRated: () => void 
   if (done) {
     return (
       <Card>
-        <Text style={{ ...font("extrabold") }} testID="rating-thanks">
-          Değerlendirmeniz için teşekkürler <Text style={{ color: colors.star }}>{"★".repeat(order.rating ?? score)}</Text>
-        </Text>
+        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+          <Text style={{ ...font("extrabold"), flex: 1, color: colors.text }} testID="rating-thanks">
+            Değerlendirmeniz için teşekkürler <Text style={{ color: colors.star }}>{"★".repeat(order.rating ?? score)}</Text>
+          </Text>
+          <Sticker name="yildiz" size={48} rotation={10} style={{ marginVertical: -12 }} />
+        </View>
         {google ? <Button title="Google'da yorum yazın" variant="secondary" onPress={() => Linking.openURL(google)} /> : null}
       </Card>
     );
@@ -134,13 +139,13 @@ function RateCard({ order, onRated }: { order: OrderDetail; onRated: () => void 
   return (
     <Card>
       <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-        <Text style={{ ...font("extrabold"), flex: 1 }}>Teslimatı nasıl buldunuz?</Text>
+        <Text style={{ ...font("black"), fontSize: 18, letterSpacing: -0.4, flex: 1, color: colors.text }}>Teslimatı nasıl buldunuz?</Text>
         <Sticker name="yildiz" size={48} rotation={10} style={{ marginVertical: -12 }} />
       </View>
       <View style={{ flexDirection: "row", gap: 6 }} accessibilityRole="radiogroup">
         {[1, 2, 3, 4, 5].map((n) => (
           <Pressable key={n} onPress={() => setScore(n)} testID={`star-${n}`} accessibilityRole="radio" accessibilityLabel={`${n} yıldız`} hitSlop={6}>
-            <Text style={{ fontSize: 34, color: n <= score ? colors.star : colors.border }}>★</Text>
+            <Text style={{ ...font("black"), fontSize: 34, color: n <= score ? colors.star : colors.border }}>★</Text>
           </Pressable>
         ))}
       </View>
@@ -186,6 +191,7 @@ export default function SiparisDetay() {
   const [cancelOpen, setCancelOpen] = useState(false);
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
+  const { reset, update } = useOrderDraft();
 
   const load = useCallback(async () => {
     try {
@@ -215,13 +221,28 @@ export default function SiparisDetay() {
 
   if (!order) return error ? <Screen><ErrorBox message={error} /></Screen> : <Loading />;
   const cancellable = order.status === "beklemede" || order.status === "onaylandi";
+  const shareable = !["teslim_edildi", "iptal", "geri_teslim"].includes(order.status);
+  const delivered = order.status === "teslim_edildi";
+  const shareTracking = () =>
+    Share.share({
+      message: `${order.orderNo} gönderisini canlı takip edin: ${trackingUrl(order.trackingToken)}`,
+    });
+  function reorder() {
+    if (!order) return;
+    // Taslak sıfırlanır, yalnız rota (adres, tarif, kişiler) taşınır; fiyat özette yeniden hesaplanır
+    reset();
+    update(routeFromOrder(order));
+    // Yığındaki ana sayfaya dön (navigate yeni bir kopya açardı)
+    router.dismissTo("/(musteri)");
+  }
 
   return (
     <Screen>
       {yeni ? (
         <Card style={{ backgroundColor: colors.lime }}>
           <Text style={{ ...font("black"), fontSize: 18, color: colors.ink }}>Siparişiniz alındı 🎉</Text>
-          <Muted>Durum değiştikçe bu ekran kendiliğinden güncellenir.</Muted>
+          <Muted style={{ color: colors.mutedDark }}>Durum değiştikçe bu ekran kendiliğinden güncellenir.</Muted>
+          {shareable ? <Button title="Takip linkini alıcıya gönder" variant="dark" onPress={shareTracking} testID="share-tracking" /> : null}
         </Card>
       ) : null}
       <Card>
@@ -233,9 +254,23 @@ export default function SiparisDetay() {
         <Timeline order={order} />
       </Card>
 
+      {delivered ? <RateCard order={order} onRated={load} /> : null}
+      {delivered ? (
+        <Card testID="reorder-card">
+          <Text style={{ ...font("black"), fontSize: 18, letterSpacing: -0.4, color: colors.text }}>Aynı rota, tek dokunuş</Text>
+          <Muted numberOfLines={2}>
+            {order.pickupAddress.split(",")[0]} → {order.dropoffAddress.split(",")[0]}
+          </Muted>
+          <Button title="Aynı rotayla tekrar gönder" variant="dark" onPress={reorder} testID="reorder" />
+          {order.invoicePdfUrl ? (
+            <Button title="Faturayı indir" variant="secondary" onPress={() => Linking.openURL(order.invoicePdfUrl!)} testID="invoice" />
+          ) : null}
+        </Card>
+      ) : null}
+
       {!["teslim_edildi", "iptal", "geri_teslim"].includes(order.status) ? <OrderMap order={order} /> : null}
       {order.failedAt ? (
-        <Card style={{ borderColor: "#9A3412" }}>
+        <Card style={{ backgroundColor: colors.returnLight }}>
           <Text style={{ ...font("extrabold") }} testID="failed-info">
             Teslim edilemedi{order.failedReason ? `: ${FAILED_DELIVERY_REASONS[order.failedReason]}` : ""}
           </Text>
@@ -260,16 +295,9 @@ export default function SiparisDetay() {
         </Card>
       ) : null}
 
-      {!["teslim_edildi", "iptal"].includes(order.status) ? (
-        <Button
-          title="Takip linkini paylaş"
-          variant="secondary"
-          onPress={() =>
-            Share.share({
-              message: `${order.orderNo} gönderisini canlı takip edin: ${trackingUrl(order.trackingToken)}`,
-            })
-          }
-        />
+      {/* Yeni siparişte paylaşım üstteki "Siparişiniz alındı" kartında */}
+      {!yeni && !["teslim_edildi", "iptal"].includes(order.status) ? (
+        <Button title="Takip linkini paylaş" variant="secondary" onPress={shareTracking} />
       ) : null}
 
       {order.courierName ? (
@@ -346,10 +374,9 @@ export default function SiparisDetay() {
         />
       ) : null}
 
-      {order.status === "teslim_edildi" ? <RateCard order={order} onRated={load} /> : null}
-
-      {order.invoicePdfUrl ? (
-        <Button title="Faturayı görüntüle" variant="secondary" onPress={() => Linking.openURL(order.invoicePdfUrl!)} />
+      {/* Teslim edilmiş siparişte fatura "Aynı rota" kartında */}
+      {order.invoicePdfUrl && !delivered ? (
+        <Button title="Faturayı indir" variant="secondary" onPress={() => Linking.openURL(order.invoicePdfUrl!)} />
       ) : null}
       <ErrorBox message={error} />
       {order.cancelReason ? <Muted>İptal nedeni: {order.cancelReason}</Muted> : null}

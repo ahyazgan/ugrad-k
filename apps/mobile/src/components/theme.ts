@@ -31,6 +31,18 @@ export const colors = {
   dangerLight: "#FDE4E4",
   success: "#1F5C08",
   successLight: neo.lime,
+  /** Uyarı (amber): yaklaşan süre, çevrimdışı kuyruk, mola */
+  warn: "#92400E",
+  warnLight: "#FEF3C7",
+  /** İade / geri dönüş (turuncu) */
+  returnTone: "#9A3412",
+  returnLight: "#FFEDD5",
+  /** Harita karoları yüklenene kadar zemin */
+  mapBg: "#E8ECEF",
+  /** Pasif ana düğme zemini (okunur kalır, limon gibi "basılabilir" görünmez) */
+  disabledBg: "#D9D3F0",
+  /** Siyah çubuk üzerindeki pasif hap */
+  inkRaised: "#2E2D38",
 };
 
 export const radii = {

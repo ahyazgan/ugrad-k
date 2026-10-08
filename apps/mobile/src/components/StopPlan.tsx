@@ -1,7 +1,7 @@
 import { planStops, STOP_LABELS, stopsDirectionsUrl } from "@yazgan/shared";
 import { router } from "expo-router";
-import { Linking, Pressable, Text, View } from "react-native";
-import { Button, Card, Muted, colors, font } from "@/components/ui";
+import { Linking, Pressable, View } from "react-native";
+import { Button, Card, Muted, Txt, colors } from "@/components/ui";
 import type { OrderSummary } from "@/lib/api";
 import { openDirections } from "@/lib/navigation";
 
@@ -26,31 +26,50 @@ export function StopPlan({ jobs, me }: { jobs: OrderSummary[]; me: { lat: number
   const all = stopsDirectionsUrl(stops);
   return (
     <Card style={{ gap: 6 }}>
-      <Text style={{ ...font("extrabold"), fontSize: 16 }}>Durak sırası</Text>
+      <Txt weight="black" size={18} style={{ letterSpacing: -0.4 }}>
+        Durak sırası
+      </Txt>
       {stops.map((s, i) => (
         <Pressable
           key={`${s.jobId}-${s.kind}`}
           onPress={() => router.push({ pathname: "/is/[id]", params: { id: s.jobId } })}
           testID={`stop-${i}`}
-          style={{ flexDirection: "row", gap: 8, paddingVertical: 4 }}
+          style={{ flexDirection: "row", gap: 10, paddingVertical: 4, alignItems: "center" }}
         >
-          <Text style={{ ...font("black"), width: 18, color: i === 0 ? colors.accent : colors.primary }}>{i + 1}</Text>
+          {/* Sıradaki durak: siyah daire + limon numara (limon yazı yalnız siyah zeminde) */}
+          <View
+            style={{
+              width: 26,
+              height: 26,
+              borderRadius: 13,
+              alignItems: "center",
+              justifyContent: "center",
+              backgroundColor: i === 0 ? colors.ink : colors.bg,
+            }}
+          >
+            <Txt weight="black" size={13} color={i === 0 ? colors.lime : colors.ink}>
+              {i + 1}
+            </Txt>
+          </View>
           <View style={{ flex: 1 }}>
-            <Text style={{ ...font("bold") }}>
+            <Txt weight="bold">
               {STOP_LABELS[s.kind]} · {s.orderNo}
               {s.urgent && s.kind === "teslim" ? " ⚡" : ""}
-            </Text>
-            <Text numberOfLines={1} style={{ color: colors.muted }}>
+            </Txt>
+            <Txt numberOfLines={1} size={13} color={colors.muted}>
               {s.address}
-            </Text>
+            </Txt>
           </View>
-          <Text style={{ color: s.late ? colors.danger : colors.muted }}>~{s.etaMinutes} dk</Text>
+          <Txt weight="bold" size={13} color={s.late ? colors.danger : colors.muted}>
+            ~{s.etaMinutes} dk
+          </Txt>
         </Pressable>
       ))}
       {stops.some((s) => s.late) ? <Muted style={{ color: colors.danger }}>Bir acil teslim taahhüdü bu sırayla kaçabilir; yöneticiye haber verin.</Muted> : null}
       <View style={{ flexDirection: "row", gap: 8 }}>
         <View style={{ flex: 1 }}>
-          <Button title="Sıradakine git" onPress={() => openDirections(next.lat, next.lng, next.address)} />
+          {/* Ekranda limon ana eylem teklif kartında olabilir: burada siyah */}
+          <Button title="Sıradakine git" variant="dark" onPress={() => openDirections(next.lat, next.lng, next.address)} />
         </View>
         {all ? (
           <View style={{ flex: 1 }}>

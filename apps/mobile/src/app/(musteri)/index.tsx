@@ -1,11 +1,52 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { router } from "expo-router";
-import { Pressable, Text, View, useWindowDimensions } from "react-native";
+import { DEFAULT_PRICING_SETTINGS } from "@yazgan/shared";
+import { router, useFocusEffect } from "expo-router";
+import { useCallback, useState } from "react";
+import { Pressable, ScrollView, Text, View, useWindowDimensions } from "react-native";
 import { HandTag, InkPillBar, RouteCard, Wordmark } from "@/components/Neo";
 import { Sticker } from "@/components/Sticker";
-import { Button, Card, Field, Muted, Screen, Segmented, ToggleRow, colors, font, radii, shadow, type } from "@/components/ui";
-import type { DraftPoint } from "@/lib/api";
+import { Button, Card, Field, Muted, Screen, Segmented, ToggleRow, Txt, colors, font, radii, shadow, type } from "@/components/ui";
+import { api, type DraftPoint } from "@/lib/api";
 import { useOrderDraft } from "@/lib/order-draft";
+import { recentPlaces, type RecentPlace } from "@/lib/recent";
+
+/** Kuruş → "1.000 TL" (fiyat ayarından gelen tutarlar; kodda sabit yazılmaz) */
+const tl = (kurus: number) => `${(kurus / 100).toLocaleString("tr-TR", { maximumFractionDigits: 2 })} TL`;
+const P = DEFAULT_PRICING_SETTINGS;
+
+/** Arama çubuğunun altındaki son 3 adres: dokununca teslim adresi olur */
+function RecentChips({ places, onPick }: { places: RecentPlace[]; onPick: (p: RecentPlace) => void }) {
+  if (!places.length) return null;
+  return (
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, paddingRight: 4 }} style={{ marginTop: -4 }}>
+      {places.map((p, i) => (
+        <Pressable
+          key={p.address}
+          testID={`recent-chip-${i}`}
+          accessibilityRole="button"
+          accessibilityLabel={`Son adres: ${p.address}`}
+          onPress={() => onPick(p)}
+          style={({ pressed }) => ({
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 6,
+            maxWidth: 240,
+            backgroundColor: pressed ? colors.primaryLight : colors.surface,
+            borderRadius: radii.pill,
+            paddingLeft: 10,
+            paddingRight: 14,
+            paddingVertical: 8,
+          })}
+        >
+          <Ionicons name="time-outline" size={15} color={colors.ink} />
+          <Txt weight="bold" size={13} numberOfLines={1} style={{ flexShrink: 1 }}>
+            {p.label}
+          </Txt>
+        </Pressable>
+      ))}
+    </ScrollView>
+  );
+}
 
 function openAddress(target: "pickup" | "dropoff") {
   router.push({ pathname: "/adres", params: { target } });
@@ -96,6 +137,13 @@ export default function YeniGonderi() {
   const contentWidth = width - 32;
   const zarfSize = Math.round(Math.min(heroSize * 0.72, contentWidth - 76 - heroSize * 2.5 - 28));
   const kutuSize = Math.round(Math.min(heroSize * 0.82, contentWidth - 102 - heroSize * 2.08 - 8));
+  // Son 3 adres (geçmiş siparişlerden); okunamazsa çipler gösterilmez
+  const [recent, setRecent] = useState<RecentPlace[]>([]);
+  useFocusEffect(
+    useCallback(() => {
+      api.listOrders().then((o) => setRecent(recentPlaces(o, 3)), () => setRecent([]));
+    }, []),
+  );
 
   function start() {
     if (ready) router.push("/ozet");
@@ -118,8 +166,8 @@ export default function YeniGonderi() {
         </Pressable>
       </View>
 
-      {/* Dev başlık + el yazısı etiketler */}
-      <View style={{ minHeight: heroSize * 2.9, justifyContent: "center", marginTop: 4 }}>
+      {/* Dev başlık + el yazısı etiketler (alttaki etiket "Kapında."nın altına iner, kelimeyi kesmez) */}
+      <View style={{ minHeight: heroSize * 2.9, justifyContent: "center", marginTop: 4, marginBottom: 16 }}>
         <Text accessibilityRole="header" style={{ ...type.hero, fontSize: heroSize, lineHeight: heroSize * 0.94, letterSpacing: -heroSize * 0.056 }}>
           {"Hızlı.\nNet.\nKapında."}
         </Text>
@@ -139,8 +187,8 @@ export default function YeniGonderi() {
         <HandTag rotate={-14} style={{ position: "absolute", right: 24, top: heroSize * 1.1 }}>
           {"MESAFE\nYOK"}
         </HandTag>
-        <HandTag tone="white" rotate={-12} style={{ position: "absolute", right: 0, bottom: 0 }}>
-          {"BUGÜN\nORADA ✓"}
+        <HandTag tone="white" rotate={-6} style={{ position: "absolute", right: 0, bottom: -22 }}>
+          BUGÜN ORADA ✓
         </HandTag>
       </View>
 
@@ -151,6 +199,7 @@ export default function YeniGonderi() {
         onPress={start}
         testID="start-send"
       />
+      <RecentChips places={recent} onPick={(p) => update({ dropoff: { address: p.address, lat: p.lat, lng: p.lng, district: p.district } })} />
 
       <View style={{ flexDirection: "row", gap: 8 }}>
         <QuickCard
@@ -233,13 +282,13 @@ export default function YeniGonderi() {
           onChangeText={(v) => update({ packageDescription: v })}
         />
         <Field
-          label="Ağırlık (kg, isteğe bağlı, en fazla 20)"
+          label={`Ağırlık (kg, isteğe bağlı${P.maxWeightKg ? `, en fazla ${P.maxWeightKg}` : ""})`}
           placeholder="Örn. 2"
           keyboardType="decimal-pad"
           value={draft.weightKg}
           onChangeText={(v) => update({ weightKg: v })}
         />
-        <ToggleRow label="Büyük paket" hint="Motora sığan ama hacimli paketler, +150 TL" value={draft.largePackage} onChange={(v) => update({ largePackage: v })} />
+        <ToggleRow label="Büyük paket" hint={`Motora sığan ama hacimli paketler, +${tl(P.heavySurchargeKurus)}`} value={draft.largePackage} onChange={(v) => update({ largePackage: v })} />
       </Card>
 
       <Text style={{ ...type.h3, marginTop: 4 }}>Ne zaman ulaşsın?</Text>
@@ -255,7 +304,7 @@ export default function YeniGonderi() {
           ]}
         />
         {draft.serviceLevel === "ekonomi" ? <Muted>Ekonomi: Pazartesi–Cumartesi öğleden önce verilen siparişler aynı gün teslim edilir.</Muted> : null}
-        <ToggleRow label="Gidiş-dönüş" hint="Dönüş ayağı %50 indirimli" value={draft.roundTrip} onChange={(v) => update({ roundTrip: v })} />
+        <ToggleRow label="Gidiş-dönüş" hint={`Dönüş ayağı %${P.returnLegDiscountPct} indirimli`} value={draft.roundTrip} onChange={(v) => update({ roundTrip: v })} />
         <Field
           label="Gönderinin değeri (TL, isteğe bağlı)"
           placeholder="Örn. 25.000"
@@ -264,7 +313,7 @@ export default function YeniGonderi() {
           onChangeText={(v) => update({ declaredValue: v })}
           testID="declared-value"
         />
-        <Muted>{"1.000 TL'ye kadar ücretsiz güvencededir; üstü için küçük bir sigorta ücreti fiyata eklenir."}</Muted>
+        <Muted>{`${tl(P.freeCoverageKurus)}'ye kadar ücretsiz güvencededir; üstü için küçük bir sigorta ücreti fiyata eklenir.`}</Muted>
         <ToggleRow
           label="Teslim kodu ile teslim"
           hint="Alıcıya SMS ile kod gider; kurye kodu almadan teslim edemez"

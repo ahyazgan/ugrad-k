@@ -4,7 +4,7 @@ import { Card, Muted, colors, font } from "@/components/ui";
 
 const STATE: Record<DocumentState, { label: string; color: string }> = {
   gecerli: { label: "Geçerli", color: colors.success },
-  yaklasiyor: { label: "Süresi yaklaşıyor", color: "#B45309" },
+  yaklasiyor: { label: "Süresi yaklaşıyor", color: colors.warn },
   suresi_doldu: { label: "Süresi dolmuş", color: colors.danger },
   eksik: { label: "Eksik", color: colors.muted },
 };
@@ -19,9 +19,9 @@ export function DocumentWarning({ c }: { c: Compliance | null }) {
   const blocking = c.blocking.length > 0;
   const list = blocking ? c.blocking : c.warnings;
   return (
-    <Card style={{ borderColor: blocking ? colors.danger : colors.accent, backgroundColor: blocking ? colors.dangerLight : "#FEF3C7" }}>
+    <Card style={{ borderColor: blocking ? colors.danger : colors.accent, backgroundColor: blocking ? colors.dangerLight : colors.warnLight }}>
       <View testID="doc-warning">
-        <Text style={{ ...font("extrabold"), color: blocking ? colors.danger : "#92400E" }}>
+        <Text style={{ ...font("extrabold"), color: blocking ? colors.danger : colors.warn }}>
           {blocking ? "Belgeleriniz eksik: vardiya başlatamazsınız" : "Belge süreniz yaklaşıyor"}
         </Text>
         {list.map((i) => (
@@ -43,7 +43,7 @@ export function DocumentList({ c }: { c: Compliance }) {
       <Text style={{ ...font("extrabold"), color: colors.text }}>Belgelerim</Text>
       {items.map((i) => (
         <View key={i.kind} style={{ flexDirection: "row", justifyContent: "space-between", gap: 8 }}>
-          <Text style={{ flex: 1, color: colors.text }}>{i.label}</Text>
+          <Text style={{ ...font("semibold"), flex: 1, color: colors.text }}>{i.label}</Text>
           <Text style={{ color: STATE[i.state].color, ...font("bold") }}>
             {STATE[i.state].label}
             {i.expiresAt ? ` · ${fmtDay(i.expiresAt)}` : ""}

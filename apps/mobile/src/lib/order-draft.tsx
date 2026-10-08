@@ -1,6 +1,38 @@
 import { createContext, useContext, useState, type ReactNode } from "react";
 import type { ServiceLevel } from "@yazgan/shared";
-import type { DraftPoint, OrderInput } from "./api";
+import type { DraftPoint, OrderDetail, OrderInput } from "./api";
+import { districtFromAddress } from "./recent";
+
+/**
+ * "Aynı rotayla tekrar gönder": geçmiş siparişin adreslerini (tarif ve kişilerle) taslağa taşır.
+ * Paket, hizmet seviyesi ve ödeme yeniden seçilir; fiyat her zaman yeniden hesaplanır.
+ */
+export function routeFromOrder(
+  o: Pick<
+    OrderDetail,
+    | "pickupAddress"
+    | "pickupLat"
+    | "pickupLng"
+    | "pickupDetails"
+    | "pickupContactName"
+    | "pickupContactPhone"
+    | "dropoffAddress"
+    | "dropoffLat"
+    | "dropoffLng"
+    | "dropoffDetails"
+    | "dropoffContactName"
+    | "dropoffContactPhone"
+  >,
+): Partial<Draft> {
+  return {
+    pickup: { address: o.pickupAddress, lat: o.pickupLat, lng: o.pickupLng, details: o.pickupDetails ?? undefined, district: districtFromAddress(o.pickupAddress) },
+    dropoff: { address: o.dropoffAddress, lat: o.dropoffLat, lng: o.dropoffLng, details: o.dropoffDetails ?? undefined, district: districtFromAddress(o.dropoffAddress) },
+    pickupContactName: o.pickupContactName ?? "",
+    pickupContactPhone: o.pickupContactPhone ?? "",
+    dropoffContactName: o.dropoffContactName ?? "",
+    dropoffContactPhone: o.dropoffContactPhone ?? "",
+  };
+}
 
 export interface Draft {
   pickup: DraftPoint | null;

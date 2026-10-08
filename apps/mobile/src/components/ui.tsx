@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { ReactNode, RefObject } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -9,10 +9,11 @@ import {
   TextInput,
   View,
   type TextInputProps,
+  type TextProps,
   type ViewStyle,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { colors, font, radii, type } from "./theme";
+import { colors, font, radii, type, type FontWeightName } from "./theme";
 
 export { colors, font, fontFamilies, radii, shadow, type } from "./theme";
 
@@ -21,31 +22,62 @@ export function Screen({
   scroll = true,
   padded = true,
   safeTop = false,
+  scrollRef,
 }: {
   children: ReactNode;
   scroll?: boolean;
   padded?: boolean;
   /** Başlıksız ekranlarda üst güvenli alanı da boşalt */
   safeTop?: boolean;
+  /** Ekran içinden bir bölüme kaydırmak için (ör. "Yoğun bölgeleri gör") */
+  scrollRef?: RefObject<ScrollView | null>;
 }) {
   const inner = <View style={[padded && styles.padded, { gap: 14 }]}>{children}</View>;
   return (
     <SafeAreaView style={styles.screen} edges={safeTop ? ["top", "bottom", "left", "right"] : ["bottom", "left", "right"]}>
-      {scroll ? <ScrollView keyboardShouldPersistTaps="handled">{inner}</ScrollView> : inner}
+      {scroll ? (
+        <ScrollView ref={scrollRef} keyboardShouldPersistTaps="handled">
+          {inner}
+        </ScrollView>
+      ) : (
+        inner
+      )}
     </SafeAreaView>
   );
+}
+
+/**
+ * Neo gövde metni: ham <Text> yerine kullanın (sistem yazı tipine düşmez).
+ * Varsayılan Archivo 600, 14 px, mürekkep rengi.
+ */
+export function Txt({
+  weight = "semibold",
+  size = 14,
+  color = colors.text,
+  style,
+  ...props
+}: TextProps & { weight?: FontWeightName; size?: number; color?: string }) {
+  return <Text {...props} style={[{ ...font(weight), fontSize: size, lineHeight: Math.round(size * 1.4), color }, style]} />;
 }
 
 export function Title({ children }: { children: ReactNode }) {
   return <Text style={styles.title}>{children}</Text>;
 }
 
-export function Muted({ children, style }: { children: ReactNode; style?: object }) {
-  return <Text style={[styles.muted, style]}>{children}</Text>;
+export function Muted({ children, style, numberOfLines }: { children: ReactNode; style?: object; numberOfLines?: number }) {
+  return (
+    <Text style={[styles.muted, style]} numberOfLines={numberOfLines}>
+      {children}
+    </Text>
+  );
 }
 
-export function Card({ children, style }: { children: ReactNode; style?: ViewStyle }) {
-  return <View style={[styles.card, style]}>{children}</View>;
+export function Card({ children, style, testID }: { children: ReactNode; style?: ViewStyle; testID?: string }) {
+  return (
+    <View testID={testID} style={[styles.card, style]}>
+      {children}
+    </View>
+  );
 }
 
 export function Button({
@@ -65,7 +97,17 @@ export function Button({
   testID?: string;
 }) {
   const off = disabled || loading;
-  const fg = variant === "danger" || variant === "dark" ? "#fff" : colors.ink;
+  // Pasif (yüklenmiyor) düğme: soluk ama okunur — limon/siyah zemin "basılabilir" görünmesin
+  const passive = !!disabled && !loading;
+  const fg = passive
+    ? variant === "secondary"
+      ? colors.inactive
+      : variant === "danger"
+        ? colors.danger
+        : colors.mutedDark
+    : variant === "danger" || variant === "dark"
+      ? "#fff"
+      : colors.ink;
   return (
     <Pressable
       testID={testID}
@@ -77,7 +119,9 @@ export function Button({
         variant === "secondary" && styles.buttonSecondary,
         variant === "danger" && styles.buttonDanger,
         variant === "dark" && styles.buttonDark,
-        off && { opacity: 0.45 },
+        passive && variant === "secondary" && { borderColor: colors.inactive, opacity: 0.7 },
+        passive && variant !== "secondary" && { backgroundColor: variant === "danger" ? colors.dangerLight : colors.disabledBg },
+        loading && { opacity: 0.7 },
         pressed && { opacity: 0.8 },
       ]}
     >

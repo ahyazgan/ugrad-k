@@ -87,7 +87,7 @@ export default function Teslim() {
       {returning ? <Stack.Screen options={{ title: "Göndericiye teslim" }} /> : null}
       <BigTitle size={52}>{returning ? "İade et." : "Teslim et."}</BigTitle>
       {returning ? (
-        <Card style={{ borderColor: "#9A3412" }}>
+        <Card style={{ backgroundColor: colors.returnLight }}>
           <Text style={{ ...font("extrabold") }}>Teslim edilemeyen paket göndericiye iade ediliyor</Text>
           <Muted>Paketi alış adresindeki yetkiliye teslim edin; fotoğraf veya imza alın.</Muted>
         </Card>

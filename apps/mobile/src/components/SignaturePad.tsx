@@ -68,7 +68,7 @@ export function SignaturePad({ onChange, height = 180 }: { onChange: (svg: strin
           ))}
         </Svg>
         {!strokes.length ? (
-          <Text pointerEvents="none" style={{ position: "absolute", alignSelf: "center", top: height / 2 - 10, color: colors.muted }}>
+          <Text pointerEvents="none" style={{ ...font("semibold"), position: "absolute", alignSelf: "center", top: height / 2 - 10, color: colors.muted }}>
             Alıcı buraya imza atsın
           </Text>
         ) : null}

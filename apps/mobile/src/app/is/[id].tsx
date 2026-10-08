@@ -1,12 +1,14 @@
+import Ionicons from "@expo/vector-icons/Ionicons";
+import { formatTL } from "@yazgan/shared";
 import { router, useLocalSearchParams } from "expo-router";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type ComponentProps } from "react";
 import { Text, TextInput, View } from "react-native";
 import { FailedDeliveryForm } from "@/components/FailedDelivery";
 import { OfferCard } from "@/components/OfferCard";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Sticker, type StickerName } from "@/components/Sticker";
 import { TileMap, type MapMarker } from "@/components/TileMap";
-import { Button, Card, ErrorBox, Loading, Muted, Screen, Title, colors, styles, font } from "@/components/ui";
+import { Button, Card, ErrorBox, Loading, Muted, Screen, Title, Txt, colors, styles, font, radii } from "@/components/ui";
 import { api, ApiError, type OrderDetail } from "@/lib/api";
 import { OutboxBanner } from "@/components/OutboxBanner";
 import { formatTime } from "@/lib/format";
@@ -53,6 +55,47 @@ function Stop({
         ) : null}
       </View>
     </Card>
+  );
+}
+
+/** Adres kartlarının üstünde tek satır paket özeti: içerik · kg · değer · teslim kodu var/yok */
+function PackageStrip({ order }: { order: OrderDetail }) {
+  const value = order.declaredValueKurus ? `${(order.declaredValueKurus / 100).toLocaleString("tr-TR", { maximumFractionDigits: 0 })} TL` : "değer yok";
+  const facts: { key: string; icon?: ComponentProps<typeof Ionicons>["name"]; text: string; on?: boolean }[] = [
+    { key: "kg", text: order.weightKg ? `${order.weightKg.toLocaleString("tr-TR")} kg` : "kg yok" },
+    { key: "value", text: value },
+    { key: "code", icon: order.deliveryCodeRequired ? "key" : "key-outline", text: order.deliveryCodeRequired ? "kodlu" : "kodsuz", on: order.deliveryCodeRequired },
+  ];
+  const label = [
+    order.packageDescription || "Paket",
+    order.weightKg ? `${order.weightKg} kg` : "ağırlık belirtilmedi",
+    order.declaredValueKurus ? `${formatTL(order.declaredValueKurus)} değer` : "değer beyanı yok",
+    order.deliveryCodeRequired ? "teslim kodu var" : "teslim kodu yok",
+  ].join(", ");
+  return (
+    <View
+      testID="package-strip"
+      accessible
+      accessibilityLabel={`Paket: ${label}`}
+      style={{ backgroundColor: colors.ink, borderRadius: radii.pill, flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 18, minHeight: 48 }}
+    >
+      <Ionicons name="cube" size={16} color={colors.lime} />
+      {/* Açıklama sığmazsa kısalır; kg · değer · kod her zaman görünür */}
+      <Txt weight="extrabold" size={13} color="#fff" numberOfLines={1} style={{ flexShrink: 1 }}>
+        {order.packageDescription || "Paket"}
+      </Txt>
+      {facts.map((f) => (
+        <View key={f.key} style={{ flexDirection: "row", alignItems: "center", gap: 4, flexShrink: 0 }}>
+          <Txt size={13} color={colors.onInkMuted}>
+            ·
+          </Txt>
+          {f.icon ? <Ionicons name={f.icon} size={13} color={f.on ? colors.lime : colors.onInkMuted} /> : null}
+          <Txt weight={f.on ? "extrabold" : "semibold"} size={13} color={f.on ? "#fff" : colors.onInkMuted}>
+            {f.text}
+          </Txt>
+        </View>
+      ))}
+    </View>
   );
 }
 
@@ -186,7 +229,6 @@ export default function IsDetay() {
           </Title>
           <StatusBadge status={s} />
         </View>
-        {order.packageDescription ? <Text style={styles.body}>📦 {order.packageDescription}{order.weightKg ? ` · ${order.weightKg} kg` : ""}</Text> : null}
         {order.customerNote ? <Text style={{ ...font("extrabold"), color: colors.ink }}>Not: {order.customerNote}</Text> : null}
         {order.roundTrip ? <Text style={{ ...font("extrabold") }}>↩ Gidiş-dönüş: teslimden sonra alış adresine geri dönülecek</Text> : null}
         {order.paymentMethod === "nakit" ? (
@@ -206,6 +248,7 @@ export default function IsDetay() {
         />
       ) : null}
 
+      <PackageStrip order={order} />
       <Stop
         sticker="kutu"
         title="1 · ALIŞ"
@@ -228,7 +271,7 @@ export default function IsDetay() {
       />
 
       <ErrorBox message={error} />
-      {queuedMsg ? <Muted style={{ color: "#92400E" }}>{queuedMsg}</Muted> : null}
+      {queuedMsg ? <Muted style={{ color: colors.warn }}>{queuedMsg}</Muted> : null}
       <OutboxBanner onSent={load} />
 
       {offerPending ? (
@@ -271,7 +314,7 @@ export default function IsDetay() {
         <Muted>Teslim adresine vardınız · {formatTime(order.arrivedDropoffAt)} (alıcıya &quot;kurye kapıda&quot; mesajı gitti)</Muted>
       ) : null}
       {s === "geri_donuyor" ? (
-        <Card style={{ gap: 8, borderColor: "#9A3412" }}>
+        <Card style={{ gap: 8, backgroundColor: colors.returnLight }}>
           <Text style={{ ...font("extrabold"), fontSize: 16 }}>Paketi göndericiye geri götürün</Text>
           <Muted>Alış adresine dönün ve paketi göndericiye teslim edin (fotoğraf veya imza).</Muted>
           <Button title="Yol tarifi (alış)" variant="secondary" onPress={() => openDirections(order.pickupLat, order.pickupLng, order.pickupAddress)} />

@@ -1,7 +1,7 @@
 import { OFFER_DECLINE_REASONS, offerSecondsLeft, roadKm } from "@yazgan/shared";
 import { useEffect, useRef, useState } from "react";
-import { Pressable, Text, Vibration, View } from "react-native";
-import { Button, Card, ErrorBox, Muted, colors, font } from "@/components/ui";
+import { Pressable, Vibration, View } from "react-native";
+import { Button, Card, ErrorBox, Muted, Txt, colors, radii } from "@/components/ui";
 import { api, ApiError, type OrderSummary } from "@/lib/api";
 
 /**
@@ -12,10 +12,13 @@ export function OfferCard({
   job,
   me,
   onDone,
+  primary = true,
 }: {
   job: OrderSummary & { offerExpiresAt: string };
   me: { lat: number; lng: number } | null;
   onDone: (message: string | null) => void;
+  /** Ekranda birden çok teklif varsa yalnız ilki limon "Kabul et" alır (ekran başına ≤1 limon eylem) */
+  primary?: boolean;
 }) {
   const [left, setLeft] = useState(() => offerSecondsLeft(job.offerExpiresAt));
   const [declining, setDeclining] = useState(false);
@@ -57,22 +60,36 @@ export function OfferCard({
 
   const toPickup = me && job.pickupPoint ? roadKm(me, job.pickupPoint) : null;
   const route = job.pickupPoint && job.dropoffPoint ? roadKm(job.pickupPoint, job.dropoffPoint) : null;
-  const urgentColor = job.urgent ? colors.accent : colors.primary;
-
   return (
-    <Card style={{ gap: 8, borderColor: urgentColor, borderWidth: 2 }}>
-      <View testID={`offer-${job.orderNo}`} style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-        <Text style={{ ...font("black"), fontSize: 16, color: urgentColor }}>{job.urgent ? "⚡ ACİL iş teklifi" : "🔔 Yeni iş teklifi"}</Text>
-        <Text
+    <Card style={{ gap: 8, borderColor: job.urgent ? colors.ink : colors.border, borderWidth: 2 }}>
+      <View testID={`offer-${job.orderNo}`} style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+        {job.urgent ? (
+          // Limon yazı yalnız siyah zeminde
+          <View style={{ backgroundColor: colors.ink, borderRadius: radii.pill, paddingHorizontal: 12, paddingVertical: 6 }}>
+            <Txt weight="black" size={13} color={colors.lime} style={{ letterSpacing: 0.6 }}>
+              ⚡ ACİL İŞ TEKLİFİ
+            </Txt>
+          </View>
+        ) : (
+          <Txt weight="black" size={16}>
+            🔔 Yeni iş teklifi
+          </Txt>
+        )}
+        <Txt
           testID="offer-countdown"
-          style={{ ...font("black"), fontSize: 18, color: left <= 15 ? colors.danger : colors.text, fontVariant: ["tabular-nums"] }}
+          weight="black"
+          size={20}
+          color={left <= 15 ? colors.danger : colors.text}
+          style={{ fontVariant: ["tabular-nums"] }}
         >
           {Math.floor(left / 60)}:{String(left % 60).padStart(2, "0")}
-        </Text>
+        </Txt>
       </View>
-      <Text style={{ ...font("extrabold") }}>{job.orderNo}</Text>
-      <Text numberOfLines={2}>↑ {job.pickupAddress}</Text>
-      <Text numberOfLines={2}>↓ {job.dropoffAddress}</Text>
+      <Txt weight="extrabold" size={15}>
+        {job.orderNo}
+      </Txt>
+      <Txt numberOfLines={2}>↑ {job.pickupAddress}</Txt>
+      <Txt numberOfLines={2}>↓ {job.dropoffAddress}</Txt>
       <Muted>
         {[toPickup != null ? `Alışa ~${toPickup.toLocaleString("tr-TR")} km` : null, route != null ? `teslimat ~${route.toLocaleString("tr-TR")} km` : null]
           .filter(Boolean)
@@ -81,7 +98,7 @@ export function OfferCard({
       <ErrorBox message={error} />
       {declining ? (
         <View style={{ gap: 6 }}>
-          <Text style={{ ...font("bold") }}>Neden reddediyorsunuz?</Text>
+          <Txt weight="bold">Neden reddediyorsunuz?</Txt>
           <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
             {OFFER_DECLINE_REASONS.map((r) => (
               <Pressable
@@ -89,9 +106,16 @@ export function OfferCard({
                 onPress={() => respond(false, { reason: r })}
                 disabled={busy}
                 testID={`decline-reason-${r}`}
-                style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 8 }}
+                style={({ pressed }) => ({
+                  borderWidth: 2,
+                  borderColor: colors.border,
+                  backgroundColor: pressed ? colors.bg : colors.surface,
+                  borderRadius: radii.pill,
+                  paddingHorizontal: 14,
+                  paddingVertical: 9,
+                })}
               >
-                <Text>{r}</Text>
+                <Txt weight="bold">{r}</Txt>
               </Pressable>
             ))}
           </View>
@@ -103,7 +127,7 @@ export function OfferCard({
             <Button title="Reddet" variant="secondary" onPress={() => setDeclining(true)} disabled={busy} testID="offer-decline" />
           </View>
           <View style={{ flex: 2 }}>
-            <Button title="Kabul et" onPress={() => respond(true)} loading={busy} testID="offer-accept" />
+            <Button title="Kabul et" variant={primary ? "primary" : "dark"} onPress={() => respond(true)} loading={busy} testID="offer-accept" />
           </View>
         </View>
       )}

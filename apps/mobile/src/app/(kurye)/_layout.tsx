@@ -14,8 +14,9 @@ export default function KuryeLayout() {
   return (
     <Tabs screenOptions={tabOptions}>
       <Tabs.Screen name="index" options={{ title: "İşlerim", headerShown: false, tabBarIcon: tabIcon("bicycle", "bicycle-outline") }} />
-      <Tabs.Screen name="vardiya" options={{ title: "Vardiyam", tabBarIcon: tabIcon("calendar", "calendar-outline") }} />
-      <Tabs.Screen name="kazanc" options={{ title: "Kazancım", tabBarIcon: tabIcon("wallet", "wallet-outline") }} />
+      {/* Sekme kökleri: başlık ekranın içinde (BigTitle + sağ üstte tek çıkartma) */}
+      <Tabs.Screen name="vardiya" options={{ title: "Vardiyam", headerShown: false, tabBarIcon: tabIcon("calendar", "calendar-outline") }} />
+      <Tabs.Screen name="kazanc" options={{ title: "Kazancım", headerShown: false, tabBarIcon: tabIcon("wallet", "wallet-outline") }} />
       <Tabs.Screen name="hesap" options={{ title: "Hesabım", headerShown: false, tabBarIcon: tabIcon("person", "person-outline") }} />
     </Tabs>
   );

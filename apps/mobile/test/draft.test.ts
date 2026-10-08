@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { draftToInput, type Draft } from "../src/lib/order-draft";
+import { draftToInput, routeFromOrder, type Draft } from "../src/lib/order-draft";
 
 const base: Draft = {
   pickup: { address: "A", lat: 41.1, lng: 29.1, district: "Beykoz" },
@@ -40,5 +40,30 @@ describe("draftToInput", () => {
   });
   it("ağırlık boşsa null", () => {
     expect(draftToInput(base)!.weightKg).toBeNull();
+  });
+});
+
+describe("routeFromOrder", () => {
+  it("geçmiş siparişin adreslerini, tariflerini ve kişilerini taslağa taşır; draftToInput ile geçerli girdi olur", () => {
+    const patch = routeFromOrder({
+      pickupAddress: "Kılıçlı Mah. Şile Cad. No: 8A, Beykoz/İstanbul",
+      pickupLat: 41.1295,
+      pickupLng: 29.1135,
+      pickupDetails: "Kat 2",
+      pickupContactName: "Ayşe",
+      pickupContactPhone: "+905321112233",
+      dropoffAddress: "Levent Mah., Büyükdere Cad., Beşiktaş/İstanbul",
+      dropoffLat: 41.0819,
+      dropoffLng: 29.0106,
+      dropoffDetails: null,
+      dropoffContactName: null,
+      dropoffContactPhone: null,
+    });
+    expect(patch.pickup).toMatchObject({ details: "Kat 2", district: "Beykoz" });
+    expect(patch.dropoff).toMatchObject({ details: undefined, district: "Beşiktaş" });
+    expect(patch.dropoffContactName).toBe("");
+    const input = draftToInput({ ...base, ...patch })!;
+    expect(input.pickup).toMatchObject({ lat: 41.1295, contactName: "Ayşe", contactPhone: "+905321112233" });
+    expect(input.dropoff.contactName).toBeUndefined();
   });
 });

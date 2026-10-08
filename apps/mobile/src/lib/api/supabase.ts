@@ -178,7 +178,8 @@ export function createSupabaseApi(url: string, anonKey: string): Api & { client:
     async listOrders() {
       const { data, error } = await client
         .from("orders")
-        .select("id, order_no, status, pickup_address, dropoff_address, total_kurus, urgent, created_at")
+        // Konumlar: "Son adresler" listesi geçmiş siparişlerden tek dokunuşla adres seçtirir
+        .select("id, order_no, status, pickup_address, dropoff_address, total_kurus, urgent, created_at, pickup_lat, pickup_lng, dropoff_lat, dropoff_lng")
         .eq("customer_id", await uid())
         .order("created_at", { ascending: false })
         .limit(100);

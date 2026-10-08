@@ -4,7 +4,7 @@ import { useCallback, useState } from "react";
 import { FlatList, Pressable, RefreshControl, Text, View } from "react-native";
 import { StatusBadge } from "@/components/StatusBadge";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { BigTitle, InkChip } from "@/components/Neo";
+import { BigTitle, EmptyState, InkChip } from "@/components/Neo";
 import { Sticker } from "@/components/Sticker";
 import { Card, ErrorBox, Muted, colors, font, styles } from "@/components/ui";
 import { api, ApiError, type OrderSummary } from "@/lib/api";
@@ -54,12 +54,24 @@ export default function Siparisler() {
             <BigTitle size={52}>Siparişlerim.</BigTitle>
             <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", minHeight: 40 }}>
               {orders && active ? <InkChip>{`AKTİF · ${active}`}</InkChip> : <View />}
-              <Sticker name="kutu" size={76} rotation={-6} style={{ marginVertical: -16, marginRight: 6 }} />
+              {/* Liste boşken çıkartma boş durum kartında; başlıkta ikinci kez gösterilmez */}
+              {orders?.length ? <Sticker name="kutu" size={76} rotation={-6} style={{ marginVertical: -16, marginRight: 6 }} /> : null}
             </View>
             <ErrorBox message={error} />
           </View>
         }
-        ListEmptyComponent={orders ? <Muted style={{ textAlign: "center", marginTop: 32 }}>Henüz siparişiniz yok.</Muted> : null}
+        ListEmptyComponent={
+          orders ? (
+            <EmptyState
+              testID="orders-empty"
+              sticker="kutu"
+              rotation={-6}
+              title="Henüz sipariş yok."
+              body="İlk gönderini 1 dakikada oluştur."
+              action={{ label: "Yeni sipariş", onPress: () => router.navigate("/(musteri)"), testID: "orders-empty-new" }}
+            />
+          ) : null
+        }
         renderItem={({ item }) => (
           <Pressable onPress={() => router.push({ pathname: "/siparis/[id]", params: { id: item.id } })}>
             <Card style={{ gap: 6 }}>

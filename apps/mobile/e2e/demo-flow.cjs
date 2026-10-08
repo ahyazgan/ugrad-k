@@ -29,12 +29,21 @@ fs.mkdirSync(out, { recursive: true });
   await page.getByRole('checkbox').nth(1).click();
   await tid('kvkk-accept').click();
   await tid('address-pickup').waitFor();
+  // Demo müşterinin geçmiş siparişlerinden son 3 adres çipi
+  await tid('recent-chip-2').waitFor();
   await shot('04-form-bos');
   for (const [target, q] of [['pickup','beykoz'],['dropoff','levent']]) {
     await tid(`address-${target}`).click();
+    // Arama boşken: "Konumumu kullan" + son adresler
+    await tid('use-my-location').waitFor();
+    await tid('recent-0').waitFor();
+    if (target === 'pickup') await shot('05a-adres-bos');
     await tid('address-search').fill(q);
     await tid('suggestion-0').click();
     await tid('address-details').fill(target==='pickup'?'Kat 2':'Kanyon AVM, B Blok');
+    // Seçilen adres: mini harita pin onayı + yaka/köprü ipucu (Levent Avrupa yakasında)
+    await tid('tile-map').waitFor();
+    if (target === 'dropoff') await tid('side-hint').getByText(/^Avrupa yakası · köprü geçişi \+[\d.,]+ TL$/).waitFor();
     if (target==='dropoff') await shot('05-adres');
     await tid('address-save').click();
     await tid('address-pickup').waitFor();
@@ -100,6 +109,11 @@ fs.mkdirSync(out, { recursive: true });
   await tid('rating-submit').click();
   await tid('rating-thanks').waitFor();
   await shot('09b-degerlendirme');
+  // Teslim sonrası: aynı rotayla tekrar gönder → adresler (tarifleriyle) taslağa dolar
+  await tid('reorder').click();
+  await tid('address-pickup').getByText(/Beykoz/).waitFor();
+  await tid('address-dropoff').getByText(/Beşiktaş/).waitFor();
+  await tid('address-dropoff').getByText('Kanyon AVM, B Blok').waitFor();
   console.log('✓ müşteri akışı geçti');
 
   // ───────── Kurye akışı
@@ -166,6 +180,10 @@ fs.mkdirSync(out, { recursive: true });
   await kt('marker-dropoff').waitFor();
   // Müşteriye yaz: hazır cevap
   await kt('open-chat').click();
+  // Boş yazışma: zarf boş durumu + ortada büyük hazır cevap çipleri, üstte sipariş şeridi
+  await kt('chat-empty').waitFor();
+  await kt('chat-order-strip').waitFor();
+  await kshot('11a0-kurye-mesaj-bos');
   await kt('quick-Kapıdayım').click();
   await kp.getByText('Tamam, teşekkürler').waitFor();
   await kp.getByText(/okundu/).waitFor();
@@ -249,8 +267,11 @@ fs.mkdirSync(out, { recursive: true });
   await kt('cash-nakit').click();
   await kt('complete-delivery').click();
   await kp.getByText(/Bugün tamamlanan \(2\)/).waitFor();
-  await kp.getByText(/Aktif işler \(0\)/).waitFor();
+  // Vardiyada, elde iş yok: "Aktif işler (0)" başlığı yerine boş durum kartı (kask)
+  await kt('jobs-empty').getByText('Yol açık, iş yok.').waitFor();
+  if (await kp.getByText(/Aktif işler \(/).count()) throw new Error('iş yokken "Aktif işler" başlığı kalmamalı');
   await kp.getByText(/Göndericiye iade edildi/).waitFor();
+  await kshot('12e-kurye-is-yok');
   // Boşta: önümüzdeki saatin yoğun bölgeleri (geçmiş talep), uzaklıkla
   await kp.getByText('Yoğun bölgeler (önümüzdeki saat)').waitFor();
   const areas = await kp.getByTestId('busy-area').allInnerTexts();
@@ -270,13 +291,15 @@ fs.mkdirSync(out, { recursive: true });
   await kshot('12b-kurye-kazanc');
   // Vardiya planı: boş bir dilim al, sonra bırak
   await kp.getByRole('tab', { name: /Vardiyam/ }).click();
-  await kt('my-shift-summary').getByText('Henüz vardiya seçmediniz.').waitFor();
+  // Demo kuryesinin yarın için önceden alınmış bir vardiyası var ("Sıradaki vardiyan" kartı için)
+  await kt('my-shift-summary').getByText(/^1 vardiya · \d+ saat \(14 gün\)$/).waitFor();
   await kp.locator('[role="button"]:not([aria-disabled="true"])').filter({ hasText: /^Al$/ }).first().click();
   await kp.getByText(/vardiyası alındı/).waitFor();
-  await kt('my-shift-summary').getByText(/^1 vardiya · \d+ saat \(14 gün\)$/).waitFor();
+  await kt('my-shift-summary').getByText(/^2 vardiya · \d+ saat \(14 gün\)$/).waitFor();
   await kshot('12d-kurye-vardiya');
   await kp.locator('[role="button"]').filter({ hasText: /^Bırak$/ }).first().click();
   await kp.getByText(/^Vardiya bırakıldı/).waitFor();
+  await kt('my-shift-summary').getByText(/^1 vardiya · \d+ saat \(14 gün\)$/).waitFor();
   await kp.getByRole('tab', { name: /Hesabım/ }).click();
   await kp.getByText('Belgelerim').waitFor();
   await kp.getByText(/Süresi yaklaşıyor ·/).waitFor();
@@ -290,6 +313,10 @@ fs.mkdirSync(out, { recursive: true });
   await kt('sos-status').getByText(/Araç arızası/).waitFor();
   await kt('sos-acknowledged').waitFor({ timeout: 15000 });
   await kshot('12c-kurye-sos');
+  // Bildirimden sonra: yöneticiyi ara + kontrol listesi + "Sorun çözüldü"
+  await kt('sos-call-manager').waitFor();
+  await kt('sos-resolved').scrollIntoViewIfNeeded();
+  await kshot('12c2-kurye-sos-alt');
   await kp.goBack();
   await kp.getByText('Moladasınız').waitFor();
   await kt('break-toggle').click();
@@ -297,6 +324,10 @@ fs.mkdirSync(out, { recursive: true });
   // Elde paket yokken vardiya kapatılabilir
   await kt('shift-toggle').click();
   await kp.getByText('Vardiya kapalı').waitFor();
+  // Vardiya kapalı: "Aktif işler (0) —" yerine sıradaki vardiya + bugünün özet şeridi
+  await kt('next-shift').getByText(/^Yarın · \d{2}:\d{2}–\d{2}:\d{2}$/).waitFor();
+  await kt('today-strip').getByText(/^2 iş · [\d.,]+ TL · (Altın|Gümüş|Gelişmeli|Riskli)$/).waitFor();
+  if (await kp.getByText(/Aktif işler \(/).count()) throw new Error('vardiya kapalıyken "Aktif işler" görünmemeli');
   await kshot('13-kurye-bitti');
   if (errors.length) throw new Error('Tarayıcı hataları: ' + JSON.stringify(errors.slice(0, 10)));
   console.log('✓ kurye akışı geçti');

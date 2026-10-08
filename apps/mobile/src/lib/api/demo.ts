@@ -91,6 +91,17 @@ export function createDemoApi(): Api {
   const othersBooked = (startsAt: string) => (new Date(startsAt).getUTCHours() === 5 || new Date(startsAt).getUTCHours() === 7 ? 1 : 0);
   const istTs = (day: string, time: string) =>
     time === "24:00" ? new Date(new Date(`${day}T00:00:00+03:00`).getTime() + 86_400_000).toISOString() : new Date(`${day}T${time}:00+03:00`).toISOString();
+  // Demo kuryesinin planında yarının ikinci dilimi hazır alınmış olsun ("Sıradaki vardiyan" kartı için).
+  // İlk dilim boş kalır: e2e "ilk boş dilimi al → bırak" akışı bu kaydı etkilemez.
+  {
+    const day = istanbulDay(new Date(Date.now() + 86_400_000));
+    const dow = ((new Date(`${day}T12:00:00Z`).getUTCDay() + 6) % 7) + 1;
+    const second = SLOT_TIMES[dow]?.[1];
+    if (second) {
+      const startsAt = istTs(day, second[0]);
+      myShiftBookings.set(startsAt, { id: `bk-${startsAt}`, startsAt });
+    }
+  }
   /** Demo yazışmaları: sipariş → mesajlar (rol: yazan taraf) */
   const chats = new Map<string, { id: string; role: "musteri" | "kurye" | "admin"; body: string; createdAt: string; readAt: string | null }[]>();
   const chatListeners = new Map<string, Set<() => void>>();
@@ -221,6 +232,60 @@ export function createDemoApi(): Api {
     }
   }
 
+  let customerSeeded = false;
+  /**
+   * Demo müşterisine teslim edilmiş üç geçmiş sipariş verir: "Son adresler", "Aynı rotayla tekrar gönder"
+   * ve Siparişlerim listesi boş görünmesin. Numaraları yeni siparişlerle (YK-1001…) çakışmaz; hepsi
+   * yeni siparişten eskidir, listede altta kalır.
+   */
+  async function seedCustomerHistory() {
+    if (customerSeeded) return;
+    customerSeeded = true;
+    const DAY = 86_400_000;
+    const past: [no: string, from: string, to: string, daysAgo: number, details: [string, string], rating: number | null][] = [
+      ["YK-0987", "mock-beykoz", "mock-levent", 2, ["Kat 2", "Kanyon AVM, B Blok"], 5],
+      ["YK-0979", "mock-kadikoy", "mock-atasehir", 6, ["Moda Cad. No: 12", "Resepsiyon"], null],
+      ["YK-0964", "mock-uskudar", "mock-sisli", 12, ["Kat 4", "Plaza girişi, güvenlik"], 4],
+    ];
+    for (const [orderNo, from, to, daysAgo, [pickupDetails, dropoffDetails], rating] of past) {
+      const pickup = await maps.placeDetails(from);
+      const dropoff = await maps.placeDetails(to);
+      const { req, q } = await quoteFor({
+        pickup: { ...pickup, details: pickupDetails, contactName: "Ayşe Gönderici", contactPhone: "+905321112233" },
+        dropoff: { ...dropoff, details: dropoffDetails, contactName: "Ali Alıcı", contactPhone: "+905334445566" },
+        serviceLevel: "standart",
+        roundTrip: false,
+        weightKg: null,
+        largePackage: false,
+        declaredValueKurus: null,
+        deliveryCode: false,
+        packageDescription: "İmzalı sözleşme zarfı",
+        scheduledPickupAt: null,
+        paymentMethod: "kart",
+      });
+      const created = Date.now() - daysAgo * DAY;
+      const at = (min: number) => new Date(created + min * 60_000).toISOString();
+      const id = `demo-past-${orderNo}`;
+      orders.set(id, {
+        ...detailFrom(id, req, q, at(0)),
+        orderNo,
+        status: "teslim_edildi",
+        paymentStatus: "odendi",
+        paidKurus: q.quote.totalKurus,
+        courierName: "Mehmet (demo)",
+        rating,
+        history: [
+          { status: "beklemede", at: at(0), note: null },
+          { status: "onaylandi", at: at(1), note: null },
+          { status: "kuryeye_atandi", at: at(3), note: null },
+          { status: "alindi", at: at(18), note: null },
+          { status: "yolda", at: at(19), note: null },
+          { status: "teslim_edildi", at: at(52), note: null },
+        ],
+      });
+    }
+  }
+
   /** Demo: tarayıcı çevrimdışıysa ağ hatası gibi davranır (çevrimdışı kuyruğu denemek için) */
   const failIfOffline = () => {
     if (typeof navigator !== "undefined" && navigator.onLine === false) throw new ApiError("Network request failed");
@@ -283,6 +348,7 @@ export function createDemoApi(): Api {
         email: null,
         corporateAccountId: null,
       };
+      if (!courier) await seedCustomerHistory();
       emit();
       return session;
     },
@@ -343,7 +409,11 @@ export function createDemoApi(): Api {
     },
     async listOrders() {
       requireSession();
-      return [...orders.values()].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+      // Konumlar "Son adresler" için (gerçek API'de de seçilir)
+      return [...orders.values()]
+        .filter((o) => o.courierName !== "Demo Kurye")
+        .map((o) => ({ ...o, pickupPoint: { lat: o.pickupLat, lng: o.pickupLng }, dropoffPoint: { lat: o.dropoffLat, lng: o.dropoffLng } }))
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
     },
     async getOrder(id) {
       const o = orders.get(id);

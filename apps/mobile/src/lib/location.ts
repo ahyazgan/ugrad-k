@@ -73,7 +73,7 @@ export async function startTracking(): Promise<{ mode: TrackingMode; message?: s
             foregroundService: {
               notificationTitle: `${BRAND.name} — vardiya açık`,
               notificationBody: "Konumunuz yalnızca vardiya süresince paylaşılıyor.",
-              notificationColor: "#0F3D6E",
+              notificationColor: BRAND.neo.ink,
             },
           });
         }
@@ -117,6 +117,40 @@ export async function currentPosition() {
   } catch {
     return null;
   }
+}
+
+/**
+ * Müşteri "Konumumu kullan": anlık konum + (iOS/Android'de) adres. Web'de ters geokodlama yoktur;
+ * `exact: false` döner ve ekran adres tarifini zorunlu kılar. İzin verilmezse hata fırlatır.
+ */
+export async function myPlace(): Promise<{ address: string; lat: number; lng: number; district: string | null; exact: boolean }> {
+  const perm = await Location.requestForegroundPermissionsAsync();
+  if (perm.status !== "granted") throw new Error("Konum izni verilmedi. Adresi arayarak seçebilirsiniz.");
+  const p = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
+  const lat = p.coords.latitude;
+  const lng = p.coords.longitude;
+  let address: string | null = null;
+  let district: string | null = null;
+  if (Platform.OS !== "web") {
+    try {
+      const [g] = await Location.reverseGeocodeAsync({ latitude: lat, longitude: lng });
+      if (g) {
+        // Türkiye'de ilçe çoğunlukla subregion alanında gelir
+        district = g.subregion ?? g.district ?? null;
+        const street = [g.street ?? g.name, g.streetNumber ? `No: ${g.streetNumber}` : null].filter(Boolean).join(" ");
+        address = g.formattedAddress ?? ([street, district && g.region ? `${district}/${g.region}` : district].filter(Boolean).join(", ") || null);
+      }
+    } catch {
+      // Ters geokodlama başarısız: koordinatla devam
+    }
+  }
+  return {
+    address: address ?? `Konumum (${lat.toFixed(5)}, ${lng.toFixed(5)})`,
+    lat,
+    lng,
+    district,
+    exact: !!address,
+  };
 }
 
 /** İzin istemeden son bilinen konum (vardiyada izin zaten verilmiştir); yoksa null */
