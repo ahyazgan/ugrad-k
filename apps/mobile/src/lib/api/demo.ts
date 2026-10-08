@@ -78,6 +78,11 @@ export function createDemoApi(): Api {
   const codeTries = new Map<string, number>();
   const codeVerified = new Set<string>();
   let incident: Incident | null = null;
+  /** Demo yazışmaları: sipariş → mesajlar (rol: yazan taraf) */
+  const chats = new Map<string, { id: string; role: "musteri" | "kurye" | "admin"; body: string; createdAt: string; readAt: string | null }[]>();
+  const chatListeners = new Map<string, Set<() => void>>();
+  const chatNotify = (id: string) => chatListeners.get(id)?.forEach((l) => l());
+  const myRole = () => (profile?.role === "kurye" ? "kurye" : "musteri");
   const notifyJobs = () => jobListeners.forEach((l) => l());
 
   const emit = () => listeners.forEach((l) => l(session));
@@ -577,6 +582,36 @@ export function createDemoApi(): Api {
         { kind: "ruhsat", number: null, expiresAt: null },
         { kind: "trafik_sigortasi", number: null, expiresAt: day(10) },
       ];
+    },
+    async listMessages(orderId) {
+      const me = myRole();
+      return (chats.get(orderId) ?? []).map((m) => ({ id: m.id, senderRole: m.role, body: m.body, createdAt: m.createdAt, mine: m.role === me, readAt: m.readAt }));
+    },
+    async sendMessage(orderId, body) {
+      const text = body.trim();
+      if (!text || text.length > 1000) throw new ApiError("Mesaj 1–1000 karakter olmalı");
+      const list = chats.get(orderId) ?? [];
+      const me = myRole();
+      list.push({ id: `m${list.length + 1}`, role: me, body: text, createdAt: new Date().toISOString(), readAt: null });
+      chats.set(orderId, list);
+      chatNotify(orderId);
+      // Demo: karşı taraf birkaç saniyede okur ve kısa cevap verir
+      setTimeout(() => {
+        for (const m of list) if (m.role === me) m.readAt ??= new Date().toISOString();
+        const reply = me === "kurye" ? "Tamam, teşekkürler" : "Tamam, 5 dakika içinde oradayım";
+        if (list.at(-1)?.role === me) list.push({ id: `m${list.length + 1}`, role: me === "kurye" ? "musteri" : "kurye", body: reply, createdAt: new Date().toISOString(), readAt: null });
+        chatNotify(orderId);
+      }, 1500);
+    },
+    async markMessagesRead(orderId) {
+      const me = myRole();
+      for (const m of chats.get(orderId) ?? []) if (m.role !== me) m.readAt ??= new Date().toISOString();
+    },
+    subscribeMessages(orderId, onChange) {
+      const set = chatListeners.get(orderId) ?? new Set();
+      set.add(onChange);
+      chatListeners.set(orderId, set);
+      return () => set.delete(onChange);
     },
     subscribeCourierJobs(onChange) {
       jobListeners.add(onChange);

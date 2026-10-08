@@ -275,6 +275,25 @@ export function createSupabaseRepo(url: string, anonKey: string): AdminRepo & { 
       // İptalde kartla alınmış ödeme iyzico'dan iptal edilir (başarısızsa "iade_bekliyor" olur)
       if (status === "iptal") await client.functions.invoke("payment-refund", { body: { orderId } });
     },
+    async listOrderMessages(orderId) {
+      const rows = check(
+        await client.from("order_messages").select("id, sender_role, body, created_at, read_at").eq("order_id", orderId).order("created_at").limit(500),
+        "Mesajlar okunamadı",
+      ) as Row[];
+      return rows.map((r) => ({ id: String(r.id), senderRole: r.sender_role, body: r.body, createdAt: r.created_at, readAt: r.read_at }));
+    },
+    async sendOrderMessage(orderId, body) {
+      check(await client.rpc("send_order_message", { p_order_id: orderId, p_body: body }), "Mesaj gönderilemedi");
+    },
+    subscribeOrderMessages(orderId, onChange) {
+      const ch = client
+        .channel(`admin-messages-${orderId}`)
+        .on("postgres_changes", { event: "*", schema: "public", table: "order_messages", filter: `order_id=eq.${orderId}` }, onChange)
+        .subscribe();
+      return () => {
+        client.removeChannel(ch);
+      };
+    },
     async listIncidents({ openOnly, limit = 50 }) {
       let q = client
         .from("courier_incidents")

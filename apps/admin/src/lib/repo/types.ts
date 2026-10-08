@@ -408,6 +408,15 @@ export interface Readiness {
   ready: boolean;
 }
 
+/** Sipariş yazışması (müşteri ↔ kurye ↔ yönetici) */
+export interface OrderMessage {
+  id: string;
+  senderRole: "musteri" | "kurye" | "admin";
+  body: string;
+  createdAt: string;
+  readAt: string | null;
+}
+
 /** Kurye acil durum (SOS) kaydı */
 export interface Incident {
   id: string;
@@ -492,6 +501,10 @@ export interface AdminRepo {
   /** Teslim edilemedi → göndericiye iade (yönetici; kanıt şartı yok) ve iade ücretinin eklenmesi */
   reportFailedDelivery(orderId: string, reason: FailedDeliveryReason, note: string): Promise<void>;
   subscribeOrders(onChange: () => void): () => void;
+  // Yazışma
+  listOrderMessages(orderId: string): Promise<OrderMessage[]>;
+  sendOrderMessage(orderId: string, body: string): Promise<void>;
+  subscribeOrderMessages(orderId: string, onChange: () => void): () => void;
   // Acil durum (SOS)
   listIncidents(filter: { openOnly?: boolean; limit?: number }): Promise<Incident[]>;
   acknowledgeIncident(id: string): Promise<void>;

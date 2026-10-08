@@ -233,6 +233,10 @@ fs.mkdirSync(out, { recursive: true });
   await page.getByTestId("dispatch-result").locator("..").getByRole("link", { name: "Sipariş" }).first().click();
   await page.getByTestId("offers").getByText("Mehmet Kaya").waitFor();
   await page.getByTestId("offers").getByText(/Yanıt bekleniyor|Kabul etti/).waitFor();
+  // Yazışma: yönetici destek olarak yazar
+  await page.getByTestId("admin-chat-input").fill("Merhaba, alıcı 14:00'ten sonra ofiste");
+  await page.getByRole("button", { name: "Gönder" }).click();
+  await page.getByTestId("order-messages").getByText("Merhaba, alıcı 14:00'ten sonra ofiste").waitFor();
   await shot("06d1-teklif");
   await shot("06d-otomasyon");
 

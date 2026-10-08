@@ -5,6 +5,7 @@
  * Tüm mesajlar bilgilendirme amaçlıdır (İYS ticari ileti onayı gerektirmez).
  */
 import { BRAND } from "./brand.ts";
+import { messagePreview, type MessageRole } from "./messages.ts";
 import { FAILED_DELIVERY_REASONS, type FailedDeliveryReason, type OrderStatus } from "./orders.ts";
 
 export type Channel = "push" | "whatsapp" | "sms";
@@ -42,6 +43,8 @@ export interface NotificationOrder {
   /** Teslim edilemedi nedeni ve iade teslim alan */
   failedReason?: FailedDeliveryReason | null;
   returnReceiverName?: string | null;
+  /** Mesaj bildiriminde son mesaj (notifications.kind mesaj_*) */
+  lastMessage?: { senderRole: MessageRole; body: string } | null;
   /** Teslim kodu istenen siparişte alıcıya gönderilen 4 haneli kod */
   deliveryCode?: string | null;
   /**
@@ -204,7 +207,7 @@ export function buildNotifications(event: OrderStatus, o: NotificationOrder, cfg
 }
 
 /** Durum değişikliği dışındaki sipariş olayları (notifications.kind) */
-export type NotificationKind = "varis_alis" | "varis_teslim";
+export type NotificationKind = "varis_alis" | "varis_teslim" | "mesaj_musteri" | "mesaj_kurye";
 
 const digits = (p: string | null | undefined) => (p ?? "").replace(/\D/g, "").slice(-10);
 
@@ -252,6 +255,17 @@ export function buildEventNotifications(kind: NotificationKind, o: NotificationO
         });
       }
       out.push({ to: customer, channels: ["push"], title: "Kurye teslim adresinde", text: `${o.orderNo}: kurye teslim adresine ulaştı.` });
+      break;
+    }
+    case "mesaj_musteri":
+    case "mesaj_kurye": {
+      const m = o.lastMessage;
+      if (!m) break;
+      const from = m.senderRole === "admin" ? BRAND.name : m.senderRole === "kurye" ? `Kuryeniz ${courierName}` : "Müşteri";
+      const to: Recipient | null =
+        kind === "mesaj_musteri" ? customer : o.courier ? { role: "courier", phone: null, pushToken: o.courier.pushToken } : null;
+      // Yalnız push: sohbet SMS'e düşmez
+      if (to) out.push({ to, channels: ["push"], title: `${from} · ${o.orderNo}`, text: messagePreview(m.body) });
       break;
     }
   }

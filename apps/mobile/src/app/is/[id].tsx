@@ -167,6 +167,14 @@ export default function IsDetay() {
       </Card>
 
       {s !== "teslim_edildi" && s !== "iptal" && s !== "geri_teslim" ? <JobMap order={order} /> : null}
+      {!offerPending && ["kuryeye_atandi", "alindi", "yolda", "sorunlu", "geri_donuyor"].includes(s) ? (
+        <Button
+          title="Müşteriye yaz"
+          variant="secondary"
+          onPress={() => router.push({ pathname: "/mesajlar/[id]", params: { id, role: "kurye" } })}
+          testID="open-chat"
+        />
+      ) : null}
 
       <Stop
         title="1 · ALIŞ"

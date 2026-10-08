@@ -3,7 +3,7 @@
 // Not: Nihai metinler bir hukukçu tarafından gözden geçirilmelidir.
 import { BRAND } from "./brand.ts";
 
-export const KVKK_VERSION = "2026-10-08";
+export const KVKK_VERSION = "2026-10-12";
 
 export const COMPANY = {
   title: "YAZGAN TEKNOLOJİ LOJİSTİK TİCARET VE SANAYİ LTD. ŞTİ.",
@@ -16,7 +16,8 @@ export const AYDINLATMA_METNI = `${COMPANY.title} ("${BRAND.name}") olarak, 6698
 • Kimlik ve iletişim: ad-soyad, cep telefonu, e-posta
 • Gönderi bilgileri: alış ve teslim adresleri, adres konumları, alıcı/gönderici adı ve telefonu, paket açıklaması
 • İşlem bilgileri: sipariş geçmişi, ödeme ve fatura bilgileri
-• Teslim kanıtı: teslim fotoğrafı, alıcı imzası ve adı
+• Teslim kanıtı: teslim fotoğrafı, alıcı imzası ve adı; teslim edilemezse adresin fotoğrafı
+• Yazışmalar: kuryeyle uygulama içinden sipariş üzerine yazışmalar (iş bitiminden 90 gün sonra silinir)
 
 2. Amaçlar
 Kurye hizmetinin sunulması, fiyatın hesaplanması, teslimatın takibi ve kanıtlanması, faturalandırma, müşteri desteği, yasal yükümlülüklerin (6475 sayılı Posta Hizmetleri Kanunu ve BTK düzenlemeleri, vergi mevzuatı) yerine getirilmesi.
@@ -43,9 +44,11 @@ export const KURYE_AYDINLATMA_METNI = `${COMPANY.title} olarak, kurye hizmetinin
 • Kimlik ve iletişim: ad-soyad, telefon, araç plakası
 • Vardiya kayıtları: başlangıç/bitiş zamanı ve konumu — 6475 sayılı Kanun ve BTK düzenlemeleri gereği kurye çalışma saatlerinin kayıt altına alınması (hukuki yükümlülük, KVKK m.5/2-ç)
 • Konum: YALNIZCA vardiya açıkken; iş atama, müşteriye canlı takip ve teslimat güvenliği için (sözleşmenin ifası ve meşru menfaat, KVKK m.5/2-c ve f). Vardiya kapandığında konum toplanmaz.
-• Teslim kanıtları: teslim fotoğrafı ve alıcı imzası
+• Teslim kanıtları: teslim fotoğrafı ve alıcı imzası; teslim edilemeyen işte adres fotoğrafı ve arama sayısı
+• İş kayıtları: iş teklifi yanıtları, adrese varış zamanları (bekleme ölçümü), mola kayıtları, müşteriyle yazışmalar
+• Acil durum: SOS bildirdiğinizde tür, not ve o anki konumunuz — güvenliğiniz için (hayati menfaat ve meşru menfaat, KVKK m.5/2-b ve f)
 
-Konum geçmişi en fazla 6 ay, vardiya kayıtları mevzuatın öngördüğü süre boyunca saklanır. KVKK m.11 kapsamındaki haklarınız için ${COMPANY.address} adresine başvurabilirsiniz.`;
+Molada elinizde iş yoksa konum toplanmaz. Konum geçmişi en fazla 6 ay, vardiya kayıtları mevzuatın öngördüğü süre boyunca saklanır. KVKK m.11 kapsamındaki haklarınız için ${COMPANY.address} adresine başvurabilirsiniz.`;
 
 export const KURYE_KONUM_ONAYI = `Vardiyam açıkken konumumun işlenmesi ve aktif teslimat süresince müşteriyle paylaşılması hakkında bilgilendirildim.`;
 
@@ -61,6 +64,8 @@ Toplanan veriler
 • Kuryeler: vardiya süresince konum, vardiya başlangıç/bitiş zamanları, teslim fotoğrafı ve alıcı imzası
 • Cihaz: bildirim gönderebilmek için push bildirim anahtarı
 • Asistan: WhatsApp, telefon veya e-posta asistanıyla yapılan yazışmalar
+• Sipariş yazışmaları: uygulama içinde kurye ile müşteri arasındaki mesajlar (90 gün saklanır)
+• Kurye iş kayıtları: teklif yanıtları, varış zamanları, molalar ve acil durum bildirimleri (konum dahil)
 • Değerlendirme: teslimattan sonra verdiğiniz puan ve yorum
 • Web formları: kurumsal başvuru/iletişim formunda verdiğiniz ad, firma, telefon, e-posta ve mesaj; kurye başvurusunda başvuru bilgileri ve yüklediğiniz belgeler
 • Kurumsal API: API ile gönderilen sipariş bilgileri ve dış referans numaraları

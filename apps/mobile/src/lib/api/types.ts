@@ -165,6 +165,18 @@ export interface CourierEarnings {
   rates: { perJobKurus: number; perKmKurus: number } | null;
 }
 
+/** Sipariş yazışması */
+export interface ChatMessage {
+  id: string;
+  senderRole: "musteri" | "kurye" | "admin";
+  body: string;
+  createdAt: string;
+  /** Bu cihazdaki kullanıcı mı yazdı */
+  mine: boolean;
+  /** Karşı taraf okudu mu */
+  readAt: string | null;
+}
+
 /** Kuryenin açık acil durum kaydı */
 export interface Incident {
   id: string;
@@ -265,4 +277,10 @@ export interface Api {
   /** Kuryenin kendi belgeleri (yönetici girer) */
   courierDocuments(): Promise<CourierDocument[]>;
   subscribeCourierJobs(onChange: () => void): () => void;
+  // Mesajlaşma (sipariş üzerinden; telefon numarası paylaşmadan)
+  listMessages(orderId: string): Promise<ChatMessage[]>;
+  sendMessage(orderId: string, body: string): Promise<void>;
+  /** Bu kullanıcıya gelen mesajları okundu işaretler */
+  markMessagesRead(orderId: string): Promise<void>;
+  subscribeMessages(orderId: string, onChange: () => void): () => void;
 }

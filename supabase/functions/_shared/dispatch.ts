@@ -83,10 +83,23 @@ export async function handleNotifyDispatch(
         .eq("id", n.order_id)
         .single();
       if (oErr || !order) throw new Error(`Sipariş okunamadı: ${oErr?.message}`);
+      const no = toNotificationOrder(order);
+      if (typeof n.kind === "string" && n.kind.startsWith("mesaj_")) {
+        // Mesaj bildirimi: o tarafa yazan son mesaj
+        const { data: last } = await ctx.admin
+          .from("order_messages")
+          .select("sender_role, body")
+          .eq("order_id", n.order_id)
+          .in("sender_role", n.kind === "mesaj_musteri" ? ["kurye", "admin"] : ["musteri", "admin"])
+          .order("created_at", { ascending: false })
+          .limit(1);
+        const m = ((last ?? []) as Row[])[0];
+        no.lastMessage = m ? { senderRole: m.sender_role, body: m.body } : null;
+      }
       const messages =
         n.kind && n.kind !== "durum"
-          ? buildEventNotifications(n.kind as NotificationKind, toNotificationOrder(order), cfg)
-          : buildNotifications(n.event as OrderStatus, toNotificationOrder(order), cfg);
+          ? buildEventNotifications(n.kind as NotificationKind, no, cfg)
+          : buildNotifications(n.event as OrderStatus, no, cfg);
       results = await Promise.all(messages.map((m) => deliver(m, deps)));
       const failed = results.filter((r) => !r.ok);
       if (!messages.length) status = "skipped";

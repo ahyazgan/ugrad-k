@@ -484,6 +484,40 @@ export function createSupabaseApi(url: string, anonKey: string): Api & { client:
       fail(error, "Belgeler okunamadı");
       return (data ?? []).map((r: Row) => ({ kind: r.kind, number: r.doc_number, expiresAt: r.expires_at }));
     },
+    async listMessages(orderId) {
+      const me = await uid();
+      const { data, error } = await client
+        .from("order_messages")
+        .select("id, sender_id, sender_role, body, created_at, read_at")
+        .eq("order_id", orderId)
+        .order("created_at", { ascending: true })
+        .limit(500);
+      fail(error, "Mesajlar okunamadı");
+      return (data ?? []).map((r: Row) => ({
+        id: String(r.id),
+        senderRole: r.sender_role,
+        body: r.body,
+        createdAt: r.created_at,
+        mine: r.sender_id === me,
+        readAt: r.read_at,
+      }));
+    },
+    async sendMessage(orderId, body) {
+      const { error } = await client.rpc("send_order_message", { p_order_id: orderId, p_body: body });
+      if (error) throw new ApiError(error.message);
+    },
+    async markMessagesRead(orderId) {
+      await client.rpc("mark_messages_read", { p_order_id: orderId });
+    },
+    subscribeMessages(orderId, onChange) {
+      const channel = client
+        .channel(`messages-${orderId}`)
+        .on("postgres_changes", { event: "*", schema: "public", table: "order_messages", filter: `order_id=eq.${orderId}` }, onChange)
+        .subscribe();
+      return () => {
+        client.removeChannel(channel);
+      };
+    },
     subscribeCourierJobs(onChange) {
       let channel: ReturnType<typeof client.channel> | null = null;
       let closed = false;

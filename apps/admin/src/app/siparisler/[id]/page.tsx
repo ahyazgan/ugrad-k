@@ -15,6 +15,7 @@ import {
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
+import { OrderMessages } from "@/components/OrderMessages";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Button, Card, ErrorText, Input, PageHeader, Select } from "@/components/ui";
 import { fmtDateTime, fmtTime } from "@/lib/dates";
@@ -400,6 +401,7 @@ export default function SiparisDetayPage() {
               </ol>
             </Card>
           ) : null}
+          {order.courierId ? <OrderMessages orderId={order.id} /> : null}
           <Card title="Geçmiş">
             <ol className="space-y-2 text-sm">
               {order.history.map((h, i) => (

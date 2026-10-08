@@ -60,6 +60,8 @@ export async function handleAutoDispatch(
   summary.autoBreaks = await autoBreakUnresponsive(ctx, deps, ops);
   summary.breakAlerts = await alertLongBreaks(ctx, deps, ops, now);
   summary.sosResent = await resendUnacknowledgedSos(ctx, deps, now);
+  // Saklama süresi dolan yazışmalar (90 gün)
+  await ctx.admin.rpc("purge_old_messages");
   if (!ops.auto_assign) {
     summary.slaAlerted = await checkUrgentSla(ctx, deps, now);
     return json(summary);

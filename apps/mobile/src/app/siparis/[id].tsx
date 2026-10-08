@@ -1,5 +1,5 @@
 import { FAILED_DELIVERY_REASONS, ORDER_STATUS_LABELS, ageLabel, etaAt, formatTL, istanbulTime, slaState, trackingBaseUrl, type OrderStatus } from "@yazgan/shared";
-import { useLocalSearchParams } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import { Linking, Pressable, Share, Text, TextInput, View } from "react-native";
 import { StatusBadge } from "@/components/StatusBadge";
@@ -274,6 +274,14 @@ export default function SiparisDetay() {
           ) : null}
           {(order.status === "yolda" || order.status === "sorunlu") && order.arrivedDropoffAt ? (
             <Text style={{ color: colors.success, fontWeight: "600" }}>📍 Kurye teslim adresinde ({formatTime(order.arrivedDropoffAt)})</Text>
+          ) : null}
+          {["kuryeye_atandi", "alindi", "yolda", "sorunlu", "geri_donuyor"].includes(order.status) ? (
+            <Button
+              title="Kuryeye yaz"
+              variant="secondary"
+              onPress={() => router.push({ pathname: "/mesajlar/[id]", params: { id: order.id, role: "musteri" } })}
+              testID="open-chat"
+            />
           ) : null}
           {order.courierPhone ? (
             <Button title="Kuryeyi ara" variant="secondary" onPress={() => Linking.openURL(`tel:${order.courierPhone}`)} />

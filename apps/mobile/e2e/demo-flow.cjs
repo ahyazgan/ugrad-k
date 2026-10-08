@@ -71,6 +71,16 @@ fs.mkdirSync(out, { recursive: true });
   await page.getByText(/Kurye konumu · az önce/).waitFor();
   if (!tiles.count) throw new Error('harita karoları istenmedi');
   await shot('09-siparis-ilerledi');
+  // Kuryeye yaz: mesaj gider, kurye cevap verir
+  await tid('open-chat').click();
+  await tid('chat-input').fill('Merhaba, resepsiyon 3. katta');
+  await tid('chat-send').click();
+  await page.getByText('Merhaba, resepsiyon 3. katta').waitFor();
+  await page.getByText('Tamam, 5 dakika içinde oradayım').waitFor();
+  await page.getByText(/okundu/).waitFor();
+  await shot('09a-mesaj');
+  await page.goBack();
+  await page.getByText('Kuryeniz:', { exact: false }).waitFor();
   console.log('DURUM:', (await page.locator('body').innerText()).match(/YK-\d+[\s\S]{0,40}/)?.[0]?.replace(/\n/g,' | '));
   if (errors.length) throw new Error('Tarayıcı hataları: ' + JSON.stringify(errors.slice(0, 10)));
   // Geri tuşu müşteri sekmelerine dönmeli (giriş ekranına değil)
@@ -154,6 +164,14 @@ fs.mkdirSync(out, { recursive: true });
   await kt('tile-map').waitFor();
   await kt('marker-pickup').waitFor();
   await kt('marker-dropoff').waitFor();
+  // Müşteriye yaz: hazır cevap
+  await kt('open-chat').click();
+  await kt('quick-Kapıdayım').click();
+  await kp.getByText('Tamam, teşekkürler').waitFor();
+  await kp.getByText(/okundu/).waitFor();
+  await kshot('11a-kurye-mesaj');
+  await kp.goBack();
+  await kt('arrive-pickup').waitFor();
   // Varış: "Vardım" sonrası bekleme otomatik ölçülür, elle giriş kalkar
   await kt('waiting').waitFor();
   await kt('arrive-pickup').click();

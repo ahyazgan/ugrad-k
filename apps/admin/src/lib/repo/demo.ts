@@ -39,6 +39,7 @@ import {
   type EarningRow,
   type PromoCodeRow,
   type Incident,
+  type OrderMessage,
   type ReadinessItem,
   type Conversation,
   type Customer,
@@ -67,6 +68,7 @@ interface State {
   orders: AdminOrderDetail[];
   shifts: Shift[];
   incidents: Incident[];
+  messages: Array<OrderMessage & { orderId: string }>;
   invoices: Invoice[];
   conversations: Conversation[];
   ops: OpsSettings;
@@ -449,9 +451,18 @@ async function seed(): Promise<State> {
       resolutionNote: "Kurye arandı, yaralanma yok; iş yeniden atandı",
     },
   ];
+  // Örnek yazışma: teklif geçmişi olan son teslimatta
+  const chatOrder = orders.filter((o) => o.offers.length).at(-1);
+  const messages: Array<OrderMessage & { orderId: string }> = chatOrder
+    ? [
+        { id: "msg-1", orderId: chatOrder.id, senderRole: "kurye", body: "Kapıdayım", createdAt: chatOrder.arrivedDropoffAt ?? chatOrder.createdAt, readAt: chatOrder.arrivedDropoffAt },
+        { id: "msg-2", orderId: chatOrder.id, senderRole: "musteri", body: "Resepsiyona bırakabilirsiniz", createdAt: chatOrder.arrivedDropoffAt ?? chatOrder.createdAt, readAt: chatOrder.arrivedDropoffAt },
+      ]
+    : [];
   return {
     signedIn: false,
     incidents,
+    messages,
     ops: {
       unpaidCardTimeoutMinutes: 30,
       autoApprove: true,
@@ -762,6 +773,24 @@ export function createDemoRepo(): AdminRepo {
       touchOrders();
     },
     subscribeOrders(cb) {
+      orderListeners.add(cb);
+      return () => orderListeners.delete(cb);
+    },
+    async listOrderMessages(orderId) {
+      return clone(
+        (await get()).messages
+          .filter((m) => m.orderId === orderId)
+          .map((m) => ({ id: m.id, senderRole: m.senderRole, body: m.body, createdAt: m.createdAt, readAt: m.readAt })),
+      );
+    },
+    async sendOrderMessage(orderId, body) {
+      const text = body.trim();
+      if (!text || text.length > 1000) throw new RepoError("Mesaj 1–1000 karakter olmalı");
+      const s = await get();
+      s.messages.push({ id: `msg-${s.messages.length + 1}`, orderId, senderRole: "admin", body: text, createdAt: new Date().toISOString(), readAt: null });
+      touchOrders();
+    },
+    subscribeOrderMessages(_orderId, cb) {
       orderListeners.add(cb);
       return () => orderListeners.delete(cb);
     },

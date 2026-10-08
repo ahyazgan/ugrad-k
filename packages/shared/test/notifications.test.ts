@@ -117,4 +117,15 @@ describe("buildNotifications", () => {
     const back = buildNotifications("geri_teslim", { ...order, status: "geri_teslim", returnReceiverName: "Ayşe" }, cfg);
     expect(back[0]!.text).toContain("geri teslim edildi (teslim alan: Ayşe)");
   });
+
+  it("mesaj: karşı tarafa yalnız push, kısa önizleme", () => {
+    const withPush = { ...order, status: "yolda" as const, customer: { ...order.customer, pushToken: "c" } };
+    const toCustomer = buildEventNotifications("mesaj_musteri", { ...withPush, lastMessage: { senderRole: "kurye", body: "Kapıdayım" } }, cfg);
+    expect(toCustomer).toEqual([{ to: { role: "customer", phone: "+905321112233", pushToken: "c" }, channels: ["push"], title: "Kuryeniz Mehmet · YK-1001", text: "Kapıdayım" }]);
+    const toCourier = buildEventNotifications("mesaj_kurye", { ...withPush, lastMessage: { senderRole: "musteri", body: "x".repeat(300) } }, cfg);
+    expect(toCourier[0]!.to.role).toBe("courier");
+    expect(toCourier[0]!.text).toHaveLength(120);
+    // Push token yoksa SMS'e düşmez
+    expect(buildEventNotifications("mesaj_musteri", { ...order, lastMessage: { senderRole: "kurye", body: "a" } }, cfg)).toEqual([]);
+  });
 });

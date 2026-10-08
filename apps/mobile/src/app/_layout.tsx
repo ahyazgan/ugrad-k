@@ -35,6 +35,7 @@ export default function RootLayout() {
             <Stack.Screen name="is/[id]" options={{ title: "İş detayı" }} />
             <Stack.Screen name="teslim/[id]" options={{ title: "Teslim et" }} />
             <Stack.Screen name="sos" options={{ title: "Acil durum" }} />
+            <Stack.Screen name="mesajlar/[id]" options={{ title: "Mesajlar" }} />
           </Stack>
         </OrderDraftProvider>
       </SessionProvider>

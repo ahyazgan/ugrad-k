@@ -39,6 +39,7 @@ Kodun tamamı yazıldı ve testlerden geçti. Bu rehber, sistemi **gerçek hesap
 32. [Acil durum (SOS)](#32-acil-durum-sos)
 33. [Teslim edilemedi → göndericiye iade](#33-teslim-edilemedi--göndericiye-iade)
 34. [Durak sırası](#34-durak-sırası)
+35. [Uygulama içi mesajlaşma](#35-uygulama-içi-mesajlaşma)
 
 ---
 
@@ -492,3 +493,11 @@ Kayıtlı müşteriler `siparis@<alan adı>` adresine yazar; yapay zeka asistan�
 - *Sıradakine git* telefonun haritasında ilk durağı, *Tüm rota* Google Haritalar'da tüm durakları sırayla açar. Kart, sıra bir acil taahhüdü kaçıracaksa uyarır.
 - Panel → Canlı harita'da her kuryenin *Sıradaki* durağı görünür.
 - Sıra öneridir; kurye istediği işi açıp ilerleyebilir. Otomatik atama kurye başına en fazla iş sayısını (Otomasyon → *Kurye başına en fazla aktif iş*) aşmaz.
+
+## 35. Uygulama içi mesajlaşma
+
+- **Müşteri** sipariş ekranında *Kuryeye yaz*, **kurye** iş ekranında *Müşteriye yaz*: sipariş üzerinden yazışma, hazır cevaplar ("Kapıdayım", "5 dakika içinde oradayım", "Resepsiyona bırakabilirsiniz"…), okundu bilgisi. Telefon numarası paylaşmak gerekmez.
+- Yazışma kurye işi kabul ettiğinde açılır, iş bittikten 2 saat sonra kapanır; kişi başı saatte en fazla 30 mesaj. Yeni mesajda karşı tarafa **yalnız push** bildirimi gider (SMS ücreti yok).
+- **Panel**: sipariş detayında *Mesajlar* kartı; yönetici tüm yazışmayı canlı görür ve "destek" olarak ikisine birden yazabilir.
+- **KVKK**: yazışmalar tamamlanan/iptal siparişlerde 90 gün sonra otomatik silinir (§6 `otomatik-dagitim`). Aydınlatma metninde "sipariş yazışmaları" veri kategorisi olarak belirtilmeli.
+- **Numara gizleme (maskeli arama)**: arama için hâlâ gerçek numara kullanılır. İstenirse Netgsm Sanal Santral / numara maskeleme hizmeti alınarak "Ara" düğmeleri ara numaraya yönlendirilebilir (hesap ve sözleşme sizde).
