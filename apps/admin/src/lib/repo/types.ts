@@ -11,6 +11,7 @@ import type {
   CostModel,
   CourierDocumentKind,
   IncidentKind,
+  Incentive,
   PerformanceStats,
   PricingSettings,
   Promo,
@@ -86,12 +87,37 @@ export interface CourierPayout {
   untilAt: string;
   deliveryCount: number;
   earningsKurus: number;
+  /** Hesaplaşmaya giren hedef primleri */
+  incentiveKurus: number;
   cashKurus: number;
-  /** Kuryeye ödenen net; eksi ise kurye şirkete ödedi */
+  /** Kuryeye ödenen net (hakediş + prim − nakit); eksi ise kurye şirkete ödedi */
   netKurus: number;
   note: string | null;
   createdAt: string;
   cancelledAt: string | null;
+}
+
+/** Kurye prim kampanyası (packages/shared/incentives.ts) */
+export interface CourierIncentive extends Incentive {
+  id: string;
+  active: boolean;
+  createdAt: string;
+}
+
+/** Kapanan dönem için hesaplanmış prim (compute_incentive_awards) */
+export interface IncentiveAward {
+  id: string;
+  incentiveId: string;
+  incentiveTitle: string;
+  courierId: string;
+  courierName: string | null;
+  periodStart: string;
+  periodEnd: string;
+  achieved: number;
+  amountKurus: number;
+  detail: string | null;
+  payoutId: string | null;
+  createdAt: string;
 }
 
 /** Teslim edilmiş ama ödemesi gelmemiş kuryeye ödemeli sipariş */
@@ -603,8 +629,8 @@ export interface AdminRepo {
   // Hakediş ve tahsilat
   getCostModel(): Promise<CostModel>;
   saveCostModel(m: CostModel): Promise<void>;
-  /** Teslim edilen siparişlerin hakedişlerini hemen yazar (normalde 5 dakikada bir otomatik) */
-  runCourierEarnings(): Promise<{ written: number }>;
+  /** Teslim edilen siparişlerin hakedişlerini ve kapanan dönemlerin primlerini hemen yazar (normalde 5 dakikada bir otomatik) */
+  runCourierEarnings(): Promise<{ written: number; awards: number }>;
   listEarnings(filter: { unpaidOnly?: boolean; courierId?: string; payoutId?: string }): Promise<EarningRow[]>;
   listPayouts(): Promise<CourierPayout[]>;
   createPayout(courierId: string, note?: string): Promise<CourierPayout>;
@@ -612,6 +638,11 @@ export interface AdminRepo {
   listReceivables(): Promise<Receivable[]>;
   /** Kuryeye ödemeli siparişin ödemesi (IBAN veya sonradan nakit) alındı */
   markOrderPaid(orderId: string): Promise<void>;
+  // Kurye primleri
+  listIncentives(): Promise<CourierIncentive[]>;
+  createIncentive(i: Incentive): Promise<void>;
+  setIncentiveActive(id: string, active: boolean): Promise<void>;
+  listIncentiveAwards(filter: { unpaidOnly?: boolean; payoutId?: string }): Promise<IncentiveAward[]>;
   // Kampanyalar
   listPromoCodes(): Promise<PromoCodeRow[]>;
   createPromoCode(p: Omit<Promo, "active" | "customerId">): Promise<void>;

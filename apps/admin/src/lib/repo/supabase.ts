@@ -27,7 +27,9 @@ import {
   type Courier,
   type CourierApplication,
   type CourierDocumentRecord,
+  type CourierIncentive,
   type CourierPayout,
+  type IncentiveAward,
   type EarningRow,
   type PromoCodeRow,
   type Invoice,
@@ -113,11 +115,43 @@ const toPayout = (r: Row): CourierPayout => ({
   untilAt: r.until_at,
   deliveryCount: r.delivery_count,
   earningsKurus: r.earnings_kurus,
+  incentiveKurus: r.incentive_kurus ?? 0,
   cashKurus: r.cash_kurus,
   netKurus: r.net_kurus,
   note: r.note,
   createdAt: r.created_at,
   cancelledAt: r.cancelled_at,
+});
+
+const toIncentive = (r: Row): CourierIncentive => ({
+  id: r.id,
+  title: r.title,
+  kind: r.kind,
+  period: r.period,
+  tiers: r.tiers ?? [],
+  bonusPct: r.bonus_pct == null ? null : Number(r.bonus_pct),
+  weekdays: r.weekdays ?? null,
+  startHour: r.start_hour,
+  endHour: r.end_hour,
+  startsOn: r.starts_on,
+  endsOn: r.ends_on,
+  active: r.active,
+  createdAt: r.created_at,
+});
+
+const toAward = (r: Row): IncentiveAward => ({
+  id: r.id,
+  incentiveId: r.incentive_id,
+  incentiveTitle: r.incentive?.title ?? "Prim",
+  courierId: r.courier_id,
+  courierName: r.courier?.profile?.full_name ?? null,
+  periodStart: r.period_start,
+  periodEnd: r.period_end,
+  achieved: r.achieved,
+  amountKurus: r.amount_kurus,
+  detail: r.detail,
+  payoutId: r.payout_id,
+  createdAt: r.created_at,
 });
 
 const toCorporate = (r: Row): CorporateAccount => ({
@@ -911,7 +945,8 @@ export function createSupabaseRepo(url: string, anonKey: string): AdminRepo & { 
       );
     },
     async runCourierEarnings() {
-      return invoke<{ written: number }>("courier-earnings", {});
+      const r = await invoke<{ written: number; awards?: number }>("courier-earnings", {});
+      return { written: r.written, awards: r.awards ?? 0 };
     },
     async listEarnings({ unpaidOnly, courierId, payoutId }) {
       let q = client
@@ -974,6 +1009,43 @@ export function createSupabaseRepo(url: string, anonKey: string): AdminRepo & { 
           .eq("id", orderId),
         "Ödeme kaydedilemedi",
       );
+    },
+
+    async listIncentives() {
+      const res = await client.from("courier_incentives").select("*").order("created_at", { ascending: false }).limit(200);
+      return (check(res, "Primler okunamadı") ?? []).map(toIncentive);
+    },
+    async createIncentive(i) {
+      const { data } = await client.auth.getSession();
+      check(
+        await client.from("courier_incentives").insert({
+          title: i.title.trim(),
+          kind: i.kind,
+          period: i.period,
+          tiers: i.kind === "hedef" ? i.tiers : [],
+          bonus_pct: i.kind === "yuzde" ? i.bonusPct : null,
+          weekdays: i.weekdays,
+          start_hour: i.startHour,
+          end_hour: i.endHour,
+          starts_on: i.startsOn,
+          ends_on: i.endsOn,
+          created_by: data.session?.user.id ?? null,
+        }),
+        "Prim kaydedilemedi",
+      );
+    },
+    async setIncentiveActive(id, active) {
+      check(await client.from("courier_incentives").update({ active }).eq("id", id), "Prim güncellenemedi");
+    },
+    async listIncentiveAwards({ unpaidOnly, payoutId }) {
+      let q = client
+        .from("courier_incentive_awards")
+        .select("*, incentive:courier_incentives(title), courier:couriers(profile:profiles(full_name))")
+        .order("period_start", { ascending: false })
+        .limit(1000);
+      if (unpaidOnly) q = q.is("payout_id", null);
+      if (payoutId) q = q.eq("payout_id", payoutId);
+      return (check(await q, "Prim ödülleri okunamadı") ?? []).map(toAward);
     },
 
     async listPromoCodes() {

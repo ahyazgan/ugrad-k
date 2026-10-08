@@ -563,6 +563,33 @@ export function createDemoApi(): Api {
     async myPerformance() {
       return { offersAccepted: 23, offersDeclined: 1, offersTimedOut: 2, delivered: 31, urgentDelivered: 8, urgentOnTime: 7, ratingCount: 11, ratingAvg: 4.7, released: 1, failedDeliveries: 0, shiftsBooked: 10, shiftsAttended: 9, lateCancels: 0 };
     },
+    async myIncentives() {
+      requireSession();
+      const today = istanbulDay(new Date());
+      const doneToday = [...orders.values()].filter((o) => o.courierName === "Demo Kurye" && o.status === "teslim_edildi").length;
+      return [
+        {
+          id: "demo-inc-1",
+          title: "Günlük hedef",
+          kind: "hedef" as const,
+          period: "gunluk" as const,
+          tiers: [
+            { target: 8, rewardKurus: 10_000 },
+            { target: 12, rewardKurus: 25_000 },
+          ],
+          bonusPct: null,
+          weekdays: null,
+          startHour: 0,
+          endHour: 24,
+          startsOn: today,
+          endsOn: null,
+          periodStart: today,
+          periodEnd: today,
+          jobs: 5 + doneToday,
+          earningKurus: 0,
+        },
+      ];
+    },
     async courierEarnings() {
       requireSession();
       const items = [...orders.values()]
@@ -579,9 +606,12 @@ export function createDemoApi(): Api {
           };
         })
         .sort((a, b) => b.deliveredAt.localeCompare(a.deliveredAt));
+      const yesterday = istanbulDay(new Date(Date.now() - 86_400_000));
+      const incentives = [{ id: "demo-award-1", title: "Günlük hedef", periodStart: yesterday, periodEnd: yesterday, amountKurus: 10_000, detail: "9 iş" }];
       return {
-        unpaid: courierBalance(items),
+        unpaid: courierBalance(items, 10_000),
         items,
+        incentives,
         payouts: [],
         rates: { perJobKurus: DEFAULT_COST_MODEL.courierPerJobKurus, perKmKurus: DEFAULT_COST_MODEL.courierPerKmKurus },
       };

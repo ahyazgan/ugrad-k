@@ -70,6 +70,7 @@ describe("courierEarning", () => {
       deliveries: 2,
       earningsKurus: 51_000,
       cashKurus: 48_000,
+      incentiveKurus: 0,
       netKurus: 3_000,
     });
   });

@@ -116,6 +116,8 @@ export function estimateJobCost(
 }
 
 export interface CourierBalance {
+  /** Ödenmemiş hedef primleri */
+  incentiveKurus: number;
   deliveries: number;
   earningsKurus: number;
   /** Kuryenin müşteriden nakit tahsil edip elinde tuttuğu tutar */
@@ -125,10 +127,11 @@ export interface CourierBalance {
 }
 
 /** Ödenmemiş hakediş satırlarından kurye bakiyesi: hakediş − elindeki nakit */
-export function courierBalance(rows: Array<{ totalKurus: number; cashCollectedKurus: number }>): CourierBalance {
+export function courierBalance(rows: Array<{ totalKurus: number; cashCollectedKurus: number }>, incentiveKurus = 0): CourierBalance {
   const earningsKurus = rows.reduce((s, r) => s + r.totalKurus, 0);
   const cashKurus = rows.reduce((s, r) => s + r.cashCollectedKurus, 0);
-  return { deliveries: rows.length, earningsKurus, cashKurus, netKurus: earningsKurus - cashKurus };
+  // Hedef primleri hakedişe eklenir (courier_incentive_awards)
+  return { deliveries: rows.length, earningsKurus, cashKurus, incentiveKurus, netKurus: earningsKurus + incentiveKurus - cashKurus };
 }
 
 /** Para alanları (köprü hariç: resmi tarife) enflasyon/endeks oranıyla güncellenir */

@@ -452,9 +452,30 @@ export function createSupabaseApi(url: string, anonKey: string): Api & { client:
       const r = ((data ?? []) as Row[])[0];
       return r ? performanceStatsFromRow(r) : null;
     },
+    async myIncentives() {
+      const { data, error } = await client.rpc("my_incentive_progress");
+      if (error) throw new ApiError(error.message);
+      return ((data ?? []) as Row[]).map((r) => ({
+        id: r.incentive_id,
+        title: r.title,
+        kind: r.kind,
+        period: r.period,
+        tiers: (r.tiers ?? []) as { target: number; rewardKurus: number }[],
+        bonusPct: r.bonus_pct == null ? null : Number(r.bonus_pct),
+        weekdays: r.weekdays ?? null,
+        startHour: r.start_hour,
+        endHour: r.end_hour,
+        startsOn: r.period_start,
+        endsOn: null,
+        periodStart: r.period_start,
+        periodEnd: r.period_end,
+        jobs: r.jobs,
+        earningKurus: r.earning_kurus,
+      }));
+    },
     async courierEarnings() {
       const id = await uid();
-      const [e, p, c] = await Promise.all([
+      const [e, p, c, a] = await Promise.all([
         client
           .from("courier_earnings")
           .select("order_id, delivered_at, km, total_kurus, cash_collected_kurus, order:orders(order_no)")
@@ -464,9 +485,26 @@ export function createSupabaseApi(url: string, anonKey: string): Api & { client:
           .limit(500),
         client.from("courier_payouts").select("*").eq("courier_id", id).is("cancelled_at", null).order("created_at", { ascending: false }).limit(10),
         client.from("cost_settings").select("courier_per_job_kurus, courier_per_km_kurus").eq("id", 1).maybeSingle(),
+        client
+          .from("courier_incentive_awards")
+          .select("id, period_start, period_end, amount_kurus, detail, incentive:courier_incentives(title)")
+          .eq("courier_id", id)
+          .is("payout_id", null)
+          .order("period_start", { ascending: false })
+          .limit(100),
       ]);
       fail(e.error, "Kazanç okunamadı");
       fail(p.error, "Hesaplaşmalar okunamadı");
+      fail(a.error, "Primler okunamadı");
+      const incentives = (a.data ?? []).map((r: Row) => ({
+        id: r.id,
+        // Kampanya pasifleştirilmiş olabilir (kurye yalnız etkin kampanyaları okur)
+        title: r.incentive?.title ?? "Hedef primi",
+        periodStart: r.period_start,
+        periodEnd: r.period_end,
+        amountKurus: r.amount_kurus,
+        detail: r.detail,
+      }));
       const items = (e.data ?? []).map((r: Row) => ({
         orderId: r.order_id,
         orderNo: r.order?.order_no ?? "",
@@ -476,9 +514,17 @@ export function createSupabaseApi(url: string, anonKey: string): Api & { client:
         cashCollectedKurus: r.cash_collected_kurus,
       }));
       return {
-        unpaid: courierBalance(items),
+        unpaid: courierBalance(items, incentives.reduce((t, i) => t + i.amountKurus, 0)),
         items,
-        payouts: (p.data ?? []).map((r: Row) => ({ id: r.id, createdAt: r.created_at, deliveryCount: r.delivery_count, netKurus: r.net_kurus, note: r.note })),
+        incentives,
+        payouts: (p.data ?? []).map((r: Row) => ({
+          id: r.id,
+          createdAt: r.created_at,
+          deliveryCount: r.delivery_count,
+          incentiveKurus: r.incentive_kurus ?? 0,
+          netKurus: r.net_kurus,
+          note: r.note,
+        })),
         rates: c.data ? { perJobKurus: c.data.courier_per_job_kurus, perKmKurus: c.data.courier_per_km_kurus } : null,
       };
     },

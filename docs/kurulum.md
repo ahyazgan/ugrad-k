@@ -528,3 +528,15 @@ Kayıtlı müşteriler `siparis@<alan adı>` adresine yazar; yapay zeka asistan�
 - **Otomatik atama**: 70 nötr; her 10 puan 1 km avantaj/dezavantaj (en fazla ±3 km). Yani yakın ama düşük puanlı kurye yerine biraz uzaktaki yüksek puanlı kurye seçilebilir.
 - **Panel**: Kuryeler → *Performans (30 gün)* sütunu; tıklayınca bileşenler. **Kurye**: Kazancım sekmesinde kendi puanı ve bileşenleri.
 - Puan prim veya ceza için tek başına kullanılmamalı; kuryeyle konuşurken bileşenlere bakın (ör. düşük kabul oranı uzak bölgeden kaynaklanabilir).
+
+## 39. Kurye hedef primleri
+
+- **Panel → Kurye primleri**: iki tür kampanya.
+  - *Hedef*: gün veya hafta (Pzt–Paz) içinde N iş → ödül; en fazla 5 kademe, ulaşılan **en yüksek** kademe ödenir (ör. 8 iş 100 TL, 12 iş 250 TL → 13 iş yapan 250 TL alır).
+  - *Yüzde ek*: kapsamdaki işlerin hakedişine +%X (ör. yağmurlu gün 16:00–20:00 %25, hafta sonu %20).
+- Kapsam: gün seçimi, saat aralığı ve tarih aralığı (İstanbul saati, işin tamamlandığı an). Göndericiye iade edilen iş de tamamlanmış sayılır.
+- Ödül **dönem kapanınca** yazılır: `courier-earnings` (5 dk cron) hakedişlerden sonra `compute_incentive_awards()` çalıştırır; son 14 günün kapanmış dönemlerine bakar, aynı dönem için ikinci kez yazmaz. Hakediş sayfasındaki *Hakedişleri güncelle* de hesaplar.
+- Primler hesaplaşmaya girer: **net = hakediş + prim − kuryedeki nakit** (`courier_payouts.incentive_kurus`). Hesaplaşma iptal edilirse primler yeniden ödenmemiş olur. Yalnız primi olan kurye de hesaplaşılabilir.
+- **Kurye**: Kazancım sekmesinde bugünün/bu haftanın ilerlemesi (ör. "bugün 6/8 iş · 2 iş daha → 100 TL") ve kazanılan primler.
+- Kampanyayı *Durdur*: kapanmamış dönem için ödül yazılmaz; kazanılmış primler kalır. Kural değiştirmek için durdurup yenisini açın (geçmiş ödüller eski kurala göre kalır).
+- Bütçe: hedef primleri iş başı maliyeti artırır; Fiyatlar → maliyet simülasyonunda marjı kontrol edin.

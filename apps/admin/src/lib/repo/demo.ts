@@ -12,7 +12,12 @@ import {
   calculateMonthlyInvoice,
   courierCompliance,
   courierEarning,
+  closedIncentivePeriods,
   DEFAULT_COST_MODEL,
+  formatTL,
+  inIncentiveScope,
+  incentiveAwardKurus,
+  incentiveProblem,
   istanbulDay,
   monthlyInvoiceItem,
   mockMapsProvider,
@@ -35,7 +40,9 @@ import {
   type CorporateAccount,
   type Courier,
   type CourierDocumentRecord,
+  type CourierIncentive,
   type CourierPayout,
+  type IncentiveAward,
   type EarningRow,
   type PromoCodeRow,
   type Incident,
@@ -87,6 +94,8 @@ interface State {
   documents: CourierDocumentRecord[];
   earnings: EarningRow[];
   payouts: CourierPayout[];
+  incentives: CourierIncentive[];
+  awards: IncentiveAward[];
 }
 
 /** Acil siparişte 60 dk taahhüt (veritabanındaki orders_sla tetikleyicisiyle aynı kural, demo) */
@@ -383,6 +392,7 @@ async function seed(): Promise<State> {
       untilAt: paidUntil,
       deliveryCount: old.length,
       earningsKurus: sum((e) => e.totalKurus),
+      incentiveKurus: 0,
       cashKurus: sum((e) => e.cashCollectedKurus),
       netKurus: sum((e) => e.totalKurus - e.cashCollectedKurus),
       note: "Havale",
@@ -628,6 +638,43 @@ async function seed(): Promise<State> {
     documents: demoDocuments(),
     earnings,
     payouts,
+    incentives: [
+      {
+        id: "inc-1",
+        title: "Günlük hedef: 8 iş 100 TL, 12 iş 250 TL",
+        kind: "hedef",
+        period: "gunluk",
+        tiers: [
+          { target: 8, rewardKurus: 10_000 },
+          { target: 12, rewardKurus: 25_000 },
+        ],
+        bonusPct: null,
+        weekdays: null,
+        startHour: 0,
+        endHour: 24,
+        startsOn: istanbulDay(new Date(Date.now() - 30 * 86_400_000)),
+        endsOn: null,
+        active: true,
+        createdAt: hoursAgo(720),
+      },
+    ],
+    // Mehmet dün 9 iş yaptı (demo geçmişi)
+    awards: [
+      {
+        id: "awd-1",
+        incentiveId: "inc-1",
+        incentiveTitle: "Günlük hedef: 8 iş 100 TL, 12 iş 250 TL",
+        courierId: "kur-1",
+        courierName: "Mehmet Kaya",
+        periodStart: istanbulDay(new Date(Date.now() - 86_400_000)),
+        periodEnd: istanbulDay(new Date(Date.now() - 86_400_000)),
+        achieved: 9,
+        amountKurus: 10_000,
+        detail: "9 iş",
+        payoutId: null,
+        createdAt: hoursAgo(2),
+      },
+    ],
     holidays: (holidaysJson as Array<{ date: string; name: string; half_day: boolean }>).map((h) => ({
       date: h.date,
       name: h.name,
@@ -1417,7 +1464,39 @@ export function createDemoRepo(): AdminRepo {
         .filter((o) => o.status === "teslim_edildi" && o.courierId && !done.has(o.id))
         .map((o) => earningFor(o, s.costModel, s.settings));
       s.earnings.unshift(...fresh);
-      return { written: fresh.length };
+      // Kapanan dönemlerin primleri (compute_incentive_awards ile aynı kural)
+      const today = istanbulDay();
+      let awards = 0;
+      for (const inc of s.incentives.filter((i) => i.active)) {
+        for (const p of closedIncentivePeriods(inc, today)) {
+          for (const c of s.couriers) {
+            if (s.awards.some((a) => a.incentiveId === inc.id && a.courierId === c.id && a.periodStart === p.periodStart)) continue;
+            const jobs = s.earnings.filter((e) => {
+              const day = istanbulDay(new Date(e.deliveredAt));
+              return e.courierId === c.id && day >= p.countFrom && day <= p.countTo && inIncentiveScope(inc, e.deliveredAt);
+            });
+            const earned = jobs.reduce((t, e) => t + e.totalKurus, 0);
+            const amount = jobs.length ? incentiveAwardKurus(inc, jobs.length, earned) : 0;
+            if (amount <= 0) continue;
+            s.awards.unshift({
+              id: `awd-${s.awards.length + 1}-${Date.now()}`,
+              incentiveId: inc.id,
+              incentiveTitle: inc.title,
+              courierId: c.id,
+              courierName: c.fullName,
+              periodStart: p.periodStart,
+              periodEnd: p.periodEnd,
+              achieved: jobs.length,
+              amountKurus: amount,
+              detail: inc.kind === "hedef" ? `${jobs.length} iş` : `${jobs.length} iş, hakediş ${formatTL(earned)} × %${inc.bonusPct}`,
+              payoutId: null,
+              createdAt: new Date().toISOString(),
+            });
+            awards++;
+          }
+        }
+      }
+      return { written: fresh.length, awards };
     },
     async listEarnings({ unpaidOnly, courierId, payoutId }) {
       const s = await get();
@@ -1434,8 +1513,10 @@ export function createDemoRepo(): AdminRepo {
       const s = await get();
       const now = new Date().toISOString();
       const rows = s.earnings.filter((e) => e.courierId === courierId && !e.payoutId && e.deliveredAt <= now);
-      if (!rows.length) throw new RepoError("Hesaplaşılacak teslimat yok");
+      const awards = s.awards.filter((a) => a.courierId === courierId && !a.payoutId && a.createdAt <= now);
+      if (!rows.length && !awards.length) throw new RepoError("Hesaplaşılacak teslimat yok");
       const sum = (f: (e: EarningRow) => number) => rows.reduce((a, e) => a + f(e), 0);
+      const bonus = awards.reduce((t, a) => t + a.amountKurus, 0);
       const p: CourierPayout = {
         id: `pay-${s.payouts.length + 1}-${Date.now()}`,
         courierId,
@@ -1443,13 +1524,15 @@ export function createDemoRepo(): AdminRepo {
         untilAt: now,
         deliveryCount: rows.length,
         earningsKurus: sum((e) => e.totalKurus),
+        incentiveKurus: bonus,
         cashKurus: sum((e) => e.cashCollectedKurus),
-        netKurus: sum((e) => e.totalKurus - e.cashCollectedKurus),
+        netKurus: sum((e) => e.totalKurus - e.cashCollectedKurus) + bonus,
         note: note?.trim() || null,
         createdAt: now,
         cancelledAt: null,
       };
       for (const e of rows) e.payoutId = p.id;
+      for (const a of awards) a.payoutId = p.id;
       s.payouts.unshift(p);
       return clone(p);
     },
@@ -1459,6 +1542,7 @@ export function createDemoRepo(): AdminRepo {
       if (!p) throw new RepoError("Hesaplaşma bulunamadı veya zaten iptal");
       p.cancelledAt = new Date().toISOString();
       for (const e of s.earnings) if (e.payoutId === id) e.payoutId = null;
+      for (const a of s.awards) if (a.payoutId === id) a.payoutId = null;
     },
     async listReceivables() {
       const s = await get();
@@ -1481,6 +1565,32 @@ export function createDemoRepo(): AdminRepo {
       o.paymentStatus = "odendi";
       o.paidKurus = o.totalKurus;
       touchOrders();
+    },
+
+    async listIncentives() {
+      return clone((await get()).incentives);
+    },
+    async createIncentive(i) {
+      const problem = incentiveProblem(i);
+      if (problem) throw new RepoError(problem);
+      const s = await get();
+      s.incentives.unshift({
+        ...clone(i),
+        title: i.title.trim(),
+        tiers: i.kind === "hedef" ? clone(i.tiers) : [],
+        bonusPct: i.kind === "yuzde" ? i.bonusPct : null,
+        id: `inc-${s.incentives.length + 1}-${Date.now()}`,
+        active: true,
+        createdAt: new Date().toISOString(),
+      });
+    },
+    async setIncentiveActive(id, active) {
+      const i = (await get()).incentives.find((x) => x.id === id);
+      if (i) i.active = active;
+    },
+    async listIncentiveAwards({ unpaidOnly, payoutId }) {
+      const s = await get();
+      return clone(s.awards.filter((a) => (!unpaidOnly || !a.payoutId) && (!payoutId || a.payoutId === payoutId)));
     },
 
     async listPromoCodes() {

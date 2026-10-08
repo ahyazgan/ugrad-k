@@ -1,6 +1,7 @@
 import type {
   CourierDocument,
   FailedDeliveryReason,
+  Incentive,
   PerformanceStats,
   IncidentKind,
   OrderStatus,
@@ -160,10 +161,21 @@ export type CashCollection = "nakit" | "iban" | "alinmadi";
 /** Kurye uygulaması → Kazancım */
 export interface CourierEarnings {
   /** Henüz hesaplaşılmamış teslimatlar */
-  unpaid: { deliveries: number; earningsKurus: number; cashKurus: number; netKurus: number };
+  unpaid: { deliveries: number; earningsKurus: number; cashKurus: number; incentiveKurus: number; netKurus: number };
+  /** Hesaplaşılmamış hedef primleri */
+  incentives: { id: string; title: string; periodStart: string; periodEnd: string; amountKurus: number; detail: string | null }[];
   items: { orderId: string; orderNo: string; deliveredAt: string; km: number; totalKurus: number; cashCollectedKurus: number }[];
-  payouts: { id: string; createdAt: string; deliveryCount: number; netKurus: number; note: string | null }[];
+  payouts: { id: string; createdAt: string; deliveryCount: number; incentiveKurus: number; netKurus: number; note: string | null }[];
   rates: { perJobKurus: number; perKmKurus: number } | null;
+}
+
+/** Bu gün/haftanın prim kampanyası ve kuryenin ilerlemesi */
+export interface IncentiveStatus extends Incentive {
+  id: string;
+  periodStart: string;
+  periodEnd: string;
+  jobs: number;
+  earningKurus: number;
 }
 
 export type CourierActionInput =
@@ -295,6 +307,8 @@ export interface Api {
   courierEarnings(): Promise<CourierEarnings>;
   /** Kuryenin son 30 günlük performans sayıları (puan: courierPerformance) */
   myPerformance(): Promise<PerformanceStats | null>;
+  /** Geçerli prim kampanyaları ve bu dönemin ilerlemesi */
+  myIncentives(): Promise<IncentiveStatus[]>;
   /** Acil durum: yöneticiye konumla alarm (molaya alınır) */
   raiseSos(input: { kind: IncidentKind; note?: string; at: (CourierLocation & { accuracy?: number | null }) | null }): Promise<{ id: string }>;
   /** Kapatılmamış son acil durum kaydı */

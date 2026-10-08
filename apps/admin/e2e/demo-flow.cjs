@@ -166,9 +166,33 @@ fs.mkdirSync(out, { recursive: true });
   await page.getByTestId("payout-kur-1").click();
   await page.getByPlaceholder("Not (ör. havale, nakit)").fill("Havale");
   await page.getByTestId("confirm-payout").click();
-  await page.getByTestId("hakedis-msg").filter({ hasText: "hesaplaşıldı" }).waitFor();
+  // Mehmet'in dünkü hedef primi hesaplaşmaya girer
+  await page.getByTestId("hakedis-msg").filter({ hasText: "100,00 TL prim hesaplaşıldı" }).waitFor();
   await page.getByTestId("balance-kur-1").waitFor({ state: "detached" });
   await page.getByText("Havale").first().waitFor();
+
+  // Kurye primleri: kural denetimi, yeni yüzde kampanyası, hesaplaşılan prim
+  await nav("Kurye primleri");
+  await page.getByTestId("incentive-award").filter({ hasText: "Hesaplaşıldı" }).first().waitFor();
+  await page.getByTestId("incentive-title").fill("Ters kademe");
+  await page.getByTestId("tier-target-0").fill("10");
+  await page.getByTestId("tier-reward-0").fill("200");
+  await page.getByTestId("tier-target-1").fill("5");
+  await page.getByTestId("tier-reward-1").fill("300");
+  await page.getByTestId("create-incentive").click();
+  await page.getByText("Kademeler artan sırada olmalı").waitFor();
+  await page.getByTestId("incentive-title").fill("Hafta sonu akşam");
+  await page.getByTestId("incentive-kind").selectOption("yuzde");
+  await page.getByTestId("incentive-pct").fill("20");
+  for (const d of [1, 2, 3, 4, 5]) await page.getByTestId(`incentive-day-${d}`).click();
+  await page.getByLabel("Başlangıç saati").selectOption("16");
+  await page.getByTestId("create-incentive").click();
+  await page.getByTestId("incentive-msg").waitFor();
+  const newRow = page.locator('[data-testid^="incentive-inc-"]').filter({ hasText: "Hafta sonu akşam" });
+  await newRow.filter({ hasText: "Cmt, Paz 16:00–24:00" }).filter({ hasText: "+%20" }).waitFor();
+  await shot("04d-primler");
+  await newRow.getByRole("button", { name: "Durdur" }).click();
+  await newRow.getByText("Kapalı").waitFor();
 
   // Vardiya planı: haftalık doluluk, kurye atama
   await nav("Vardiya planı");

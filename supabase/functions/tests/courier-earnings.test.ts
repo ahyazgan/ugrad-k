@@ -38,11 +38,21 @@ Deno.test("courier-earnings: cron bekleyenleri ödeme modeline göre yazar, nab�
     },
   });
   const res = await handler((r) => handleCourierEarnings(r, ctx, { env }))(cron());
-  assertEquals((await res.json()).written, 2);
+  const body = await res.json();
+  assertEquals(body.written, 2);
   const rows = inserted.courier_earnings!;
   assertEquals(rows.map((r) => r.total_kurus), [25_000, 25_000]);
   assertEquals(rows.map((r) => r.cash_collected_kurus), [48_000, 0]);
   assertEquals(rpcCalls.some((c) => c.name === "record_heartbeat" && c.args.p_name === "courier-earnings"), true);
+  assertEquals(rpcCalls.at(-1)?.name, "compute_incentive_awards");
+});
+
+Deno.test("courier-earnings: bekleyen yokken de primler hesaplanır", async () => {
+  const { ctx, inserted, rpcCalls } = fakeCtx({ tables: { "rpc:compute_incentive_awards": 3 } });
+  const res = await handler((r) => handleCourierEarnings(r, ctx, { env }))(cron());
+  assertEquals(await res.json(), { trigger: "cron", written: 0, awards: 3 });
+  assertEquals(inserted.courier_earnings, undefined);
+  assertEquals(rpcCalls.filter((c) => c.name === "compute_incentive_awards").length, 1);
 });
 
 Deno.test("courier-earnings: yetkisiz 401, müşteri 401", async () => {

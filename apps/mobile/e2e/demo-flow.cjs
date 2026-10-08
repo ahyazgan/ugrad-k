@@ -255,6 +255,10 @@ fs.mkdirSync(out, { recursive: true });
   await kp.getByRole('tab', { name: /Kazancım/ }).click();
   await kt('earnings-net').waitFor();
   await kt('my-performance').getByText(/^\d+ · (Altın|Gümüş|Gelişmeli|Riskli)$/).waitFor();
+  // Primler: bugünün hedef ilerlemesi ve dünkü kazanılan prim bakiyede
+  await kt('incentive-progress').getByText(/^bugün \d+\/8 iş · \d+ iş daha → 100,00 TL$/).waitFor();
+  await kt('incentive-award').waitFor();
+  await kp.getByText('Hedef primleri').waitFor();
   const earn = await kp.locator('body').innerText();
   if (!/Elinizdeki nakit tahsilat/.test(earn) || !/YK-\d+/.test(earn)) throw new Error('kazanç ekranı eksik');
   console.log('KAZANC:', earn.match(/Hesaplaşılmamış kazanç[\s\S]{0,160}/)?.[0]?.replace(/\n+/g, ' | '));

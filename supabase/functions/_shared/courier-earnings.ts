@@ -60,15 +60,21 @@ export async function handleCourierEarnings(req: Request, ctx: Ctx, deps: { env:
   const { data: pending, error } = await ctx.admin.rpc("pending_courier_earnings", { p_limit: 200 });
   if (error) throw new Error(`Bekleyen hakedişler okunamadı: ${error.message}`);
   const orders = (pending ?? []) as Row[];
-  if (!orders.length) return json({ trigger, written: 0 });
-  const [{ data: costRow }, { settings }] = await Promise.all([
-    ctx.admin.from("cost_settings").select("*").eq("id", 1).single(),
-    ctx.loadPricing(),
-  ]);
-  const model = costRow ? costModelFromRow(costRow as CostSettingsRow) : DEFAULT_COST_MODEL;
-  const rows = orders.map((o) => earningRow(o, model, settings));
-  // Aynı anda iki çalıştırma olursa çift kayıt oluşmaz (order_id birincil anahtar)
-  const { error: insErr } = await ctx.admin.from("courier_earnings").upsert(rows, { onConflict: "order_id", ignoreDuplicates: true });
-  if (insErr) throw new Error(`Hakediş yazılamadı: ${insErr.message}`);
-  return json({ trigger, written: rows.length });
+  let written = 0;
+  if (orders.length) {
+    const [{ data: costRow }, { settings }] = await Promise.all([
+      ctx.admin.from("cost_settings").select("*").eq("id", 1).single(),
+      ctx.loadPricing(),
+    ]);
+    const model = costRow ? costModelFromRow(costRow as CostSettingsRow) : DEFAULT_COST_MODEL;
+    const rows = orders.map((o) => earningRow(o, model, settings));
+    // Aynı anda iki çalıştırma olursa çift kayıt oluşmaz (order_id birincil anahtar)
+    const { error: insErr } = await ctx.admin.from("courier_earnings").upsert(rows, { onConflict: "order_id", ignoreDuplicates: true });
+    if (insErr) throw new Error(`Hakediş yazılamadı: ${insErr.message}`);
+    written = rows.length;
+  }
+  // Hedef primleri: kapanan gün/haftaların ödülleri (hakedişler yazıldıktan sonra; tekrar çalıştırılabilir)
+  const { data: awards, error: awardErr } = await ctx.admin.rpc("compute_incentive_awards");
+  if (awardErr) throw new Error(`Primler hesaplanamadı: ${awardErr.message}`);
+  return json({ trigger, written, awards: typeof awards === "number" ? awards : 0 });
 }
