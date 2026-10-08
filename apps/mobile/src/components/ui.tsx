@@ -12,26 +12,25 @@ import {
   type ViewStyle,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { colors, font, radii, type } from "./theme";
 
-export const colors = {
-  primary: "#0F3D6E",
-  primaryLight: "#E7EEF6",
-  accent: "#F59E0B",
-  text: "#111827",
-  muted: "#6B7280",
-  border: "#E5E7EB",
-  bg: "#F7F8FA",
-  card: "#FFFFFF",
-  danger: "#B91C1C",
-  dangerLight: "#FEE2E2",
-  success: "#047857",
-  successLight: "#D1FAE5",
-};
+export { colors, font, fontFamilies, radii, shadow, type } from "./theme";
 
-export function Screen({ children, scroll = true, padded = true }: { children: ReactNode; scroll?: boolean; padded?: boolean }) {
-  const inner = <View style={[padded && styles.padded, { gap: 16 }]}>{children}</View>;
+export function Screen({
+  children,
+  scroll = true,
+  padded = true,
+  safeTop = false,
+}: {
+  children: ReactNode;
+  scroll?: boolean;
+  padded?: boolean;
+  /** Başlıksız ekranlarda üst güvenli alanı da boşalt */
+  safeTop?: boolean;
+}) {
+  const inner = <View style={[padded && styles.padded, { gap: 14 }]}>{children}</View>;
   return (
-    <SafeAreaView style={styles.screen} edges={["bottom", "left", "right"]}>
+    <SafeAreaView style={styles.screen} edges={safeTop ? ["top", "bottom", "left", "right"] : ["bottom", "left", "right"]}>
       {scroll ? <ScrollView keyboardShouldPersistTaps="handled">{inner}</ScrollView> : inner}
     </SafeAreaView>
   );
@@ -61,10 +60,12 @@ export function Button({
   onPress: () => void;
   loading?: boolean;
   disabled?: boolean;
-  variant?: "primary" | "secondary" | "danger";
+  /** primary: limon zemin + mürekkep yazı · dark: siyah hap · secondary: çerçeveli hap · danger: kırmızı */
+  variant?: "primary" | "secondary" | "danger" | "dark";
   testID?: string;
 }) {
   const off = disabled || loading;
+  const fg = variant === "danger" || variant === "dark" ? "#fff" : colors.ink;
   return (
     <Pressable
       testID={testID}
@@ -75,15 +76,12 @@ export function Button({
         styles.button,
         variant === "secondary" && styles.buttonSecondary,
         variant === "danger" && styles.buttonDanger,
-        off && { opacity: 0.5 },
+        variant === "dark" && styles.buttonDark,
+        off && { opacity: 0.45 },
         pressed && { opacity: 0.8 },
       ]}
     >
-      {loading ? (
-        <ActivityIndicator color={variant === "secondary" ? colors.primary : "#fff"} />
-      ) : (
-        <Text style={[styles.buttonText, variant === "secondary" && { color: colors.primary }]}>{title}</Text>
-      )}
+      {loading ? <ActivityIndicator color={fg} /> : <Text style={[styles.buttonText, { color: fg }]}>{title}</Text>}
     </Pressable>
   );
 }
@@ -91,7 +89,7 @@ export function Button({
 export function Field({ label, error, ...props }: TextInputProps & { label: string; error?: string | null }) {
   return (
     <View style={{ gap: 6 }}>
-      <Text style={styles.label}>{label}</Text>
+      <Text style={styles.label}>{label.toLocaleUpperCase("tr")}</Text>
       <TextInput
         placeholderTextColor={colors.muted}
         style={[styles.input, error ? { borderColor: colors.danger } : null]}
@@ -119,7 +117,13 @@ export function ToggleRow({
         <Text style={styles.toggleLabel}>{label}</Text>
         {hint ? <Text style={styles.muted}>{hint}</Text> : null}
       </View>
-      <Switch value={value} onValueChange={onChange} trackColor={{ true: colors.primary }} />
+      <Switch
+        value={value}
+        onValueChange={onChange}
+        trackColor={{ true: colors.ink, false: colors.border }}
+        thumbColor={value ? colors.lime : "#fff"}
+        {...({ activeThumbColor: colors.lime } as object)}
+      />
     </Pressable>
   );
 }
@@ -153,18 +157,18 @@ export function Segmented<T extends string>({
               accessibilityState={{ selected: on }}
               style={{
                 flex: 1,
-                borderWidth: 1.5,
-                borderColor: on ? colors.primary : colors.border,
-                backgroundColor: on ? "#eef4fb" : "#fff",
-                borderRadius: 10,
-                paddingVertical: 8,
+                borderWidth: 2,
+                borderColor: on ? colors.ink : colors.border,
+                backgroundColor: on ? colors.lime : colors.surface,
+                borderRadius: radii.tile,
+                paddingVertical: 10,
                 paddingHorizontal: 6,
                 alignItems: "center",
                 gap: 2,
               }}
             >
-              <Text style={{ fontSize: 14, fontWeight: "700", color: on ? colors.primary : colors.text }}>{o.label}</Text>
-              {o.hint ? <Text style={{ fontSize: 11, color: colors.muted, textAlign: "center" }}>{o.hint}</Text> : null}
+              <Text style={{ ...font("black"), fontSize: 15, letterSpacing: -0.3, color: colors.ink }}>{o.label}</Text>
+              {o.hint ? <Text style={{ ...font("semibold"), fontSize: 11, color: on ? colors.mutedDark : colors.muted, textAlign: "center" }}>{o.hint}</Text> : null}
             </Pressable>
           );
         })}
@@ -186,7 +190,7 @@ export function ErrorBox({ message }: { message: string | null | undefined }) {
   if (!message) return null;
   return (
     <View style={styles.errorBox}>
-      <Text style={{ color: colors.danger }}>{message}</Text>
+      <Text style={{ ...font("bold"), color: colors.danger }}>{message}</Text>
     </View>
   );
 }
@@ -210,58 +214,58 @@ export function Row({ label, value, bold }: { label: string; value: string; bold
 
 export const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
-  padded: { padding: 16 },
-  title: { fontSize: 22, fontWeight: "700", color: colors.text },
-  muted: { color: colors.muted, fontSize: 14, lineHeight: 20 },
+  padded: { padding: 14 },
+  title: { ...type.h2 },
+  muted: { ...font("semibold"), color: colors.muted, fontSize: 14, lineHeight: 20 },
   card: {
     backgroundColor: colors.card,
-    borderRadius: 12,
-    padding: 16,
+    borderRadius: radii.card,
+    padding: 18,
     gap: 12,
-    borderWidth: 1,
-    borderColor: colors.border,
   },
   button: {
-    backgroundColor: colors.primary,
-    paddingVertical: 14,
-    borderRadius: 10,
+    backgroundColor: colors.lime,
+    paddingHorizontal: 22,
+    borderRadius: radii.pill,
     alignItems: "center",
-    minHeight: 50,
+    minHeight: 56,
     justifyContent: "center",
   },
-  buttonSecondary: { backgroundColor: colors.primaryLight },
+  buttonSecondary: { backgroundColor: "transparent", borderWidth: 2, borderColor: colors.ink, minHeight: 52 },
   buttonDanger: { backgroundColor: colors.danger },
-  buttonText: { color: "#fff", fontSize: 16, fontWeight: "600" },
-  label: { fontSize: 14, fontWeight: "600", color: colors.text },
+  buttonDark: { backgroundColor: colors.ink },
+  buttonText: { ...font("black"), color: colors.ink, fontSize: 17, letterSpacing: -0.2 },
+  label: { ...type.label },
   input: {
-    backgroundColor: "#fff",
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
+    ...font("bold"),
+    backgroundColor: colors.bg,
+    borderWidth: 2,
+    borderColor: "transparent",
+    borderRadius: radii.field,
+    paddingHorizontal: 16,
+    paddingVertical: 13,
     fontSize: 16,
     color: colors.text,
   },
-  error: { color: colors.danger, fontSize: 13 },
-  errorBox: { backgroundColor: colors.dangerLight, borderRadius: 10, padding: 12 },
+  error: { ...font("bold"), color: colors.danger, fontSize: 13 },
+  errorBox: { backgroundColor: colors.dangerLight, borderRadius: radii.field, padding: 14 },
   toggleRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 4 },
-  toggleLabel: { fontSize: 15, fontWeight: "600", color: colors.text },
+  toggleLabel: { ...font("extrabold"), fontSize: 15, color: colors.text },
   checkRow: { flexDirection: "row", gap: 12, alignItems: "flex-start" },
   checkbox: {
-    width: 24,
-    height: 24,
-    borderRadius: 6,
+    width: 26,
+    height: 26,
+    borderRadius: 9,
     borderWidth: 2,
-    borderColor: colors.primary,
+    borderColor: colors.ink,
     alignItems: "center",
     justifyContent: "center",
-    marginTop: 2,
+    marginTop: 1,
   },
-  checkboxOn: { backgroundColor: colors.primary },
-  check: { color: "#fff", fontWeight: "700" },
+  checkboxOn: { backgroundColor: colors.lime },
+  check: { ...font("black"), color: colors.ink },
   row: { flexDirection: "row", justifyContent: "space-between", gap: 12 },
-  rowLabel: { color: colors.text, flex: 1, fontSize: 14 },
-  rowValue: { color: colors.text, fontSize: 14 },
-  bold: { fontWeight: "700", fontSize: 16 },
+  rowLabel: { ...font("semibold"), color: colors.mutedDark, flex: 1, fontSize: 14 },
+  rowValue: { ...font("bold"), color: colors.text, fontSize: 14 },
+  bold: { ...font("black"), color: colors.ink, fontSize: 17, letterSpacing: -0.3 },
 });

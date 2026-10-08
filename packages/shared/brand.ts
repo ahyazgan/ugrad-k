@@ -33,7 +33,26 @@ export const BRAND = {
   whatsapp: "" as string,
   /** Google İşletme Profili "yorum yaz" bağlantısı (5 puan verenler yönlendirilir). Boşsa yönlendirme yapılmaz. */
   googleReviewUrl: "" as string,
+  /** Kısa marka sözü (Neo tasarımında logonun altında, büyük harfle) */
+  tagline: "Her yerde seninle",
+  /** Eski (v1) renkler — web sitesi ve panelin mevcut kullanımları için korunur */
   colors: { primary: "#0f3d6e", accent: "#f59e0b" },
+  /**
+   * "Neo" marka dili (2026-10): lila zemin, limon vurgu, mürekkep siyahı.
+   * Kural: limon yalnız zemin rengi olarak kullanılır; açık zeminde limon yazı yok.
+   */
+  neo: {
+    bg: "#ECE6FD",
+    lime: "#D6FB45",
+    limeDot: "#9BC20F",
+    ink: "#111114",
+    surface: "#FFFFFF",
+    muted: "#5A5870",
+    mutedDark: "#3B3A4A",
+    inactive: "#6E6B8A",
+    /** Siyah zemin üzerindeki soluk yazı */
+    onInkMuted: "#B9B7C9",
+  },
 } as const;
 
 export const trackingBaseUrl = `${BRAND.panelUrl}/takip`;
