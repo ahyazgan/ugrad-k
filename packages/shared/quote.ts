@@ -27,6 +27,10 @@ export interface OrderRequest {
   roundTrip: boolean;
   weightKg: number | null;
   largePackage: boolean;
+  /** Beyan edilen gönderi değeri (kuruş); sigorta ücreti fiyata eklenir */
+  declaredValueKurus: number | null;
+  /** Alıcıya SMS ile teslim kodu gider; kurye kodu girmeden teslim kapanmaz */
+  deliveryCode: boolean;
   packageDescription?: string;
   customerNote?: string;
   /** ISO tarih; boşsa "hemen" */
@@ -108,6 +112,15 @@ export function parseOrderRequest(body: unknown, now: Date = new Date()): OrderR
     scheduledPickupAt = d.toISOString();
   }
 
+  let declaredValueKurus: number | null = null;
+  if (b.declaredValueKurus != null && b.declaredValueKurus !== "") {
+    declaredValueKurus = Number(b.declaredValueKurus);
+    if (!Number.isInteger(declaredValueKurus) || declaredValueKurus < 0) {
+      throw new ValidationError("Gönderi değeri geçersiz", "declaredValueKurus");
+    }
+    if (declaredValueKurus === 0) declaredValueKurus = null;
+  }
+
   const paymentMethod = (b.paymentMethod ?? "kart") as OrderRequest["paymentMethod"];
   if (!["kart", "cari", "nakit"].includes(paymentMethod)) {
     throw new ValidationError("Ödeme yöntemi geçersiz", "paymentMethod");
@@ -130,6 +143,8 @@ export function parseOrderRequest(body: unknown, now: Date = new Date()): OrderR
     roundTrip: b.roundTrip === true,
     weightKg,
     largePackage: b.largePackage === true,
+    declaredValueKurus,
+    deliveryCode: b.deliveryCode === true,
     packageDescription: str(b.packageDescription, "packageDescription"),
     customerNote: str(b.customerNote, "customerNote", { max: 1000 }),
     scheduledPickupAt,
@@ -174,6 +189,7 @@ export async function buildQuote(req: OrderRequest, deps: QuoteDeps): Promise<Qu
       largePackage: req.largePackage,
       bridgeCrossings,
       pickupPoint: { lat: req.pickup.lat, lng: req.pickup.lng },
+      declaredValueKurus: req.declaredValueKurus,
       holidays: deps.holidays,
     },
     deps.settings,
@@ -210,6 +226,8 @@ export function orderRowFromQuote(req: OrderRequest, q: QuoteResult) {
     package_description: req.packageDescription ?? null,
     weight_kg: req.weightKg,
     large_package: req.largePackage,
+    declared_value_kurus: req.declaredValueKurus,
+    delivery_code_required: req.deliveryCode,
     urgent: req.serviceLevel === "acil",
     service_level: req.serviceLevel,
     round_trip: req.roundTrip,

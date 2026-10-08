@@ -43,7 +43,8 @@ Kurallar:
 - Şikâyet, hasar, kayıp, ödeme sorunu veya müşteri insanla görüşmek isterse handoff_to_human çağır ve bir temsilcinin döneceğini söyle.
 - Kısa, sıcak ve net yaz; WhatsApp için başlık veya tablo kullanma, gerekirse kısa madde işaretleri kullan. Kişisel verileri gereğinden fazla tekrarlama.
 - Hizmet seviyeleri: "standart" (varsayılan, aynı gün en kısa sürede), "acil" (60 dk içinde teslim taahhüdü, ek ücretli; taahhüt kaçarsa acil ek ücreti sonraki siparişten otomatik düşülür) ve "ekonomi" (gün içinde teslim, indirimli; yalnızca Pazartesi–Cumartesi sabah 07:00 ile öğleden sonra arası alışlarda). Müşteri acele etmediğini söylerse ekonomiyi önerebilirsin.
-- Gece 22:00–07:00, Pazar ve resmi tatil ek ücretlerini, uzak alış ücretini fiyat aracı zaten hesaplar; sorulursa açıkla. 20 kg üzeri gönderi motosikletle taşınamaz.`;
+- Gece 22:00–07:00, Pazar ve resmi tatil ek ücretlerini, uzak alış ücretini fiyat aracı zaten hesaplar; sorulursa açıkla. 20 kg üzeri gönderi motosikletle taşınamaz.
+- Değerli gönderi (para değeri olan evrak, cihaz, numune): değerini sor (1.000 TL'ye kadar ücretsiz güvence, üstüne küçük sigorta ücreti fiyata eklenir) ve alıcıya SMS teslim kodu isteyip istemediğini sor.`;
 
 const str = { type: "string" } as const;
 const nullableStr = { type: ["string", "null"] } as const;
@@ -73,8 +74,9 @@ export const TOOLS: Tool[] = [
         round_trip: { type: "boolean" },
         weight_kg: { type: ["number", "null"] },
         large_package: { type: "boolean" },
+        declared_value_tl: { type: ["number", "null"], description: "Müşteri gönderinin değerini söylediyse TL; yoksa null" },
       },
-      required: ["pickup_place_id", "dropoff_place_id", "service_level", "round_trip", "weight_kg", "large_package"],
+      required: ["pickup_place_id", "dropoff_place_id", "service_level", "round_trip", "weight_kg", "large_package", "declared_value_tl"],
       additionalProperties: false,
     },
   },
@@ -98,6 +100,8 @@ export const TOOLS: Tool[] = [
         round_trip: { type: "boolean" },
         weight_kg: { type: ["number", "null"] },
         large_package: { type: "boolean" },
+        declared_value_tl: { type: ["number", "null"], description: "Müşteri gönderinin değerini söylediyse TL; yoksa null" },
+        delivery_code: { type: "boolean", description: "Alıcıya SMS teslim kodu gönderilsin mi (değerli/önemli evrak)" },
         payment_method: { type: "string", enum: ["nakit", "cari"] },
         customer_note: nullableStr,
       },
@@ -115,6 +119,8 @@ export const TOOLS: Tool[] = [
         "round_trip",
         "weight_kg",
         "large_package",
+        "declared_value_tl",
+        "delivery_code",
         "payment_method",
         "customer_note",
       ],
@@ -193,6 +199,8 @@ async function quoteFor(tc: ToolContext, i: Record<string, unknown>) {
     roundTrip: i.round_trip === true,
     weightKg: i.weight_kg ?? null,
     largePackage: i.large_package === true,
+    declaredValueKurus: typeof i.declared_value_tl === "number" && i.declared_value_tl > 0 ? Math.round(i.declared_value_tl * 100) : null,
+    deliveryCode: i.delivery_code === true,
   });
   return { req, p, d };
 }

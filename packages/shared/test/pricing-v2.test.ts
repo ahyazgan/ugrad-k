@@ -106,3 +106,18 @@ describe("v2: kurumsal indirim yalnız taşıma bedeline", () => {
     expect(calculateMonthlyInvoice([40_000, 40_000], T).discountKurus).toBe(0);
   });
 });
+
+describe("değer beyanı sigortası", () => {
+  it("1.000 TL'ye kadar ücretsiz, üstü %0,5 (en az 25 TL), sınır üstü reddedilir", async () => {
+    const { insuranceFeeKurus } = await import("../pricing.ts");
+    expect(insuranceFeeKurus(null, T)).toBe(0);
+    expect(insuranceFeeKurus(100_000, T)).toBe(0);
+    expect(insuranceFeeKurus(200_000, T)).toBe(2_500); // 500 × %0,5 = 5 TL → en az 25 TL
+    expect(insuranceFeeKurus(2_100_000, T)).toBe(10_000); // 20.000 TL × %0,5 = 100 TL
+    expect(() => insuranceFeeKurus(10_000_001, T)).toThrow("100.000,00 TL");
+    const q = calculatePrice({ distanceMeters: 5000, pickupAt: WED, declaredValueKurus: 2_100_000 }, T);
+    expect(line(q, "insurance")).toBe(10_000);
+    // Kurumsal indirime tabi değil
+    expect(discountableKurus(q)).toBe(q.subtotalKurus - 10_000);
+  });
+});

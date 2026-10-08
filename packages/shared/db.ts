@@ -30,6 +30,10 @@ export interface PricingSettingsRow {
   free_pickup_radius_km: number | string;
   remote_pickup_per_km_kurus: number;
   remote_pickup_max_kurus: number;
+  free_coverage_kurus: number;
+  insurance_rate_pct: number | string;
+  insurance_min_kurus: number;
+  max_declared_value_kurus: number | null;
   corporate_tiers: CorporateTier[];
   vat_pct: number | string;
   utc_offset_minutes: number;
@@ -64,6 +68,10 @@ export const PRICING_COLUMN_MAP = {
   freePickupRadiusKm: "free_pickup_radius_km",
   remotePickupPerKmKurus: "remote_pickup_per_km_kurus",
   remotePickupMaxKurus: "remote_pickup_max_kurus",
+  freeCoverageKurus: "free_coverage_kurus",
+  insuranceRatePct: "insurance_rate_pct",
+  insuranceMinKurus: "insurance_min_kurus",
+  maxDeclaredValueKurus: "max_declared_value_kurus",
   corporateTiers: "corporate_tiers",
   vatPct: "vat_pct",
   utcOffsetMinutes: "utc_offset_minutes",
@@ -77,7 +85,7 @@ export function pricingSettingsFromRow(row: PricingSettingsRow): PricingSettings
   for (const [key, col] of Object.entries(PRICING_COLUMN_MAP)) {
     const v = row[col];
     if (col === "corporate_tiers" || col === "km_tiers") out[key] = v ?? [];
-    else if (col === "max_surcharge_pct" || col === "max_weight_kg") out[key] = v == null ? null : num(v as number | string);
+    else if (col === "max_surcharge_pct" || col === "max_weight_kg" || col === "max_declared_value_kurus") out[key] = v == null ? null : num(v as number | string);
     else out[key] = num(v as number | string);
   }
   return out as unknown as PricingSettings;

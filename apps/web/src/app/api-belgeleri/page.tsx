@@ -43,6 +43,8 @@ const orderExample = `{
   "roundTrip": false,
   "weightKg": null,
   "largePackage": false,
+  "declaredValueKurus": 2500000,
+  "deliveryCode": true,
   "scheduledPickupAt": null,
   "packageDescription": "Sözleşme (2 nüsha)",
   "customerNote": "İmzalı nüshayı geri getirin"
@@ -124,7 +126,10 @@ export default function ApiDocsPage() {
         <p className="mt-3">
           <code className="font-mono">serviceLevel</code>: <code className="font-mono">&quot;standart&quot;</code> (varsayılan), <code className="font-mono">&quot;acil&quot;</code> (60 dk, ek ücretli) veya{" "}
           <code className="font-mono">&quot;ekonomi&quot;</code> (gün içinde, indirimli; yalnızca Pazartesi–Cumartesi öğleden önceki alışlarda). Eski{" "}
-          <code className="font-mono">&quot;urgent&quot;: true</code> alanı hâlâ kabul edilir. 20 kg üzeri gönderiler <code className="font-mono">400</code> ile reddedilir.
+          <code className="font-mono">&quot;urgent&quot;: true</code> alanı hâlâ kabul edilir. 20 kg üzeri gönderiler <code className="font-mono">400</code> ile reddedilir.{" "}
+          <code className="font-mono">declaredValueKurus</code>: gönderi değeri (kuruş); 1.000 TL üstü kısım için sigorta ücreti fiyata eklenir.{" "}
+          <code className="font-mono">deliveryCode</code>: <code className="font-mono">true</code> ise alıcıya SMS ile 4 haneli teslim kodu gider, kurye kodu
+          almadan teslim edemez; kod oluşturma yanıtında <code className="font-mono">order.deliveryCode</code> olarak da döner.
         </p>
         <p className="mt-3">Yanıt:</p>
         <Code>{orderResponse}</Code>

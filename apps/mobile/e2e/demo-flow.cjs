@@ -40,9 +40,12 @@ fs.mkdirSync(out, { recursive: true });
     await tid('address-pickup').waitFor();
   }
   await tid('level-acil').click();
+  await tid('declared-value').fill('25.000');
+  await page.getByText('Teslim kodu ile teslim').click();
   await shot('06-form-dolu');
   await tid('see-price').click();
   await page.getByText('Toplam', { exact: true }).waitFor();
+  await page.getByText(/Değer beyanı sigortası/).waitFor();
   await shot('07-ozet');
   const text = await page.locator('body').innerText();
   console.log('OZET:', text.match(/Fiyat[\s\S]*?Toplam\s*[\d.,]+ TL/)?.[0]?.replace(/\n+/g,' | '));
@@ -52,6 +55,7 @@ fs.mkdirSync(out, { recursive: true });
   await page.getByText('Ödendi (kart)').waitFor();
   await shot('08-siparis-yeni');
   await page.getByText('Kuryeniz:', { exact: false }).waitFor({ timeout: 20000 });
+  await tid('delivery-code').waitFor();
   // Tahmini teslim ve acil taahhüdü
   await tid('eta').waitFor();
   await page.getByText(/Acil teslim taahhüdü: \d{2}:\d{2}/).waitFor();
@@ -125,6 +129,13 @@ fs.mkdirSync(out, { recursive: true });
   await kp.mouse.down();
   for (let i = 1; i <= 12; i++) await kp.mouse.move(pad.x + 30 + i * 20, pad.y + 100 + (i % 2 ? -30 : 30), { steps: 3 });
   await kp.mouse.up();
+  // Teslim kodu: yanlış kod hak düşer, doğru kodla açılır
+  await kt('delivery-code-input').fill('0000');
+  await kt('verify-code').click();
+  await kp.getByText('Kod yanlış, 4 hakkınız kaldı').waitFor();
+  await kt('delivery-code-input').fill('4821');
+  await kt('verify-code').click();
+  await kp.getByText('Kod doğru').waitFor();
   // Kuryeye ödemeli sipariş: tahsilat seçilmeden teslim tamamlanamaz
   await kp.getByText(/^Tahsilat: [\d.,]+ TL$/).waitFor();
   if (await kt('complete-delivery').isEnabled()) throw new Error('tahsilat seçilmeden teslim açık');

@@ -190,6 +190,7 @@ Panel → Otomasyon → **Sistem durumu** kartında her görevin en son ne zaman
    |---|---|
    | `siparis_alindi` | `{{1}} numaralı siparişiniz alındı. Canlı takip: {{2}}` |
    | `alici_gonderi_yolda` | `Merhaba {{1}}, size gönderilen paket Yazgan Kurye ile yola çıktı. Canlı takip: {{2}}` |
+   | `alici_gonderi_yolda_kod` | `Merhaba {{1}}, size gönderilen paket Yazgan Kurye ile yola çıktı. Teslim kodunuz: {{2}} (paketi alırken kuryeye söyleyin). Canlı takip: {{3}}` |
    | `teslim_edildi` | `{{1}} numaralı gönderi teslim edildi. Teslim alan: {{2}}` |
    | `yonetici_uyari` | `Yazgan Kurye uyarı: {{1}}` |
    | `acil_gecikme` | `{{1}} numaralı acil gönderiniz gecikebilir, tahmini teslim {{2}}. Taahhüt aşılırsa acil ek ücreti sonraki siparişinizden düşülür. Takip: {{3}}` |
@@ -389,3 +390,9 @@ Kayıtlı müşteriler `siparis@<alan adı>` adresine yazar; yapay zeka asistan�
 - **Erken uyarı**: §6 `otomatik-dagitim` görevi her dakika açık acil siparişlerin tahmini teslimini (kurye konumu, rota süresi, ortalama 25 km/s) hesaplar. Taahhüt aşılacaksa yöneticiye ve müşteriye **bir kez** haber verir (WhatsApp şablonu `acil_gecikme`, yoksa SMS/push).
 - **Telafi**: teslim taahhütten sonra olursa acil ek ücreti kadar `customer_credits` kaydı açılır ve müşterinin **sonraki siparişinden otomatik düşülür** (teklifte "Telafi" satırı). İade işlemi gerekmez; kart ödemesi değişmez.
 - **Görünürlük**: takip sayfası ve müşteri uygulaması tahmini teslim saatini ve taahhüdü gösterir; panelde acil siparişlerde kalan süre / "GECİKTİ" / "Taahhüt kaçtı" rozeti vardır.
+
+## 26. Değerli gönderiler: değer beyanı ve teslim kodu
+
+- **Değer beyanı**: müşteri gönderinin değerini girerse ücretsiz güvenceyi (varsayılan 1.000 TL) aşan kısım için sigorta ücreti fiyata eklenir (varsayılan %0,5, en az 25 TL; en fazla 100.000 TL beyan). Tümü panel → Fiyatlar'dan değişir; kurumsal indirime tabi değildir. **Bu tutarların bir sigorta poliçesiyle (emtia/nakliyat sorumluluk) karşılanması gerekir**; teminat sınırını poliçenize göre ayarlayın.
+- **Teslim kodu**: "Teslim kodu ile teslim" seçilen siparişte 4 haneli kod üretilir. Müşteri uygulamada görür; alıcıya gönderi yola çıkınca SMS/WhatsApp ile gider (şablon `alici_gonderi_yolda_kod`). Kurye kodu teslim ekranında doğrular; 5 yanlış denemede kilitlenir. Kurye kodu göremez. Yönetici gerekirse siparişi panelden kodsuz kapatabilir (sipariş detayında kod ve yanlış deneme sayısı görünür).
+- **Kurumsal API**: `declaredValueKurus` ve `deliveryCode` alanları; kod oluşturma yanıtında `order.deliveryCode` olarak döner.

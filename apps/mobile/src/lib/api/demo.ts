@@ -69,6 +69,8 @@ export function createDemoApi(): Api {
   let courierSeeded = false;
   /** Teslimde bildirilen tahsilat (yalnız kuryeye ödemeli siparişler) */
   const cash = new Map<string, CashCollection>();
+  const codeTries = new Map<string, number>();
+  const codeVerified = new Set<string>();
   const notifyJobs = () => jobListeners.forEach((l) => l());
 
   const emit = () => listeners.forEach((l) => l(session));
@@ -110,6 +112,9 @@ export function createDemoApi(): Api {
     scheduledPickupAt: req.scheduledPickupAt,
     priceQuote: q.quote,
     durationSeconds: q.durationSeconds,
+    declaredValueKurus: req.declaredValueKurus,
+    deliveryCodeRequired: req.deliveryCode,
+    deliveryCode: req.deliveryCode ? "4821" : null,
     slaDueAt: req.serviceLevel === "acil" ? new Date(new Date(now).getTime() + 60 * 60_000).toISOString() : null,
     slaMissed: null,
     paymentMethod: req.paymentMethod,
@@ -153,6 +158,9 @@ export function createDemoApi(): Api {
         roundTrip: false,
         weightKg: null,
         largePackage: false,
+        declaredValueKurus: null,
+        // İlk demo işi teslim kodlu (kod: 4821)
+        deliveryCode: urgent,
         packageDescription: "İmzalı sözleşme zarfı",
         customerNote: "Resepsiyona bırakılabilir",
         scheduledPickupAt: null,
@@ -385,6 +393,9 @@ export function createDemoApi(): Api {
             throw new ApiError("Teslim için fotoğraf veya imza gerekli");
           }
           const o = orders.get(orderId);
+          if (o?.deliveryCodeRequired && !codeVerified.has(orderId)) {
+            throw new ApiError("Alıcının teslim kodu doğrulanmadı");
+          }
           if (o?.paymentMethod === "nakit" && o.paymentStatus !== "odendi" && !action.pod.cashCollection) {
             throw new ApiError("Kuryeye ödemeli siparişte tahsilat bilgisi gerekli");
           }
@@ -425,6 +436,18 @@ export function createDemoApi(): Api {
         payouts: [],
         rates: { perJobKurus: DEFAULT_COST_MODEL.courierPerJobKurus, perKmKurus: DEFAULT_COST_MODEL.courierPerKmKurus },
       };
+    },
+    async verifyDeliveryCode(orderId, code) {
+      const o = orders.get(orderId);
+      if (!o?.deliveryCode) return { ok: true, remaining: 5 };
+      const tries = (codeTries.get(orderId) ?? 0);
+      if (tries >= 5) throw new ApiError("Teslim kodu 5 kez yanlış girildi; yöneticiyi arayın");
+      if (code.trim() === o.deliveryCode) {
+        codeVerified.add(orderId);
+        return { ok: true, remaining: 5 - tries };
+      }
+      codeTries.set(orderId, tries + 1);
+      return { ok: false, remaining: 4 - tries };
     },
     async courierDocuments() {
       requireSession();

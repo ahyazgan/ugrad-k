@@ -86,6 +86,19 @@ Deno.test("api: sipariş cari hesapla açılır, dış referans saklanır; tekra
   assertEquals(inserted.orders!.length, 1);
 });
 
+Deno.test("api: değer beyanı ve teslim kodu", async () => {
+  const { call, inserted, tables } = await setup();
+  tables.order_secrets = [{ order_id: "new-id", delivery_code: "4821" }];
+  const res = await call("POST", "/v1/orders", { ...orderBody, externalRef: "ERP-43", declaredValueKurus: 2_100_000, deliveryCode: true });
+  assertEquals(res.status, 201);
+  const data = await res.json();
+  assertEquals(data.order.deliveryCode, "4821");
+  assert(data.quote.lines.some((l: { code: string }) => l.code === "insurance"));
+  const row = inserted.orders![0]!;
+  assertEquals(row.declared_value_kurus, 2_100_000);
+  assertEquals(row.delivery_code_required, true);
+});
+
 Deno.test("api: başka hesabın siparişi 404, iptal kuralları", async () => {
   const order = { id: ORDER_ID, corporate_account_id: "acc1", status: "yolda", order_no: "YK-1", tracking_token: "t".repeat(32) };
   const { call, rpcCalls } = await setup({ orders: [order], "rpc:api_cancel_order": () => "not_cancellable" });

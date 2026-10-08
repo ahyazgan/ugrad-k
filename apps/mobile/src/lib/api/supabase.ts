@@ -177,7 +177,7 @@ export function createSupabaseApi(url: string, anonKey: string): Api & { client:
         // Kurye bilgisi RLS gereği yalnızca aktif teslimat sırasında döner
         client
           .from("orders")
-          .select("*, courier:couriers(plate, profile:profiles(full_name, phone)), invoice:invoices(pdf_url), rating:order_ratings(score)")
+          .select("*, courier:couriers(plate, profile:profiles(full_name, phone)), invoice:invoices(pdf_url), rating:order_ratings(score), secret:order_secrets(delivery_code)")
           .eq("id", id)
           .single(),
         client.from("order_status_history").select("to_status, created_at, note").eq("order_id", id).order("created_at"),
@@ -204,6 +204,10 @@ export function createSupabaseApi(url: string, anonKey: string): Api & { client:
         scheduledPickupAt: r!.scheduled_pickup_at,
         priceQuote: r!.price_quote,
         durationSeconds: r!.duration_seconds ?? null,
+        declaredValueKurus: r!.declared_value_kurus ?? null,
+        deliveryCodeRequired: !!r!.delivery_code_required,
+        // RLS: yalnız müşteri görür, kuryeye boş döner
+        deliveryCode: (Array.isArray(r!.secret) ? r!.secret[0] : r!.secret)?.delivery_code ?? null,
         slaDueAt: r!.sla_due_at ?? null,
         slaMissed: r!.sla_missed ?? null,
         paymentMethod: r!.payment_method,
@@ -396,6 +400,11 @@ export function createSupabaseApi(url: string, anonKey: string): Api & { client:
         payouts: (p.data ?? []).map((r: Row) => ({ id: r.id, createdAt: r.created_at, deliveryCount: r.delivery_count, netKurus: r.net_kurus, note: r.note })),
         rates: c.data ? { perJobKurus: c.data.courier_per_job_kurus, perKmKurus: c.data.courier_per_km_kurus } : null,
       };
+    },
+    async verifyDeliveryCode(orderId, code) {
+      const { data, error } = await client.rpc("verify_delivery_code", { p_order_id: orderId, p_code: code });
+      if (error) throw new ApiError(error.message);
+      return data as { ok: boolean; remaining: number };
     },
     async courierDocuments() {
       const { data, error } = await client.from("courier_documents").select("kind, doc_number, expires_at").eq("courier_id", await uid());

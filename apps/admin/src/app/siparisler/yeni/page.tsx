@@ -23,7 +23,7 @@ export default function TelefonSiparisiPage() {
   const [fullName, setFullName] = useState("");
   const [pickup, setPickup] = useState<Point | null>(null);
   const [dropoff, setDropoff] = useState<Point | null>(null);
-  const [opts, setOpts] = useState({ serviceLevel: "standart" as ServiceLevel, roundTrip: false, largePackage: false, weightKg: "", packageDescription: "", customerNote: "", scheduled: "" });
+  const [opts, setOpts] = useState({ declaredValue: "", deliveryCode: false, serviceLevel: "standart" as ServiceLevel, roundTrip: false, largePackage: false, weightKg: "", packageDescription: "", customerNote: "", scheduled: "" });
   const [payment, setPayment] = useState<"nakit" | "cari">("nakit");
   const [consent, setConsent] = useState(false);
   const [quote, setQuote] = useState<{ key: string; q?: AdminQuote; error?: string } | null>(null);
@@ -52,6 +52,8 @@ export default function TelefonSiparisiPage() {
           serviceLevel: opts.serviceLevel,
           roundTrip: opts.roundTrip,
           largePackage: opts.largePackage,
+          declaredValueKurus: opts.declaredValue.trim() ? Math.round(Number(opts.declaredValue.replace(/\./g, "").replace(",", ".")) * 100) || null : null,
+          deliveryCode: opts.deliveryCode,
           weightKg: opts.weightKg ? Number(opts.weightKg.replace(",", ".")) : null,
           packageDescription: opts.packageDescription || undefined,
           customerNote: opts.customerNote || undefined,
@@ -163,6 +165,13 @@ export default function TelefonSiparisiPage() {
             <div className="grid gap-3 sm:grid-cols-2">
               <Input label="Ne gönderiliyor?" value={opts.packageDescription} onChange={(e) => setOpts({ ...opts, packageDescription: e.target.value })} />
               <Input label="Ağırlık (kg)" inputMode="decimal" value={opts.weightKg} onChange={(e) => setOpts({ ...opts, weightKg: e.target.value })} />
+              <Input
+                label="Gönderi değeri (TL, isteğe bağlı)"
+                inputMode="decimal"
+                value={opts.declaredValue}
+                onChange={(e) => setOpts({ ...opts, declaredValue: e.target.value })}
+                data-testid="declared-value"
+              />
               <Input label="Planlı alış (boşsa hemen)" type="datetime-local" value={opts.scheduled} onChange={(e) => setOpts({ ...opts, scheduled: e.target.value })} />
               <Input label="Kuryeye not" value={opts.customerNote} onChange={(e) => setOpts({ ...opts, customerNote: e.target.value })} />
               <Select
@@ -183,6 +192,7 @@ export default function TelefonSiparisiPage() {
                 [
                   ["roundTrip", "Gidiş-dönüş"],
                   ["largePackage", "Büyük paket"],
+                  ["deliveryCode", "Teslim kodu (alıcıya SMS)"],
                 ] as const
               ).map(([k, label]) => (
                 <label key={k} className="flex items-center gap-2">

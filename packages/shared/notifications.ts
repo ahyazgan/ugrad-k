@@ -36,6 +36,8 @@ export interface NotificationOrder {
   podReceiverName: string | null;
   cancelReason: string | null;
   problemNote: string | null;
+  /** Teslim kodu istenen siparişte alıcıya gönderilen 4 haneli kod */
+  deliveryCode?: string | null;
   customer: { fullName: string | null; phone: string | null; pushToken: string | null };
   courier: { fullName: string | null; phone: string | null; pushToken: string | null } | null;
 }
@@ -107,8 +109,13 @@ export function buildNotifications(event: OrderStatus, o: NotificationOrder, cfg
           to: { role: "receiver", phone: o.dropoffContactPhone },
           channels: ["whatsapp", "sms"],
           title: "Gönderiniz yolda",
-          text: `${name ? `Merhaba ${name}, ` : ""}size gönderilen paket ${BRAND.name} ile yola çıktı. Canlı takip: ${url}`,
-          whatsappTemplate: { name: "alici_gonderi_yolda", params: [name || "Sayın alıcı", url] },
+          text:
+            `${name ? `Merhaba ${name}, ` : ""}size gönderilen paket ${BRAND.name} ile yola çıktı.` +
+            (o.deliveryCode ? ` Teslim kodunuz: ${o.deliveryCode} (paketi alırken kuryeye söyleyin).` : "") +
+            ` Canlı takip: ${url}`,
+          whatsappTemplate: o.deliveryCode
+            ? { name: "alici_gonderi_yolda_kod", params: [name || "Sayın alıcı", o.deliveryCode, url] }
+            : { name: "alici_gonderi_yolda", params: [name || "Sayın alıcı", url] },
         });
       }
       break;

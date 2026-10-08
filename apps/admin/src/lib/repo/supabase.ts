@@ -201,7 +201,7 @@ export function createSupabaseRepo(url: string, anonKey: string): AdminRepo & { 
     },
     async getOrder(id) {
       const [o, h] = await Promise.all([
-        client.from("orders").select(ORDER_SELECT).eq("id", id).single(),
+        client.from("orders").select(`${ORDER_SELECT}, secret:order_secrets(delivery_code, failed_attempts)`).eq("id", id).single(),
         client.from("order_status_history").select("*").eq("order_id", id).order("created_at"),
       ]);
       const r = check(o, "Sipariş okunamadı") as Row;
@@ -218,6 +218,10 @@ export function createSupabaseRepo(url: string, anonKey: string): AdminRepo & { 
         customerNote: r.customer_note,
         waitingMinutes: r.waiting_minutes,
         priceQuote: r.price_quote,
+        declaredValueKurus: r.declared_value_kurus ?? null,
+        deliveryCodeRequired: !!r.delivery_code_required,
+        deliveryCode: (Array.isArray(r.secret) ? r.secret[0] : r.secret)?.delivery_code ?? null,
+        deliveryCodeFailedAttempts: (Array.isArray(r.secret) ? r.secret[0] : r.secret)?.failed_attempts ?? 0,
         trackingToken: r.tracking_token,
         cancelReason: r.cancel_reason,
         problemNote: r.problem_note,

@@ -20,7 +20,7 @@ type Row = Record<string, unknown>;
 
 export const API_RATE_LIMIT = { perKey: 120, windowSeconds: 60 };
 const ORDER_COLUMNS =
-  "id, order_no, external_ref, status, created_at, scheduled_pickup_at, picked_up_at, delivered_at, pickup_address, dropoff_address, urgent, service_level, round_trip, subtotal_kurus, vat_kurus, total_kurus, tracking_token, pod_receiver_name, cancel_reason";
+  "id, order_no, external_ref, status, created_at, scheduled_pickup_at, picked_up_at, delivered_at, pickup_address, dropoff_address, urgent, service_level, round_trip, declared_value_kurus, delivery_code_required, subtotal_kurus, vat_kurus, total_kurus, tracking_token, pod_receiver_name, cancel_reason";
 
 export async function sha256Hex(s: string): Promise<string> {
   const d = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
@@ -63,6 +63,8 @@ export function apiOrder(r: Row, baseUrl = trackingBaseUrl) {
     serviceLevel: r.service_level ?? (r.urgent ? "acil" : "standart"),
     urgent: r.urgent,
     roundTrip: r.round_trip,
+    declaredValueKurus: r.declared_value_kurus ?? null,
+    deliveryCodeRequired: !!r.delivery_code_required,
     subtotalKurus: r.subtotal_kurus,
     vatKurus: r.vat_kurus,
     totalKurus: r.total_kurus,
@@ -154,7 +156,13 @@ export async function handleCorporateApi(req: Request, ctx: Ctx, deps: { env: En
       external_ref: externalRef,
     });
     const full = await findOrder(ctx, key, (created as Row).id as string).catch(() => created as Row);
-    return json({ order: apiOrder({ ...full, external_ref: externalRef }, base), quote: quote.quote }, 201);
+    // Teslim kodu yalnız oluşturma yanıtında döner (alıcıya ayrıca SMS ile gider)
+    let deliveryCode: string | null = null;
+    if (order.deliveryCode) {
+      const { data: sec } = await ctx.admin.from("order_secrets").select("delivery_code").eq("order_id", (created as Row).id).maybeSingle();
+      deliveryCode = ((sec as Row | null)?.delivery_code as string | undefined) ?? null;
+    }
+    return json({ order: { ...apiOrder({ ...full, external_ref: externalRef }, base), deliveryCode }, quote: quote.quote }, 201);
   }
 
   if (route === "/orders" && m === "GET") {

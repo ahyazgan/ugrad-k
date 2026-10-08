@@ -9,6 +9,9 @@ export interface Draft {
   roundTrip: boolean;
   weightKg: string;
   largePackage: boolean;
+  /** TL, boşsa beyan yok */
+  declaredValue: string;
+  deliveryCode: boolean;
   packageDescription: string;
   customerNote: string;
   pickupContactName: string;
@@ -25,6 +28,8 @@ const EMPTY: Draft = {
   roundTrip: false,
   weightKg: "",
   largePackage: false,
+  declaredValue: "",
+  deliveryCode: false,
   packageDescription: "",
   customerNote: "",
   pickupContactName: "",
@@ -39,6 +44,7 @@ const EMPTY: Draft = {
 export function draftToInput(d: Draft): OrderInput | null {
   if (!d.pickup || !d.dropoff) return null;
   const weight = d.weightKg.replace(",", ".").trim();
+  const declared = d.declaredValue.replace(/\./g, "").replace(",", ".").trim();
   return {
     pickup: { ...d.pickup, contactName: d.pickupContactName || undefined, contactPhone: d.pickupContactPhone || undefined },
     dropoff: { ...d.dropoff, contactName: d.dropoffContactName || undefined, contactPhone: d.dropoffContactPhone || undefined },
@@ -46,6 +52,8 @@ export function draftToInput(d: Draft): OrderInput | null {
     roundTrip: d.roundTrip,
     weightKg: weight ? Number(weight) : null,
     largePackage: d.largePackage,
+    declaredValueKurus: declared ? Math.round(Number(declared) * 100) : null,
+    deliveryCode: d.deliveryCode,
     packageDescription: d.packageDescription || undefined,
     customerNote: d.customerNote || undefined,
     scheduledPickupAt: null,

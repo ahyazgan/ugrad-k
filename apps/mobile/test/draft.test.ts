@@ -8,6 +8,8 @@ const base: Draft = {
   roundTrip: false,
   weightKg: "",
   largePackage: false,
+  declaredValue: "",
+  deliveryCode: false,
   packageDescription: "",
   customerNote: "",
   pickupContactName: "",
@@ -30,6 +32,10 @@ describe("draftToInput", () => {
   });
   it("hizmet seviyesini aktarır", () => {
     expect(draftToInput({ ...base, serviceLevel: "ekonomi" })!.serviceLevel).toBe("ekonomi");
+  });
+  it("değer beyanı TL → kuruş (binlik nokta, ondalık virgül)", () => {
+    expect(draftToInput({ ...base, declaredValue: "25.000,50", deliveryCode: true })).toMatchObject({ declaredValueKurus: 2_500_050, deliveryCode: true });
+    expect(draftToInput(base)!.declaredValueKurus).toBeNull();
   });
   it("ağırlık boşsa null", () => {
     expect(draftToInput(base)!.weightKg).toBeNull();

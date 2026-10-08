@@ -108,6 +108,11 @@ export interface AdminOrderDetail extends AdminOrder {
   customerNote: string | null;
   waitingMinutes: number;
   priceQuote: PriceQuote;
+  declaredValueKurus: number | null;
+  deliveryCodeRequired: boolean;
+  /** Yönetici görür; kurye görmez */
+  deliveryCode: string | null;
+  deliveryCodeFailedAttempts: number;
   trackingToken: string;
   cancelReason: string | null;
   problemNote: string | null;
@@ -224,6 +229,8 @@ export interface OrderRequestInput {
   roundTrip: boolean;
   weightKg: number | null;
   largePackage: boolean;
+  declaredValueKurus: number | null;
+  deliveryCode: boolean;
   packageDescription?: string;
   customerNote?: string;
   scheduledPickupAt: string | null;

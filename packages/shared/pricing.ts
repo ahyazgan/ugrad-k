@@ -75,6 +75,14 @@ export interface PricingSettings {
   serviceCenterLng: number;
   /** Merkezden bu kadar yol-km'ye kadar alış ücretsiz */
   freePickupRadiusKm: number;
+  /** Değer beyanı olmadan sorumluluk sınırı; beyan bunun üstündeki kısım için sigortalanır */
+  freeCoverageKurus: number;
+  /** Beyan edilen değerin sigortalanan kısmına uygulanan oran (%) */
+  insuranceRatePct: number;
+  /** En düşük sigorta ücreti */
+  insuranceMinKurus: number;
+  /** Kabul edilen en yüksek beyan; null = sınırsız */
+  maxDeclaredValueKurus: number | null;
   /** Ücretsiz yarıçapın dışındaki her yol-km için konumlanma ücreti (0 = kapalı) */
   remotePickupPerKmKurus: number;
   /** Uzak alış ücretinin üst sınırı */
@@ -119,6 +127,11 @@ export const DEFAULT_PRICING_SETTINGS: PricingSettings = {
   freePickupRadiusKm: 40,
   remotePickupPerKmKurus: 1_000,
   remotePickupMaxKurus: 30_000,
+  // Değer beyanı: 1.000 TL'ye kadar sorumluluk ücretsiz, üstü %0,5 (en az 25 TL), en fazla 100.000 TL
+  freeCoverageKurus: 100_000,
+  insuranceRatePct: 0.5,
+  insuranceMinKurus: 2_500,
+  maxDeclaredValueKurus: 10_000_000,
   corporateTiers: [
     { minDeliveries: 20, discountPct: 15 },
     { minDeliveries: 50, discountPct: 25 },
@@ -156,6 +169,8 @@ export interface PriceInput {
   bridgeCrossings?: number;
   /** Alışta beklenen dakika (teslimattan sonra gerçek süreyle yeniden hesaplanır) */
   waitingMinutes?: number;
+  /** Müşterinin beyan ettiği gönderi değeri (kuruş) */
+  declaredValueKurus?: number | null;
   holidays?: Holiday[];
 }
 
@@ -170,6 +185,8 @@ export type PriceLineCode =
   | "return_leg"
   | "waiting"
   | "bridge"
+  /** Değer beyanı sigortası */
+  | "insurance"
   /** Önceki gecikmeli acil teslimin telafisi (eksi tutar) */
   | "credit";
 
@@ -272,6 +289,22 @@ export function economyAvailableAt(at: Date, settings: PricingSettings, holidays
 /** Hizmet seviyesinin yüzde etkisi: acil +, ekonomi − */
 export function serviceLevelPct(level: ServiceLevel, settings: PricingSettings): number {
   return level === "acil" ? settings.urgentSurchargePct : level === "ekonomi" ? -settings.economyDiscountPct : 0;
+}
+
+/**
+ * Değer beyanı sigortası: beyanın ücretsiz sorumluluk sınırını aşan kısmının yüzdesi (en az insuranceMinKurus).
+ * Beyan üst sınırı aşarsa PricingError.
+ */
+export function insuranceFeeKurus(declaredKurus: number | null | undefined, settings: PricingSettings = DEFAULT_PRICING_SETTINGS): number {
+  if (!declaredKurus || declaredKurus <= 0) return 0;
+  if (settings.maxDeclaredValueKurus != null && declaredKurus > settings.maxDeclaredValueKurus) {
+    throw new PricingError(
+      `En fazla ${formatTL(settings.maxDeclaredValueKurus)} değerinde gönderi taşıyoruz; daha değerli gönderiler için bizi arayın`,
+    );
+  }
+  const insured = declaredKurus - settings.freeCoverageKurus;
+  if (insured <= 0) return 0;
+  return Math.max(settings.insuranceMinKurus, Math.ceil((insured * settings.insuranceRatePct) / 100 / 100) * 100);
 }
 
 /** Merkezden alış noktasına tahmini yol-km (kuş uçuşu × 1,35) ve uzak alış ücreti */
@@ -449,6 +482,15 @@ export function calculatePrice(
         remote.feeKurus === settings.remotePickupMaxKurus ? ", üst sınır" : ""
       })`,
       amountKurus: remote.feeKurus,
+    });
+  }
+
+  const insurance = insuranceFeeKurus(input.declaredValueKurus, settings);
+  if (insurance > 0) {
+    lines.push({
+      code: "insurance",
+      label: `Değer beyanı sigortası (${tl(input.declaredValueKurus!)} TL beyan, ${tl(settings.freeCoverageKurus)} TL üstü %${settings.insuranceRatePct.toLocaleString("tr-TR")})`,
+      amountKurus: insurance,
     });
   }
 

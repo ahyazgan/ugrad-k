@@ -45,6 +45,12 @@ describe("buildNotifications", () => {
     expect(r.whatsappTemplate).toEqual({ name: "alici_gonderi_yolda", params: ["Ali", "https://panel.yazgankurye.com/takip/abc"] });
   });
 
+  it("yolda: teslim kodu istenen siparişte kod alıcıya gider", () => {
+    const r = buildNotifications("yolda", { ...order, deliveryCode: "4821" }, cfg).find((x) => x.to.role === "receiver")!;
+    expect(r.text).toContain("Teslim kodunuz: 4821");
+    expect(r.whatsappTemplate).toEqual({ name: "alici_gonderi_yolda_kod", params: ["Ali", "4821", "https://panel.yazgankurye.com/takip/abc"] });
+  });
+
   it("alıcı telefonu yoksa alıcıya mesaj yok", () => {
     const m = buildNotifications("yolda", { ...order, dropoffContactPhone: null }, cfg);
     expect(m.some((x) => x.to.role === "receiver")).toBe(false);

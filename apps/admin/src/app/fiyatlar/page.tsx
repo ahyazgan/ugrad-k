@@ -44,6 +44,9 @@ const FIELDS: Field[] = [
   { key: "freePickupRadiusKm", label: "Ücretsiz alış yarıçapı (km)", kind: "kg", hint: "Merkeze tahmini yol mesafesi; dışında uzak alış ücreti" },
   { key: "remotePickupPerKmKurus", label: "Uzak alış km ücreti", kind: "tl" },
   { key: "remotePickupMaxKurus", label: "Uzak alış ücreti en fazla", kind: "tl" },
+  { key: "freeCoverageKurus", label: "Ücretsiz güvence (değer beyanı olmadan)", kind: "tl" },
+  { key: "insuranceRatePct", label: "Değer beyanı sigorta oranı", kind: "pct", hint: "Beyanın ücretsiz güvenceyi aşan kısmına" },
+  { key: "insuranceMinKurus", label: "En düşük sigorta ücreti", kind: "tl" },
   { key: "serviceCenterLat", label: "Merkez enlem", kind: "coord" },
   { key: "serviceCenterLng", label: "Merkez boylam", kind: "coord" },
   { key: "vatPct", label: "KDV", kind: "pct" },
@@ -106,6 +109,7 @@ export default function FiyatlarPage() {
   const [kmTiers, setKmTiers] = useState("");
   const [cap, setCap] = useState("");
   const [maxWeight, setMaxWeight] = useState("");
+  const [maxDeclared, setMaxDeclared] = useState("");
   const [indexPct, setIndexPct] = useState("");
   const [indexMsg, setIndexMsg] = useState<string | null>(null);
   const costLoad = useLoad(() => repo.getCostModel());
@@ -123,6 +127,7 @@ export default function FiyatlarPage() {
     setKmTiers(formatKmTiers(data.settings.kmTiers));
     setCap(data.settings.maxSurchargePct == null ? "" : String(data.settings.maxSurchargePct));
     setMaxWeight(data.settings.maxWeightKg == null ? "" : String(data.settings.maxWeightKg));
+    setMaxDeclared(data.settings.maxDeclaredValueKurus == null ? "" : String(data.settings.maxDeclaredValueKurus / 100));
   }, [data]);
 
   useEffect(() => {
@@ -190,10 +195,13 @@ export default function FiyatlarPage() {
     const w = parseCap(maxWeight);
     if (w === undefined || w === 0) errors.push("Ağırlık sınırı");
     else s.maxWeightKg = w;
+    const md = parseCap(maxDeclared.replace(/\./g, ""));
+    if (md === undefined || md === 0) errors.push("En yüksek değer beyanı");
+    else s.maxDeclaredValueKurus = md == null ? null : Math.round(md * 100);
     if (s.economyCutoffHour <= s.nightEndHour) errors.push("Ekonomi son alış saati");
     if (s.waitingBlockMinutes <= 0) errors.push("Bekleme dilimi");
     return { settings: s, errors };
-  }, [data, values, tiers, kmTiers, cap, maxWeight]);
+  }, [data, values, tiers, kmTiers, cap, maxWeight, maxDeclared]);
 
   async function save(e: FormEvent) {
     e.preventDefault();
@@ -255,6 +263,10 @@ export default function FiyatlarPage() {
               <div>
                 <Input label="Motosiklet ağırlık sınırı (kg)" value={maxWeight} inputMode="decimal" onChange={(e) => setMaxWeight(e.target.value)} />
                 <p className="mt-1 text-xs text-slate-500">Üzerindeki gönderi kabul edilmez. Boş bırakılırsa sınır yok.</p>
+              </div>
+              <div>
+                <Input label="En yüksek değer beyanı (TL)" value={maxDeclared} inputMode="decimal" onChange={(e) => setMaxDeclared(e.target.value)} />
+                <p className="mt-1 text-xs text-slate-500">Daha değerli gönderi kabul edilmez (sigortacınızın teminat sınırı). Boş = sınırsız.</p>
               </div>
             </div>
             <div>

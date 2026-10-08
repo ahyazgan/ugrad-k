@@ -192,7 +192,17 @@ export default function SiparisDetayPage() {
               <Info label="Paket">
                 {order.packageDescription}
                 {order.weightKg ? ` · ${order.weightKg} kg` : ""}
+                {order.declaredValueKurus ? ` · beyan ${formatTL(order.declaredValueKurus)}` : ""}
               </Info>
+              {order.deliveryCodeRequired ? (
+                <Info label="Teslim kodu">
+                  <span data-testid="admin-delivery-code">{order.deliveryCode ?? "—"}</span>
+                  {order.deliveryCodeFailedAttempts ? (
+                    <span className="ml-2 text-red-700">{order.deliveryCodeFailedAttempts} yanlış deneme</span>
+                  ) : null}
+                  <span className="block text-xs text-slate-500">Alıcıya SMS ile gider; kurye kodu almadan teslim edemez (yönetici kodsuz kapatabilir).</span>
+                </Info>
+              ) : null}
               <Info label="Müşteri notu">{order.customerNote}</Info>
               <Info label="Mesafe">{(order.distanceMeters / 1000).toFixed(1)} km{order.roundTrip ? " · gidiş-dönüş" : ""}</Info>
               <Info label="Planlı alış">{order.scheduledPickupAt ? fmtDateTime(order.scheduledPickupAt) : "Hemen"}</Info>

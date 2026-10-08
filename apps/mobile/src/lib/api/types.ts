@@ -38,6 +38,8 @@ export interface OrderInput {
   roundTrip: boolean;
   weightKg: number | null;
   largePackage: boolean;
+  declaredValueKurus: number | null;
+  deliveryCode: boolean;
   packageDescription?: string;
   customerNote?: string;
   scheduledPickupAt: string | null;
@@ -83,6 +85,10 @@ export interface OrderDetail extends OrderSummary {
   weightKg: number | null;
   scheduledPickupAt: string | null;
   priceQuote: PriceQuote;
+  declaredValueKurus: number | null;
+  deliveryCodeRequired: boolean;
+  /** Müşteriye gösterilir (kurye göremez) */
+  deliveryCode: string | null;
   /** Rota süresi (saniye); tahmini teslim için */
   durationSeconds: number | null;
   /** Acil teslim taahhüdü ve kaçırıldı mı */
@@ -204,6 +210,8 @@ export interface Api {
   ): Promise<void>;
   pushLocation(loc: CourierLocation, orderId: string | null): Promise<void>;
   courierEarnings(): Promise<CourierEarnings>;
+  /** Kurye alıcıdan aldığı teslim kodunu doğrular */
+  verifyDeliveryCode(orderId: string, code: string): Promise<{ ok: boolean; remaining: number }>;
   /** Kuryenin kendi belgeleri (yönetici girer) */
   courierDocuments(): Promise<CourierDocument[]>;
   subscribeCourierJobs(onChange: () => void): () => void;

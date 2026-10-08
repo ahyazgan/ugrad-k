@@ -79,6 +79,21 @@ export default function YeniGonderi() {
         <ToggleRow label="Gidiş-dönüş" hint="Dönüş ayağı %50 indirimli" value={draft.roundTrip} onChange={(v) => update({ roundTrip: v })} />
         <ToggleRow label="Büyük paket" hint="Motora sığan ama hacimli paketler, +150 TL" value={draft.largePackage} onChange={(v) => update({ largePackage: v })} />
         <Field
+          label="Gönderinin değeri (TL, isteğe bağlı)"
+          placeholder="Örn. 25.000"
+          keyboardType="decimal-pad"
+          value={draft.declaredValue}
+          onChangeText={(v) => update({ declaredValue: v })}
+          testID="declared-value"
+        />
+        <Muted>{"1.000 TL'ye kadar ücretsiz güvencededir; üstü için küçük bir sigorta ücreti fiyata eklenir."}</Muted>
+        <ToggleRow
+          label="Teslim kodu ile teslim"
+          hint="Alıcıya SMS ile kod gider; kurye kodu almadan teslim edemez"
+          value={draft.deliveryCode}
+          onChange={(v) => update({ deliveryCode: v })}
+        />
+        <Field
           label="Kuryeye not"
           placeholder="Örn. resepsiyona bırakın"
           value={draft.customerNote}

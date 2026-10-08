@@ -4,7 +4,7 @@ import { formatTL } from "@yazgan/shared";
 import { useEffect, useState } from "react";
 import { Image, Text } from "react-native";
 import { SignaturePad } from "@/components/SignaturePad";
-import { Button, Card, ErrorBox, Field, Muted, Screen, Segmented } from "@/components/ui";
+import { Button, Card, ErrorBox, Field, Muted, Screen, Segmented, colors } from "@/components/ui";
 import { api, ApiError, type CashCollection, type OrderDetail } from "@/lib/api";
 import { setActiveOrderForLocation } from "@/lib/location";
 
@@ -17,6 +17,9 @@ export default function Teslim() {
   const [error, setError] = useState<string | null>(null);
   const [order, setOrder] = useState<OrderDetail | null>(null);
   const [collection, setCollection] = useState<CashCollection | "">("");
+  const [code, setCode] = useState("");
+  const [codeOk, setCodeOk] = useState(false);
+  const [codeMsg, setCodeMsg] = useState<string | null>(null);
 
   useEffect(() => {
     api.getOrder(id).then(setOrder, () => undefined);
@@ -33,6 +36,19 @@ export default function Teslim() {
     }
     const res = await ImagePicker.launchCameraAsync({ mediaTypes: ["images"], quality: 0.5 });
     if (!res.canceled && res.assets[0]) setPhotoUri(res.assets[0].uri);
+  }
+
+  const needsCode = !!order?.deliveryCodeRequired && !codeOk;
+
+  async function verifyCode() {
+    setCodeMsg(null);
+    try {
+      const r = await api.verifyDeliveryCode(id, code);
+      setCodeOk(r.ok);
+      setCodeMsg(r.ok ? "Kod doğru" : `Kod yanlış, ${r.remaining} hakkınız kaldı`);
+    } catch (e) {
+      setCodeMsg(e instanceof ApiError ? e.message : "Kod doğrulanamadı");
+    }
   }
 
   async function submit() {
@@ -67,6 +83,15 @@ export default function Teslim() {
         <Text style={{ fontWeight: "600" }}>İmza</Text>
         <SignaturePad onChange={setSignature} />
       </Card>
+      {order?.deliveryCodeRequired ? (
+        <Card>
+          <Text style={{ fontWeight: "600" }}>Teslim kodu</Text>
+          <Muted>Alıcıdan SMS ile gelen 4 haneli kodu isteyin.</Muted>
+          <Field label="Kod" keyboardType="number-pad" maxLength={4} value={code} onChangeText={setCode} editable={!codeOk} testID="delivery-code-input" />
+          {codeOk ? null : <Button title="Kodu doğrula" variant="secondary" onPress={verifyCode} disabled={code.trim().length !== 4} testID="verify-code" />}
+          {codeMsg ? <Muted style={{ color: codeOk ? colors.success : colors.danger }}>{codeMsg}</Muted> : null}
+        </Card>
+      ) : null}
       {needsCash ? (
         <Card>
           <Text style={{ fontWeight: "600" }}>Tahsilat: {formatTL(order.totalKurus)}</Text>
@@ -88,7 +113,7 @@ export default function Teslim() {
         title="Teslimi tamamla"
         onPress={submit}
         loading={busy}
-        disabled={receiver.trim().length < 2 || (!photoUri && !signature) || (needsCash && !collection)}
+        disabled={receiver.trim().length < 2 || (!photoUri && !signature) || (needsCash && !collection) || needsCode}
         testID="complete-delivery"
       />
       <Muted style={{ textAlign: "center" }}>Fotoğraf veya imzadan en az biri zorunludur.</Muted>

@@ -38,6 +38,10 @@ export function pricingRows(s: PricingSettings = DEFAULT_PRICING_SETTINGS): Arra
       value: `+${tl(s.remotePickupPerKmKurus)}`,
     });
   }
+  rows.push({
+    label: `Değer beyanı: ${tl(s.freeCoverageKurus)}'ye kadar ücretsiz güvence; üstü (en az ${tl(s.insuranceMinKurus)})`,
+    value: `%${s.insuranceRatePct.toLocaleString("tr-TR")}`,
+  });
   if (s.maxWeightKg != null) rows.push({ label: "Motosikletle taşınabilen en fazla ağırlık", value: `${s.maxWeightKg} kg` });
   return rows;
 }

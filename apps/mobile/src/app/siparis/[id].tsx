@@ -221,6 +221,14 @@ export default function SiparisDetay() {
       </Card>
 
       {!["teslim_edildi", "iptal"].includes(order.status) ? <OrderMap order={order} /> : null}
+      {order.deliveryCode && order.status !== "teslim_edildi" && order.status !== "iptal" ? (
+        <Card>
+          <Text style={{ fontWeight: "700" }} testID="delivery-code">
+            Teslim kodu: {order.deliveryCode}
+          </Text>
+          <Muted>Gönderi yola çıkınca alıcıya SMS ile de gider. Kurye bu kodu almadan teslim edemez.</Muted>
+        </Card>
+      ) : null}
       {order.slaMissed ? (
         <Card>
           <Muted>Acil teslim taahhüdü aşıldı; acil ek ücreti sonraki siparişinizden otomatik düşülecek. Özür dileriz.</Muted>

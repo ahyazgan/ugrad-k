@@ -29,6 +29,7 @@ export function toNotificationOrder(r: Row): NotificationOrder {
     podReceiverName: r.pod_receiver_name,
     cancelReason: r.cancel_reason,
     problemNote: r.problem_note,
+    deliveryCode: (Array.isArray(r.secret) ? r.secret[0] : r.secret)?.delivery_code ?? null,
     customer: {
       fullName: r.customer?.full_name ?? null,
       phone: r.customer?.phone ?? null,
@@ -70,7 +71,7 @@ export async function handleNotifyDispatch(
       const { data: order, error: oErr } = await ctx.admin
         .from("orders")
         .select(
-          "*, customer:profiles!orders_customer_id_fkey(full_name, phone, push_token), courier:couriers(profile:profiles(full_name, phone, push_token))",
+          "*, customer:profiles!orders_customer_id_fkey(full_name, phone, push_token), courier:couriers(profile:profiles(full_name, phone, push_token)), secret:order_secrets(delivery_code)",
         )
         .eq("id", n.order_id)
         .single();

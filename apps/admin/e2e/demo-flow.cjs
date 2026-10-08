@@ -62,12 +62,16 @@ fs.mkdirSync(out, { recursive: true });
   await t("dropoff-suggestion-0").click();
   await t("dropoff-details").fill("Kanyon B Blok");
   await t("opt-level").selectOption("acil");
+  await t("declared-value").fill("25000");
+  await t("opt-deliveryCode").check();
   await t("total").waitFor();
   console.log("TELEFON FIYAT", await t("total").innerText());
   await shot("03b-telefon-siparisi");
   await t("submit").click();
   await page.getByText("Telefon siparişi", { exact: true }).waitFor(); // geçmiş notu
   await page.getByText("Kanyon B Blok").waitFor();
+  await page.getByTestId("admin-delivery-code").filter({ hasText: /^\d{4}$/ }).waitFor();
+  await page.getByText(/beyan 25\.000,00 TL/).waitFor();
 
   // Yeni müşteri: sözlü KVKK onayı olmadan gönderilemez
   await nav("Siparişler");
