@@ -210,8 +210,21 @@ fs.mkdirSync(out, { recursive: true });
   await kp.locator('[data-testid^="job-"]').first().click();
   await kt('arrive-pickup').click();
   await kp.getByText(/Alış adresine vardınız/).waitFor();
+  // Çevrimdışı: işlemler telefonda sıraya alınır, ekran akmaya devam eder, bağlantı gelince gider
+  const setOnline = (v) => kp.evaluate((on) => {
+    Object.defineProperty(navigator, 'onLine', { configurable: true, get: () => on });
+    window.dispatchEvent(new Event(on ? 'online' : 'offline'));
+  }, v);
+  await setOnline(false);
   await kt('pickup').click();
+  await kp.getByText(/Bağlantı yok: işlem kaydedildi/).waitFor();
   await kt('on-the-way').click();
+  // Ana ekran da yığında açık: banner iki yerde olabilir
+  await kt('outbox-pending').last().getByText('📶 Bağlantı yok: 3 işlem bekliyor').waitFor();
+  await kshot('11b-kurye-cevrimdisi');
+  await setOnline(true);
+  await kp.waitForFunction(() => !document.querySelector('[data-testid="outbox-pending"]'), null, { timeout: 20000 });
+  await kt('arrive-dropoff').waitFor();
   await kt('arrive-dropoff').click();
   await kp.getByText(/Teslim adresine vardınız/).waitFor();
   await kt('failed-open').click();

@@ -66,11 +66,11 @@ export function createSupabaseApi(url: string, anonKey: string): Api & { client:
     return id;
   };
 
-  /** Teslim kanıtı / adres fotoğrafını özel "pod" deposuna yükler */
+  /** Teslim kanıtı / adres fotoğrafını özel "pod" deposuna yükler (aynı adla tekrar yüklenebilir) */
   async function uploadPod(orderId: string, name: string, uri: string) {
     const path = `${orderId}/${name}`;
     const body = await (await fetch(uri)).arrayBuffer();
-    const { error } = await client.storage.from("pod").upload(path, body, { contentType: "image/jpeg" });
+    const { error } = await client.storage.from("pod").upload(path, body, { contentType: "image/jpeg", upsert: true });
     if (error) throw new ApiError(`Fotoğraf yüklenemedi: ${error.message}`);
     return path;
   }
@@ -354,17 +354,15 @@ export function createSupabaseApi(url: string, anonKey: string): Api & { client:
       if (error) throw new ApiError(error.message);
       return data as { ok: boolean; message: string | null };
     },
-    async courierAction(orderId, action) {
+    async courierAction(orderId, action, opts = {}) {
       const rpc = async (p: Record<string, unknown>) => {
-        const { error } = await client.rpc("set_order_status", { p_order_id: orderId, ...p });
+        const { error } = await client.rpc("set_order_status", { p_order_id: orderId, p_occurred_at: opts.occurredAt ?? null, ...p });
         if (error) throw new ApiError(error.message);
       };
       switch (action.type) {
         case "pickup":
-          await rpc({ p_status: "alindi", p_waiting_minutes: action.waitingMinutes });
-          // Bekleme sunucuda varıştan ölçülür (yoksa girilen süre); ücret pricing.ts ile teklife eklenir
-          await invoke("reprice-order", { orderId });
-          return;
+          // Bekleme sunucuda varıştan ölçülür (yoksa girilen süre); ücret repriceOrder ile işlenir
+          return rpc({ p_status: "alindi", p_waiting_minutes: action.waitingMinutes });
         case "on_the_way":
           return rpc({ p_status: "yolda" });
         case "problem":
@@ -373,14 +371,14 @@ export function createSupabaseApi(url: string, anonKey: string): Api & { client:
           return rpc({ p_status: "onaylandi", p_note: action.note });
         case "deliver":
         case "return_deliver": {
-          const stamp = Date.now();
+          const stamp = opts.fileStamp ?? Date.now();
           const photoPath = action.pod.photoUri ? await uploadPod(orderId, `foto-${stamp}.jpg`, action.pod.photoUri) : null;
           let signaturePath: string | null = null;
           if (action.pod.signatureSvg) {
             signaturePath = `${orderId}/imza-${stamp}.svg`;
             const { error } = await client.storage
               .from("pod")
-              .upload(signaturePath, action.pod.signatureSvg, { contentType: "image/svg+xml" });
+              .upload(signaturePath, action.pod.signatureSvg, { contentType: "image/svg+xml", upsert: true });
             if (error) throw new ApiError(`İmza yüklenemedi: ${error.message}`);
           }
           return rpc({
@@ -393,17 +391,19 @@ export function createSupabaseApi(url: string, anonKey: string): Api & { client:
         }
       }
     },
-    async reportFailedDelivery(orderId, input) {
-      const photoPath = await uploadPod(orderId, `teslim-edilemedi-${Date.now()}.jpg`, input.photoUri);
+    async reportFailedDelivery(orderId, input, opts = {}) {
+      const photoPath = await uploadPod(orderId, `teslim-edilemedi-${opts.fileStamp ?? Date.now()}.jpg`, input.photoUri);
       const { error } = await client.rpc("report_failed_delivery", {
         p_order_id: orderId,
         p_reason: input.reason,
         p_note: input.note.trim() || null,
         p_photo_path: photoPath,
         p_call_attempts: input.callAttempts,
+        p_occurred_at: opts.occurredAt ?? null,
       });
       if (error) throw new ApiError(error.message);
-      // İade ücreti (dönüş ayağı) sunucuda pricing.ts ile eklenir
+    },
+    async repriceOrder(orderId) {
       await invoke("reprice-order", { orderId });
     },
     async pushLocation(loc, orderId) {
@@ -415,6 +415,7 @@ export function createSupabaseApi(url: string, anonKey: string): Api & { client:
         accuracy_m: loc.accuracy ?? null,
         heading: loc.heading ?? null,
         speed_mps: loc.speed ?? null,
+        ...(loc.recordedAt ? { recorded_at: loc.recordedAt } : {}),
       });
       if (error) throw new ApiError(error.message);
     },
@@ -434,8 +435,14 @@ export function createSupabaseApi(url: string, anonKey: string): Api & { client:
       fail(error, "Acil durum kaydı okunamadı");
       return data ? { id: data.id, kind: data.kind, createdAt: data.created_at, acknowledgedAt: data.acknowledged_at } : null;
     },
-    async markArrived(orderId, stop, at) {
-      const { data, error } = await client.rpc("mark_arrived", { p_order_id: orderId, p_stop: stop, p_lat: at?.lat ?? null, p_lng: at?.lng ?? null });
+    async markArrived(orderId, stop, at, occurredAt) {
+      const { data, error } = await client.rpc("mark_arrived", {
+        p_order_id: orderId,
+        p_stop: stop,
+        p_lat: at?.lat ?? null,
+        p_lng: at?.lng ?? null,
+        p_at: occurredAt ?? null,
+      });
       if (error) throw new ApiError(error.message);
       return { arrivedAt: (data as { arrived_at: string }).arrived_at };
     },

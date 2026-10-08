@@ -2,10 +2,14 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { Redirect } from "expo-router";
 import { Tabs } from "expo-router/js-tabs";
 import { colors } from "@/components/ui";
+import { useEffect } from "react";
+import { startOutboxSync } from "@/lib/outbox";
 import { useSession } from "@/lib/session";
 
 export default function KuryeLayout() {
   const { loading, session, consented, profile } = useSession();
+  // Çevrimdışı kuyruktaki kurye işlemlerini bağlantı gelince gönder
+  useEffect(() => startOutboxSync(), []);
   if (!loading && (!session || !consented || profile?.role !== "kurye")) return <Redirect href="/" />;
   return (
     <Tabs

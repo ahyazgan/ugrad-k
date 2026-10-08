@@ -3,14 +3,26 @@ import * as ImagePicker from "expo-image-picker";
 import { useState } from "react";
 import { Image, Pressable, Text, TextInput, View } from "react-native";
 import { Button, Card, ErrorBox, Muted, colors, styles } from "@/components/ui";
-import { api, ApiError, type OrderDetail } from "@/lib/api";
+import { ApiError, type OrderDetail } from "@/lib/api";
 import { callPhone } from "@/lib/navigation";
+import { outbox } from "@/lib/outbox";
 
 /**
  * Teslim edilemedi: neden, alıcıyı arama, adres fotoğrafı. Sunucu varış ve en az bekleme şartını denetler
  * (alıcı reddettiyse / adres bulunamadıysa bekleme gerekmez). Paket göndericiye döner.
  */
-export function FailedDeliveryForm({ order, now, onDone, onCancel }: { order: OrderDetail; now: number; onDone: () => void; onCancel: () => void }) {
+export function FailedDeliveryForm({
+  order,
+  now,
+  onDone,
+  onCancel,
+}: {
+  order: OrderDetail;
+  now: number;
+  /** queued: bağlantı yok, telefonda sıraya alındı */
+  onDone: (queued: boolean) => void;
+  onCancel: () => void;
+}) {
   const [reason, setReason] = useState<FailedDeliveryReason | null>(null);
   const [calls, setCalls] = useState(0);
   const [note, setNote] = useState("");
@@ -36,10 +48,14 @@ export function FailedDeliveryForm({ order, now, onDone, onCancel }: { order: Or
     setBusy(true);
     setError(null);
     try {
-      await api.reportFailedDelivery(order.id, { reason, note, callAttempts: calls, photoUri });
-      onDone();
+      const base = { orderId: order.id, orderNo: order.orderNo };
+      const r = await outbox.run([
+        { kind: "failed", ...base, input: { reason, note, callAttempts: calls, photoUri }, fileStamp: Date.now() },
+        { kind: "reprice", ...base },
+      ]);
+      onDone(r === "queued");
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : "Kaydedilemedi");
+      setError(e instanceof ApiError || e instanceof Error ? e.message : "Kaydedilemedi");
     } finally {
       setBusy(false);
     }

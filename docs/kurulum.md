@@ -40,6 +40,7 @@ Kodun tamamı yazıldı ve testlerden geçti. Bu rehber, sistemi **gerçek hesap
 33. [Teslim edilemedi → göndericiye iade](#33-teslim-edilemedi--göndericiye-iade)
 34. [Durak sırası](#34-durak-sırası)
 35. [Uygulama içi mesajlaşma](#35-uygulama-içi-mesajlaşma)
+36. [Çevrimdışı çalışma](#36-çevrimdışı-çalışma)
 
 ---
 
@@ -501,3 +502,11 @@ Kayıtlı müşteriler `siparis@<alan adı>` adresine yazar; yapay zeka asistan�
 - **Panel**: sipariş detayında *Mesajlar* kartı; yönetici tüm yazışmayı canlı görür ve "destek" olarak ikisine birden yazabilir.
 - **KVKK**: yazışmalar tamamlanan/iptal siparişlerde 90 gün sonra otomatik silinir (§6 `otomatik-dagitim`). Aydınlatma metninde "sipariş yazışmaları" veri kategorisi olarak belirtilmeli.
 - **Numara gizleme (maskeli arama)**: arama için hâlâ gerçek numara kullanılır. İstenirse Netgsm Sanal Santral / numara maskeleme hizmeti alınarak "Ara" düğmeleri ara numaraya yönlendirilebilir (hesap ve sözleşme sizde).
+
+## 36. Çevrimdışı çalışma
+
+- Kurye asansörde, otoparkta veya çekmeyen bir binadayken *Paketi aldım*, *Yola çıktım*, *Vardım*, *Teslim et* (fotoğraf/imza dahil), *Teslim edilemedi*, *Göndericiye teslim* ve **SOS** telefonda sıraya alınır; ekran akmaya devam eder. Konum noktaları da dakikada bir saklanır (en fazla 120).
+- Bağlantı gelince (uygulama öne geldiğinde, 15 saniyede bir veya *Şimdi dene*) işlemler **yapıldıkları saatle** ve sırayla gönderilir: teslim saati, bekleme ölçümü, acil taahhüt ve BTK kayıtları doğru kalır. Sunucu en fazla 6 saat geriye kabul eder; bir işlem siparişin önceki adımından önceye yazılamaz.
+- Sunucunun reddettiği işlem (ör. "Önce işi kabul edin") *Gönderilemedi* olarak İşlerim ekranında kalır; kurye silip yeniden yapabilir. Aynı siparişin sonraki işlemleri o çözülene kadar bekler.
+- Çevrimdışı yapılamayanlar: iş teklifini kabul/ret, teslim kodunu doğrulama (sunucu doğrular), işi bırakma, mesajlaşma.
+- SOS çevrimdışıysa ekranda "İnternet yok, şimdi 112'yi veya yöneticinizi arayın" uyarısı çıkar; alarm bağlantı gelir gelmez basıldığı saat notuyla gider.

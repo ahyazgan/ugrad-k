@@ -165,6 +165,22 @@ export interface CourierEarnings {
   rates: { perJobKurus: number; perKmKurus: number } | null;
 }
 
+export type CourierActionInput =
+  | { type: "pickup"; waitingMinutes: number }
+  | { type: "on_the_way" }
+  | { type: "deliver"; pod: ProofOfDelivery }
+  /** Teslim edilemeyen paketi göndericiye teslim (kanıtla) */
+  | { type: "return_deliver"; pod: ProofOfDelivery }
+  | { type: "problem"; note: string }
+  | { type: "release"; note: string };
+
+export interface FailedDeliveryInput {
+  reason: FailedDeliveryReason;
+  note: string;
+  callAttempts: number;
+  photoUri: string;
+}
+
 /** Sipariş yazışması */
 export interface ChatMessage {
   id: string;
@@ -246,25 +262,22 @@ export interface Api {
    * timeout: geri sayım bitti (kurye yanıt vermedi)
    */
   respondOffer(orderId: string, accept: boolean, opts?: { reason?: string; timeout?: boolean }): Promise<{ ok: boolean; message: string | null }>;
-  courierAction(
-    orderId: string,
-    action:
-      | { type: "pickup"; waitingMinutes: number }
-      | { type: "on_the_way" }
-      | { type: "deliver"; pod: ProofOfDelivery }
-      /** Teslim edilemeyen paketi göndericiye teslim (kanıtla) */
-      | { type: "return_deliver"; pod: ProofOfDelivery }
-      | { type: "problem"; note: string }
-      | { type: "release"; note: string },
-  ): Promise<void>;
-  pushLocation(loc: CourierLocation, orderId: string | null): Promise<void>;
   /**
-   * Teslim edilemedi: neden, alıcıyı arama sayısı, adres fotoğrafı (zorunlu). Paket göndericiye döner,
-   * dönüş ayağı ücreti eklenir. Sunucu varış ve en az bekleme şartını denetler.
+   * Kurye durum değişikliği. Çevrimdışı kuyruktan gönderilirken `occurredAt` işlemin yapıldığı an,
+   * `fileStamp` kanıt dosya adlarının sabit kalması (tekrar denemede aynı dosya) içindir.
+   * Bekleme/iade ücreti için ardından `repriceOrder` çağrılır.
    */
-  reportFailedDelivery(orderId: string, input: { reason: FailedDeliveryReason; note: string; callAttempts: number; photoUri: string }): Promise<void>;
+  courierAction(orderId: string, action: CourierActionInput, opts?: { occurredAt?: string; fileStamp?: number }): Promise<void>;
+  /** Bekleme ve iade ücretini sunucuda (pricing.ts) teklife işler */
+  repriceOrder(orderId: string): Promise<void>;
+  pushLocation(loc: CourierLocation & { recordedAt?: string }, orderId: string | null): Promise<void>;
+  /**
+   * Teslim edilemedi: neden, alıcıyı arama sayısı, adres fotoğrafı (zorunlu). Paket göndericiye döner;
+   * dönüş ayağı ücreti için ardından `repriceOrder`. Sunucu varış ve en az bekleme şartını denetler.
+   */
+  reportFailedDelivery(orderId: string, input: FailedDeliveryInput, opts?: { occurredAt?: string; fileStamp?: number }): Promise<void>;
   /** Kurye adrese vardığını bildirir (adrese 300 m içinde olmalı) */
-  markArrived(orderId: string, stop: "alis" | "teslim", at: CourierLocation | null): Promise<{ arrivedAt: string }>;
+  markArrived(orderId: string, stop: "alis" | "teslim", at: CourierLocation | null, occurredAt?: string): Promise<{ arrivedAt: string }>;
   courierEarnings(): Promise<CourierEarnings>;
   /** Acil durum: yöneticiye konumla alarm (molaya alınır) */
   raiseSos(input: { kind: IncidentKind; note?: string; at: (CourierLocation & { accuracy?: number | null }) | null }): Promise<{ id: string }>;

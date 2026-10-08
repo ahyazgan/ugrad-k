@@ -7,7 +7,9 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { TileMap, type MapMarker } from "@/components/TileMap";
 import { Button, Card, ErrorBox, Loading, Muted, Screen, Title, colors, styles } from "@/components/ui";
 import { api, ApiError, type OrderDetail } from "@/lib/api";
+import { OutboxBanner } from "@/components/OutboxBanner";
 import { formatTime } from "@/lib/format";
+import { outbox } from "@/lib/outbox";
 import { currentPosition, lastKnownPosition, setActiveOrderForLocation } from "@/lib/location";
 import { callPhone, openDirections } from "@/lib/navigation";
 
@@ -107,35 +109,57 @@ export default function IsDetay() {
     return api.subscribeOrder(id, load);
   }, [id, load]);
 
+  const [queuedMsg, setQueuedMsg] = useState<string | null>(null);
+
   async function act(action: Parameters<typeof api.courierAction>[1]) {
+    if (!order) return;
     setBusy(true);
     setError(null);
+    setQueuedMsg(null);
     try {
-      await api.courierAction(id, action);
-      if (action.type === "on_the_way" || action.type === "pickup") setActiveOrderForLocation(id);
       if (action.type === "release") {
+        // İşi bırakmak sunucu kararı gerektirir (bağlantı şart)
+        await api.courierAction(id, action);
         router.back();
         return;
       }
+      // Paketi aldım / yola çıktım / sorun: bağlantı yoksa telefonda sıraya alınır
+      const base = { orderId: id, orderNo: order.orderNo };
+      const r = await outbox.run([
+        { kind: "action", ...base, action, fileStamp: Date.now() },
+        ...(action.type === "pickup" ? [{ kind: "reprice" as const, ...base }] : []),
+      ]);
+      if (action.type === "on_the_way" || action.type === "pickup") setActiveOrderForLocation(id);
       setNoteFor(null);
       setNote("");
-      await load();
+      if (r === "queued") {
+        // Ekran akmaya devam etsin: durum yerelde ilerler, sunucuya sonra gider
+        const next: Partial<Record<typeof action.type, OrderDetail["status"]>> = { pickup: "alindi", on_the_way: "yolda", problem: "sorunlu" };
+        setOrder({ ...order, status: next[action.type] ?? order.status });
+        setQueuedMsg("Bağlantı yok: işlem kaydedildi, bağlantı gelince yapıldığı saatle gönderilecek.");
+      } else await load();
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : "İşlem başarısız");
+      setError(e instanceof ApiError || e instanceof Error ? e.message : "İşlem başarısız");
     } finally {
       setBusy(false);
     }
   }
 
   async function arrive(stop: "alis" | "teslim") {
+    if (!order) return;
     setBusy(true);
     setError(null);
+    setQueuedMsg(null);
     try {
-      await api.markArrived(id, stop, await currentPosition());
+      const r = await outbox.run([{ kind: "arrive", orderId: id, orderNo: order.orderNo, stop, loc: await currentPosition() }]);
       setNow(Date.now());
-      await load();
+      if (r === "queued") {
+        const at = new Date().toISOString();
+        setOrder({ ...order, ...(stop === "alis" ? { arrivedPickupAt: at } : { arrivedDropoffAt: at }) });
+        setQueuedMsg("Bağlantı yok: varış kaydedildi, bağlantı gelince gönderilecek.");
+      } else await load();
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : "Varış bildirilemedi");
+      setError(e instanceof ApiError || e instanceof Error ? e.message : "Varış bildirilemedi");
     } finally {
       setBusy(false);
     }
@@ -196,6 +220,8 @@ export default function IsDetay() {
       />
 
       <ErrorBox message={error} />
+      {queuedMsg ? <Muted style={{ color: "#92400E" }}>{queuedMsg}</Muted> : null}
+      <OutboxBanner onSent={load} />
 
       {offerPending ? (
         <OfferCard
@@ -253,9 +279,12 @@ export default function IsDetay() {
           order={order}
           now={now}
           onCancel={() => setFailing(false)}
-          onDone={() => {
+          onDone={(queued) => {
             setFailing(false);
-            load();
+            if (queued) {
+              setOrder({ ...order, status: "geri_donuyor", failedAt: new Date().toISOString() });
+              setQueuedMsg("Bağlantı yok: teslim edilemedi kaydı ve fotoğraf telefonda bekliyor, bağlantı gelince gönderilecek.");
+            } else load();
           }}
         />
       ) : null}

@@ -5,6 +5,7 @@ import { Button, Card, ErrorBox, Muted, Screen, Title, colors, styles } from "@/
 import { api, ApiError, type Incident } from "@/lib/api";
 import { formatTime } from "@/lib/format";
 import { currentPosition, lastKnownPosition } from "@/lib/location";
+import { outbox } from "@/lib/outbox";
 
 /**
  * Acil durum: kurye tür seçip tek tuşla yöneticiye konumuyla alarm verir. Hayati tehlikede önce 112.
@@ -16,6 +17,7 @@ export default function Sos() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [incident, setIncident] = useState<Incident | null | undefined>(undefined);
+  const [offline, setOffline] = useState(false);
 
   const load = useCallback(() => api.myOpenIncident().then(setIncident, () => setIncident(null)), []);
   useEffect(() => {
@@ -32,10 +34,12 @@ export default function Sos() {
     try {
       // Hızlı olsun: önce son bilinen konum, yoksa anlık konum
       const at = (await lastKnownPosition()) ?? (await currentPosition());
-      await api.raiseSos({ kind: k, note: note.trim() || undefined, at });
-      await load();
+      // Bağlantı yoksa alarm telefonda bekler ve bağlantı gelir gelmez gider
+      const r = await outbox.run([{ kind: "sos", incident: k, note: note.trim() || null, loc: at }]);
+      setOffline(r === "queued");
+      if (r === "sent") await load();
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : "Gönderilemedi; yöneticinizi telefonla arayın");
+      setError(e instanceof ApiError || e instanceof Error ? e.message : "Gönderilemedi; yöneticinizi telefonla arayın");
     } finally {
       setBusy(false);
     }
@@ -48,6 +52,13 @@ export default function Sos() {
         <Button title="112 Acil Çağrı" variant="danger" onPress={() => Linking.openURL("tel:112")} testID="call-112" />
       </Card>
 
+      {offline ? (
+        <Card style={{ borderColor: colors.danger }}>
+          <Text testID="sos-offline" style={{ color: colors.danger, fontWeight: "800" }}>
+            İnternet yok! Alarm telefonda bekliyor, bağlantı gelir gelmez gönderilecek. Şimdi 112&apos;yi veya yöneticinizi telefonla arayın.
+          </Text>
+        </Card>
+      ) : null}
       {incident ? (
         <Card style={{ gap: 6 }}>
           <Title>Bildirildi</Title>

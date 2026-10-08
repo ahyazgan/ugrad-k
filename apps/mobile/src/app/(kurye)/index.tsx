@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import { complianceFor, DocumentWarning } from "@/components/CourierDocs";
 import { OfferCard } from "@/components/OfferCard";
+import { OutboxBanner } from "@/components/OutboxBanner";
 import { StopPlan } from "@/components/StopPlan";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Button, Card, ErrorBox, Muted, Screen, Title, colors } from "@/components/ui";
@@ -158,6 +159,7 @@ export default function KuryeIsler() {
         <Button title="🚨 Acil durum (SOS)" variant="danger" onPress={() => router.push("/sos")} testID="sos-open" />
       ) : null}
       <ErrorBox message={error} />
+      <OutboxBanner onSent={load} />
       {offerMsg ? <Muted style={{ color: colors.danger }}>{offerMsg}</Muted> : null}
       {offers.map((j) => (
         <OfferCard

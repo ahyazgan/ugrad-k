@@ -8,7 +8,7 @@ import * as Location from "expo-location";
 import * as TaskManager from "expo-task-manager";
 import { Platform } from "react-native";
 import { BRAND } from "@yazgan/shared";
-import { api } from "./api";
+import { outbox } from "./outbox";
 
 export const LOCATION_TASK = "yazgan-kurye-konum";
 const INTERVAL_MS = 30_000;
@@ -22,16 +22,20 @@ export const setActiveOrderForLocation = (id: string | null) => {
 
 async function send(loc: Location.LocationObject) {
   try {
-    await api.pushLocation(
+    // Bağlantı yoksa nokta telefonda bekler (dakikada bir), sonra kaydedildiği saatle gider
+    await outbox.run([
       {
-        lat: loc.coords.latitude,
-        lng: loc.coords.longitude,
-        accuracy: loc.coords.accuracy,
-        heading: loc.coords.heading,
-        speed: loc.coords.speed,
+        kind: "location",
+        orderId: activeOrderId,
+        loc: {
+          lat: loc.coords.latitude,
+          lng: loc.coords.longitude,
+          accuracy: loc.coords.accuracy,
+          heading: loc.coords.heading,
+          speed: loc.coords.speed,
+        },
       },
-      activeOrderId,
-    );
+    ]);
   } catch (e) {
     console.warn("Konum gönderilemedi", e);
   }

@@ -208,14 +208,19 @@ export function createDemoApi(): Api {
     }
   }
 
-  function move(id: string, to: OrderStatus, note: string | null = null) {
+  /** Demo: tarayıcı çevrimdışıysa ağ hatası gibi davranır (çevrimdışı kuyruğu denemek için) */
+  const failIfOffline = () => {
+    if (typeof navigator !== "undefined" && navigator.onLine === false) throw new ApiError("Network request failed");
+  };
+
+  function move(id: string, to: OrderStatus, note: string | null = null, at?: string) {
     const o = orders.get(id);
     if (!o) throw new ApiError("Sipariş bulunamadı", undefined, 404);
     if (!ORDER_TRANSITIONS[o.status].includes(to)) {
       throw new ApiError(`Bu işlem şu an yapılamaz (${o.status} → ${to})`);
     }
     o.status = to;
-    o.history.push({ status: to, at: new Date().toISOString(), note });
+    o.history.push({ status: to, at: at ?? new Date().toISOString(), note });
     notify(id);
     notifyJobs();
     return o;
@@ -412,6 +417,7 @@ export function createDemoApi(): Api {
         .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
     },
     async raiseSos({ kind }) {
+      failIfOffline();
       if (!incident) {
         incident = { id: "demo-sos", kind, createdAt: new Date().toISOString(), acknowledgedAt: null };
         // Demo: yönetici birkaç saniyede görür
@@ -426,12 +432,13 @@ export function createDemoApi(): Api {
     async myOpenIncident() {
       return incident ? { ...incident } : null;
     },
-    async markArrived(orderId, stop) {
+    async markArrived(orderId, stop, _at, occurredAt) {
+      failIfOffline();
       const o = orders.get(orderId);
       if (!o) throw new ApiError("Sipariş bulunamadı", undefined, 404);
       if (stop === "alis" && (o.status !== "kuryeye_atandi" || o.offerExpiresAt)) throw new ApiError("Alış adresine varış yalnız paket alınmadan önce bildirilir");
       if (stop === "teslim" && o.status !== "yolda" && o.status !== "sorunlu") throw new ApiError("Teslim adresine varış paket yoldayken bildirilir");
-      const now = new Date().toISOString();
+      const now = occurredAt ?? new Date().toISOString();
       // Demo: konum kontrolü yok (gerçekte adrese 300 m içinde olmalı)
       if (stop === "alis") o.arrivedPickupAt ??= now;
       else o.arrivedDropoffAt ??= now;
@@ -457,11 +464,13 @@ export function createDemoApi(): Api {
       notifyJobs();
       return accept ? { ok: false, message: "Teklifin süresi doldu; iş başka kuryeye verilecek" } : { ok: true, message: null };
     },
-    async courierAction(orderId, action) {
+    async courierAction(orderId, action, opts = {}) {
+      failIfOffline();
+      const at = opts.occurredAt;
       if (orders.get(orderId)?.offerExpiresAt && action.type !== "release") throw new ApiError("Önce işi kabul edin");
       switch (action.type) {
         case "pickup": {
-          const o = move(orderId, "alindi");
+          const o = move(orderId, "alindi", null, at);
           // Varış bildirildiyse bekleme varıştan ölçülür
           o.waitingMinutes = o.arrivedPickupAt
             ? Math.max(0, Math.floor((Date.now() - new Date(o.arrivedPickupAt).getTime()) / 60_000))
@@ -471,7 +480,7 @@ export function createDemoApi(): Api {
           return;
         }
         case "on_the_way":
-          move(orderId, "yolda");
+          move(orderId, "yolda", null, at);
           return;
         case "problem":
           move(orderId, "sorunlu", action.note);
@@ -500,7 +509,7 @@ export function createDemoApi(): Api {
               o.paidKurus = o.totalKurus;
             }
           }
-          move(orderId, "teslim_edildi");
+          move(orderId, "teslim_edildi", null, at);
           return;
         }
         case "return_deliver": {
@@ -510,12 +519,17 @@ export function createDemoApi(): Api {
             throw new ApiError("Kuryeye ödemeli siparişte tahsilat bilgisi gerekli");
           }
           if (o && action.pod.cashCollection) cash.set(orderId, action.pod.cashCollection);
-          move(orderId, "geri_teslim");
+          move(orderId, "geri_teslim", null, at);
           return;
         }
       }
     },
-    async reportFailedDelivery(orderId, input) {
+    async repriceOrder() {
+      failIfOffline();
+      // Demo: ücretler işlem anında teklife eklenir
+    },
+    async reportFailedDelivery(orderId, input, opts = {}) {
+      failIfOffline();
       const o = orders.get(orderId);
       if (!o) throw new ApiError("Sipariş bulunamadı", undefined, 404);
       if (!input.photoUri) throw new ApiError("Adresin fotoğrafını çekin (kanıt)");
@@ -524,14 +538,15 @@ export function createDemoApi(): Api {
       }
       if (input.reason === "alici_yok" && input.callAttempts < 1) throw new ApiError("Alıcıyı en az bir kez arayın");
       // Demo: en az bekleme süresi (gerçekte 10 dk) denetlenmez
-      move(orderId, "geri_donuyor", `Teslim edilemedi: ${input.reason}${input.note.trim() ? ` — ${input.note.trim()}` : ""}`);
+      move(orderId, "geri_donuyor", `Teslim edilemedi: ${input.reason}${input.note.trim() ? ` — ${input.note.trim()}` : ""}`, opts.occurredAt);
       o.failedReason = input.reason;
-      o.failedAt = new Date().toISOString();
+      o.failedAt = opts.occurredAt ?? new Date().toISOString();
       o.priceQuote = applyFailedDeliveryReturn(o.priceQuote, { roundTrip: o.roundTrip }, DEFAULT_PRICING_SETTINGS);
       o.totalKurus = o.priceQuote.totalKurus;
       notify(orderId);
     },
     async pushLocation() {
+      failIfOffline();
       // Demo: konum sunucuya gönderilmez
     },
     async courierEarnings() {

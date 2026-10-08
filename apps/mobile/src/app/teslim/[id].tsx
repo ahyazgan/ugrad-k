@@ -7,6 +7,7 @@ import { SignaturePad } from "@/components/SignaturePad";
 import { Button, Card, ErrorBox, Field, Muted, Screen, Segmented, colors } from "@/components/ui";
 import { api, ApiError, type CashCollection, type OrderDetail } from "@/lib/api";
 import { setActiveOrderForLocation } from "@/lib/location";
+import { outbox } from "@/lib/outbox";
 
 export default function Teslim() {
   const { id, mode } = useLocalSearchParams<{ id: string; mode?: string }>();
@@ -57,14 +58,23 @@ export default function Teslim() {
     setBusy(true);
     setError(null);
     try {
-      await api.courierAction(id, {
-        type: returning ? "return_deliver" : "deliver",
-        pod: { photoUri, signatureSvg: signature, receiverName: receiver.trim(), cashCollection: needsCash ? (collection as CashCollection) : null },
-      });
+      // Bağlantı yoksa kanıtla birlikte telefonda sıraya alınır, teslim saati korunur
+      await outbox.run([
+        {
+          kind: "action",
+          orderId: id,
+          orderNo: order?.orderNo ?? "",
+          fileStamp: Date.now(),
+          action: {
+            type: returning ? "return_deliver" : "deliver",
+            pod: { photoUri, signatureSvg: signature, receiverName: receiver.trim(), cashCollection: needsCash ? (collection as CashCollection) : null },
+          },
+        },
+      ]);
       setActiveOrderForLocation(null);
       router.dismissTo("/(kurye)");
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : "Teslim kaydedilemedi");
+      setError(e instanceof ApiError || e instanceof Error ? e.message : "Teslim kaydedilemedi");
     } finally {
       setBusy(false);
     }
