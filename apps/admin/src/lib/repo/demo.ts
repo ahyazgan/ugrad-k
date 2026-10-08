@@ -9,8 +9,12 @@ import {
   ORDER_TRANSITIONS,
   buildQuote,
   calculateMonthlyInvoice,
+  monthlyInvoiceItem,
   mockMapsProvider,
   MOCK_PLACES,
+  parseOrderRequest,
+  planAssignments,
+  ValidationError,
   type Holiday,
   type OrderStatus,
   type PricingSettings,
@@ -27,8 +31,16 @@ import {
   type Conversation,
   type Customer,
   type Invoice,
+  type OpsSettings,
+  type PhoneCustomer,
   type Shift,
+  type CourierApplication,
+  type Lead,
+  type ApiKeyInfo,
+  type OrderRating,
+  type WebhookConfig,
 } from "./types";
+import { generateApiKey, keyPrefix } from "../api-keys";
 
 const DEMO_EMAIL = "admin@yazgankurye.com";
 const DEMO_PASSWORD = "demo1234";
@@ -44,8 +56,16 @@ interface State {
   shifts: Shift[];
   invoices: Invoice[];
   conversations: Conversation[];
+  ops: OpsSettings;
+  /** KVKK onayı verilmiş müşteri kimlikleri */
+  consented: Set<string>;
+  leads: Lead[];
+  applications: CourierApplication[];
+  apiKeys: Array<ApiKeyInfo & { accountId: string }>;
+  webhooks: Map<string, WebhookConfig>;
 }
 
+const phoneDigits = (p: string) => p.replace(/\D/g, "").replace(/^(90|0)/, "");
 const hoursAgo = (h: number) => new Date(Date.now() - h * 3_600_000).toISOString();
 
 async function seed(): Promise<State> {
@@ -63,6 +83,7 @@ async function seed(): Promise<State> {
   ];
   const customers: Customer[] = [
     { id: "cus-1", fullName: "Ayşe Yılmaz", phone: "+905321112233", email: null, corporateAccountId: null, createdAt: hoursAgo(400), orderCount: 0 },
+    { id: "cus-3", fullName: "Kaan Öztürk", phone: "+905367778899", email: null, corporateAccountId: null, createdAt: hoursAgo(800), orderCount: 0 },
     { id: "cus-2", fullName: "Av. Murat Demir", phone: "+905334445566", email: "murat@ornek-hukuk.com", corporateAccountId: "corp-1", createdAt: hoursAgo(900), orderCount: 0 },
   ];
   const couriers: Courier[] = [
@@ -85,16 +106,45 @@ async function seed(): Promise<State> {
       i % 2 ? "kur-1" : "kur-2",
     ]),
   ];
+  // Raporlar için ~4 haftalık geçmiş: sabit tohumlu sözde rastgele (her açılışta aynı veri)
+  let rnd = 7;
+  const next = () => ((rnd = (rnd * 1103515245 + 12345) % 2 ** 31) / 2 ** 31);
+  const pick = <T,>(xs: T[]) => xs[Math.floor(next() * xs.length)]!;
+  const HOURS = [8, 9, 9, 10, 10, 10, 11, 11, 12, 13, 14, 14, 15, 15, 16, 16, 17, 18, 19, 21, 23];
+  const ANADOLU = ["mock-beykoz", "mock-kadikoy", "mock-uskudar", "mock-atasehir", "mock-umraniye", "mock-kartal"];
+  const ALL = [...ANADOLU, "mock-levent", "mock-sisli", "mock-taksim", "mock-bakirkoy"];
+  const deliveryMin = new Map<number, number>();
+  for (let day = 7; day <= 28; day++) {
+    const dow = new Date(Date.now() - day * 86_400_000).getUTCDay();
+    const n = dow === 0 ? 0 : dow === 6 ? 1 : 1 + Math.floor(next() * 3);
+    for (let k = 0; k < n; k++) {
+      const at = new Date(Date.now() - day * 86_400_000);
+      at.setUTCHours(pick(HOURS) - 3, Math.floor(next() * 60), 0, 0);
+      const cancelled = next() < 0.08;
+      const urgent = next() < 0.3;
+      deliveryMin.set(specs.length, urgent ? 32 + Math.floor(next() * 40) : 45 + Math.floor(next() * 75));
+      specs.push([
+        next() < 0.6 ? "cus-3" : "cus-1",
+        pick(ANADOLU),
+        pick(ALL),
+        cancelled ? "iptal" : "teslim_edildi",
+        (Date.now() - at.getTime()) / 3_600_000,
+        urgent,
+        cancelled ? null : next() < 0.55 ? "kur-1" : "kur-2",
+      ]);
+    }
+  }
   const orders: AdminOrderDetail[] = [];
   let no = 1000;
-  for (const [customerId, from, to, status, ago, urgent, courierId] of specs) {
+  for (const [idx, [customerId, from, to, status, ago, urgent, courierId]] of specs.entries()) {
     const p = place(from);
-    const d = place(to);
+    const d = place(to === from ? "mock-levent" : to);
     const createdAt = hoursAgo(ago);
     const q = await buildQuote(
       {
         pickup: p,
         dropoff: d,
+        serviceLevel: urgent ? "acil" : "standart",
         urgent,
         roundTrip: false,
         weightKg: null,
@@ -107,16 +157,21 @@ async function seed(): Promise<State> {
     const cust = customers.find((c) => c.id === customerId)!;
     cust.orderCount++;
     const flow: OrderStatus[] = ["beklemede", "onaylandi", "kuryeye_atandi", "alindi", "yolda", "teslim_edildi"];
-    const reached = flow.slice(0, flow.indexOf(status) + 1);
+    const reached = status === "iptal" ? (["beklemede", "iptal"] as OrderStatus[]) : flow.slice(0, flow.indexOf(status) + 1);
     orders.push({
       id: `ord-${++no}`,
       orderNo: `YK-${no}`,
       status,
       createdAt,
       urgent,
+      serviceLevel: urgent ? "acil" : "standart",
       roundTrip: false,
       pickupAddress: p.address,
       pickupSide: p.side,
+      pickupLat: p.lat,
+      pickupLng: p.lng,
+      dropoffLat: d.lat,
+      dropoffLng: d.lng,
       dropoffAddress: d.address,
       dropoffSide: d.side,
       customerId,
@@ -132,7 +187,7 @@ async function seed(): Promise<State> {
       paidKurus: null,
       distanceMeters: q.distanceMeters,
       scheduledPickupAt: null,
-      deliveredAt: status === "teslim_edildi" ? hoursAgo(ago - 1) : null,
+      deliveredAt: status === "teslim_edildi" ? hoursAgo(ago - (deliveryMin.get(idx) ?? 60) / 60) : null,
       pickupDetails: "Kat 2",
       pickupContactName: cust.fullName,
       pickupContactPhone: cust.phone,
@@ -145,7 +200,7 @@ async function seed(): Promise<State> {
       waitingMinutes: 0,
       priceQuote: q.quote,
       trackingToken: `demo${no}`.padEnd(32, "0"),
-      cancelReason: null,
+      cancelReason: status === "iptal" ? "Müşteri vazgeçti" : null,
       problemNote: null,
       paymentRef: null,
       paymentError: null,
@@ -185,6 +240,93 @@ async function seed(): Promise<State> {
   });
   return {
     signedIn: false,
+    ops: {
+      unpaidCardTimeoutMinutes: 30,
+      autoApprove: true,
+      autoAssign: true,
+      maxActiveOrdersPerCourier: 3,
+      maxPickupDistanceKm: 15,
+      locationMaxAgeMinutes: 10,
+      unassignedAlertMinutes: 10,
+    },
+    consented: new Set(["cus-1", "cus-2", "cus-3"]),
+    apiKeys: [],
+    webhooks: new Map(),
+    leads: [
+      {
+        id: "lead-1",
+        kind: "kurumsal",
+        companyName: "Kadıköy Mali Müşavirlik",
+        contactName: "Selin Arslan",
+        phone: "+902163334455",
+        email: "selin@ornek-mm.com",
+        monthlyVolume: "20-50",
+        message: "Ayda 30 civarı vergi dairesi ve SGK evrakımız var.",
+        sourcePage: "/kurumsal",
+        status: "yeni",
+        adminNote: null,
+        createdAt: hoursAgo(2),
+      },
+      {
+        id: "lead-2",
+        kind: "iletisim",
+        companyName: null,
+        contactName: "Burak Çelik",
+        phone: "+905301234567",
+        email: null,
+        monthlyVolume: null,
+        message: "Hafta sonu çalışıyor musunuz?",
+        sourcePage: "/iletisim",
+        status: "arandi",
+        adminNote: "Cumartesi de çalıştığımızı söyledim.",
+        createdAt: hoursAgo(30),
+      },
+    ],
+    applications: [
+      {
+        id: "app-1",
+        fullName: "Okan Yıldız",
+        phone: "+905441112233",
+        email: null,
+        district: "Ümraniye",
+        birthYear: 1996,
+        licenseClass: "A2",
+        hasMotorcycle: true,
+        plate: "34 OKN 34",
+        vehicleModel: "Yamaha NMAX 125",
+        experienceYears: 3,
+        availability: "tam_zamanli",
+        message: "Daha önce yemek kuryeliği yaptım.",
+        documents: [
+          { kind: "ehliyet_on", path: "app-1/ehliyet_on.jpg" },
+          { kind: "ruhsat", path: "app-1/ruhsat.pdf" },
+        ],
+        status: "yeni",
+        adminNote: null,
+        courierId: null,
+        createdAt: hoursAgo(5),
+      },
+      {
+        id: "app-2",
+        fullName: "Murat Ak",
+        phone: "+905467778899",
+        email: null,
+        district: "Kartal",
+        birthYear: 1990,
+        licenseClass: "A",
+        hasMotorcycle: false,
+        plate: null,
+        vehicleModel: null,
+        experienceYears: 6,
+        availability: "yari_zamanli",
+        message: null,
+        documents: [],
+        status: "gorusme",
+        adminNote: "Perşembe 14:00 görüşme",
+        courierId: null,
+        createdAt: hoursAgo(50),
+      },
+    ],
     settings: { ...DEFAULT_PRICING_SETTINGS },
     holidays: (holidaysJson as Array<{ date: string; name: string; half_day: boolean }>).map((h) => ({
       date: h.date,
@@ -313,7 +455,8 @@ export function createDemoRepo(): AdminRepo {
                 x.toLocaleLowerCase("tr-TR").includes(search),
               ),
           )
-          .sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
+          .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+          .slice(0, filter.limit ?? 500),
       ) as AdminOrder[];
     },
     async getOrder(id) {
@@ -371,6 +514,7 @@ export function createDemoRepo(): AdminRepo {
         lastLocationAt: null,
         activeOrderCount: 0,
       });
+      return { id: s.couriers[s.couriers.length - 1]!.id };
     },
     async updateCourier(id, patch) {
       const c = (await get()).couriers.find((x) => x.id === id);
@@ -432,7 +576,7 @@ export function createDemoRepo(): AdminRepo {
         month,
         orders,
         invoice: calculateMonthlyInvoice(
-          orders.map((o) => o.subtotalKurus),
+          orders.map((o) => monthlyInvoiceItem(o.subtotalKurus, o.priceQuote)),
           s.settings,
         ),
       });
@@ -472,6 +616,305 @@ export function createDemoRepo(): AdminRepo {
       if (inv) Object.assign(inv, { status: "pending", attempts: 0, lastError: null });
     },
 
+    async getOpsSettings() {
+      return clone((await get()).ops);
+    },
+    async saveOpsSettings(o) {
+      (await get()).ops = clone(o);
+    },
+    async getSystemHealth() {
+      const s = await get();
+      const now = Date.now();
+      const fresh = new Date(now - 60_000).toISOString();
+      const waiting = s.orders.filter(
+        (o) => (o.status === "beklemede" || o.status === "onaylandi") && now - new Date(o.createdAt).getTime() > 30 * 60_000,
+      ).length;
+      const onShift = s.couriers.filter((c) => c.isOnShift && c.active);
+      const stale = onShift.filter((c) => !c.lastLocationAt || now - new Date(c.lastLocationAt).getTime() > 15 * 60_000).length;
+      const failedInvoices = s.invoices.filter((i) => i.status === "failed").length;
+      const issues: Awaited<ReturnType<AdminRepo["getSystemHealth"]>>["issues"] = [];
+      if (waiting) issues.push({ key: "orders_waiting", severity: "critical", message: `${waiting} sipariş 30 dakikadan uzun süredir kurye bekliyor` });
+      if (failedInvoices) issues.push({ key: "invoices_failed", severity: "warning", message: `${failedInvoices} fatura kesilemedi` });
+      if (stale) issues.push({ key: "couriers_stale", severity: "warning", message: `Vardiyadaki ${stale} kuryenin konumu 15 dakikadır gelmiyor` });
+      return {
+        snapshot: {
+          checked_at: new Date().toISOString(),
+          orders_waiting: waiting,
+          orders_problem: s.orders.filter((o) => o.status === "sorunlu").length,
+          notifications_stuck: 0,
+          invoices_failed: failedInvoices,
+          webhooks_failed_24h: 0,
+          couriers_on_shift: onShift.length,
+          couriers_stale: stale,
+          heartbeats: { "notify-dispatch": fresh, "auto-dispatch": fresh, "webhook-dispatch": fresh, "invoice-dispatch": fresh, health: fresh },
+        },
+        issues,
+      };
+    },
+    async runDispatch() {
+      const s = await get();
+      let approved = 0;
+      if (s.ops.autoApprove) {
+        for (const o of s.orders) {
+          if (o.status === "beklemede" && (o.paymentMethod !== "kart" || o.paymentStatus === "odendi")) {
+            transition(o, "onaylandi", "Otomatik onay");
+            approved++;
+          }
+        }
+      }
+      if (!s.ops.autoAssign) return { approved, assigned: [], unassigned: [] };
+      refreshCounts(s);
+      const pending = s.orders.filter((o) => o.status === "onaylandi" && (o.paymentMethod !== "kart" || o.paymentStatus === "odendi"));
+      const plan = planAssignments(
+        pending.map((o) => ({
+          id: o.id,
+          pickupLat: o.pickupLat,
+          pickupLng: o.pickupLng,
+          urgent: o.urgent,
+          serviceLevel: o.serviceLevel,
+          createdAt: o.createdAt,
+          scheduledPickupAt: o.scheduledPickupAt,
+          declinedBy: [],
+        })),
+        s.couriers
+          .filter((c) => c.active && c.isOnShift)
+          .map((c) => ({ id: c.id, name: c.fullName, lat: c.lastLat, lng: c.lastLng, locationAt: c.lastLocationAt, activeOrders: c.activeOrderCount })),
+        {
+          maxActiveOrdersPerCourier: s.ops.maxActiveOrdersPerCourier,
+          maxPickupDistanceKm: s.ops.maxPickupDistanceKm,
+          locationMaxAgeMinutes: s.ops.locationMaxAgeMinutes,
+          now: new Date(),
+        },
+      );
+      for (const a of plan.assignments) {
+        const o = s.orders.find((x) => x.id === a.orderId)!;
+        const c = s.couriers.find((x) => x.id === a.courierId)!;
+        o.courierId = c.id;
+        o.courierName = c.fullName;
+        transition(o, "kuryeye_atandi", `Otomatik atama (${a.distanceKm.toLocaleString("tr-TR")} km)`);
+      }
+      refreshCounts(s);
+      touchOrders();
+      return { approved, assigned: plan.assignments, unassigned: plan.unassigned };
+    },
+
+    async searchPlaces(input) {
+      return mockMapsProvider().autocomplete(input);
+    },
+    async placeDetails(placeId) {
+      return mockMapsProvider().placeDetails(placeId);
+    },
+    async quote(order) {
+      const s = await get();
+      try {
+        return await buildQuote(parseOrderRequest(order), { maps: mockMapsProvider(), settings: s.settings, holidays: s.holidays });
+      } catch (e) {
+        if (e instanceof ValidationError) throw new RepoError(e.message);
+        throw e;
+      }
+    },
+    async lookupPhoneCustomer(phone) {
+      const s = await get();
+      const key = phoneDigits(phone);
+      const c = s.customers.find((x) => x.phone && phoneDigits(x.phone) === key);
+      if (!c) return null;
+      const seen = new Set<string>();
+      const recent: PhoneCustomer["recentAddresses"] = [];
+      for (const o of s.orders.filter((x) => x.customerId === c.id).sort((a, b) => b.createdAt.localeCompare(a.createdAt))) {
+        for (const side of ["pickup", "dropoff"] as const) {
+          const address = side === "pickup" ? o.pickupAddress : o.dropoffAddress;
+          if (seen.has(address)) continue;
+          seen.add(address);
+          const p = MOCK_PLACES.find((m) => m.address === address);
+          if (!p) continue;
+          recent.push({
+            address,
+            details: side === "pickup" ? o.pickupDetails : o.dropoffDetails,
+            lat: p.lat,
+            lng: p.lng,
+            contactName: side === "pickup" ? o.pickupContactName : o.dropoffContactName,
+            contactPhone: side === "pickup" ? o.pickupContactPhone : o.dropoffContactPhone,
+          });
+        }
+      }
+      return {
+        id: c.id,
+        fullName: c.fullName,
+        email: c.email,
+        corporateAccountId: c.corporateAccountId,
+        hasConsent: s.consented.has(c.id),
+        recentAddresses: recent.slice(0, 6),
+      };
+    },
+    async createPhoneOrder({ phone, fullName, verbalConsent, order }) {
+      const s = await get();
+      const key = phoneDigits(phone);
+      if (!/^5\d{9}$/.test(key)) throw new RepoError("Geçerli bir cep telefonu numarası girin");
+      if (order.paymentMethod === "kart") throw new RepoError("Telefon siparişinde ödeme kuryeye veya cari hesaba yapılır");
+      let c = s.customers.find((x) => x.phone && phoneDigits(x.phone) === key);
+      if (!c) {
+        c = { id: `cus-${s.customers.length + 1}`, fullName: fullName || null, phone: `+90${key}`, email: null, corporateAccountId: null, createdAt: new Date().toISOString(), orderCount: 0 };
+        s.customers.push(c);
+      }
+      if (!s.consented.has(c.id)) {
+        if (!verbalConsent) throw new RepoError("Müşteriden KVKK onayı alınmalı (aydınlatma metnini okuyup sözlü onayını işaretleyin)");
+        s.consented.add(c.id);
+      }
+      if (order.paymentMethod === "cari" && !c.corporateAccountId) throw new RepoError("Cari hesap ile ödeme yalnızca kurumsal müşteriler içindir");
+      const req = parseOrderRequest(order);
+      const q = await buildQuote(req, { maps: mockMapsProvider(), settings: s.settings, holidays: s.holidays });
+      const n = 1000 + s.orders.length + 1;
+      const now = new Date().toISOString();
+      const o: AdminOrderDetail = {
+        id: `ord-${n}`,
+        orderNo: `YK-${n}`,
+        status: "beklemede",
+        createdAt: now,
+        urgent: req.urgent,
+        serviceLevel: req.serviceLevel,
+        roundTrip: req.roundTrip,
+        pickupAddress: req.pickup.address,
+        pickupSide: q.pickupSide,
+        pickupLat: req.pickup.lat,
+        pickupLng: req.pickup.lng,
+        dropoffLat: req.dropoff.lat,
+        dropoffLng: req.dropoff.lng,
+        dropoffAddress: req.dropoff.address,
+        dropoffSide: q.dropoffSide,
+        customerId: c.id,
+        customerName: c.fullName,
+        customerPhone: c.phone,
+        corporateAccountId: c.corporateAccountId,
+        courierId: null,
+        courierName: null,
+        totalKurus: q.quote.totalKurus,
+        subtotalKurus: q.quote.subtotalKurus,
+        paymentMethod: req.paymentMethod,
+        paymentStatus: req.paymentMethod === "cari" ? "cari_hesap" : "odenmedi",
+        paidKurus: null,
+        distanceMeters: q.distanceMeters,
+        scheduledPickupAt: req.scheduledPickupAt,
+        deliveredAt: null,
+        pickupDetails: req.pickup.details ?? null,
+        pickupContactName: req.pickup.contactName ?? null,
+        pickupContactPhone: req.pickup.contactPhone ?? null,
+        dropoffDetails: req.dropoff.details ?? null,
+        dropoffContactName: req.dropoff.contactName ?? null,
+        dropoffContactPhone: req.dropoff.contactPhone ?? null,
+        packageDescription: req.packageDescription ?? null,
+        weightKg: req.weightKg,
+        customerNote: req.customerNote ?? null,
+        waitingMinutes: 0,
+        priceQuote: q.quote,
+        trackingToken: `demo${n}`.padEnd(32, "0"),
+        cancelReason: status === "iptal" ? "Müşteri vazgeçti" : null,
+        problemNote: null,
+        paymentRef: null,
+        paymentError: null,
+        podPhotoPath: null,
+        podSignaturePath: null,
+        podReceiverName: null,
+        history: [{ fromStatus: null, toStatus: "beklemede", at: now, note: "Telefon siparişi" }],
+      };
+      s.orders.push(o);
+      c.orderCount++;
+      touchOrders();
+      return { id: o.id, orderNo: o.orderNo };
+    },
+
+    async listRatings({ from, to }) {
+      const s = await get();
+      // Demo: teslim edilen siparişlere sabit örnek puanlar (çoğu 5, birkaç düşük)
+      const SCORES = [5, 5, 4, 5, 5, 3, 5, 4, 5, 5, 2, 5, 4, 5];
+      const COMMENTS: Record<number, string> = { 2: "Kurye geç geldi, haber vermedi.", 3: "Paket biraz ezilmişti." };
+      return s.orders
+        .filter((o) => o.status === "teslim_edildi" && o.deliveredAt)
+        .filter((o) => o.deliveredAt! >= istDayStartUtc(from) && o.deliveredAt! < istDayEndUtc(to))
+        .map((o, i): OrderRating | null => {
+          if (i % 3 === 2) return null; // herkes puan vermez
+          const score = SCORES[i % SCORES.length]!;
+          return {
+            orderId: o.id,
+            orderNo: o.orderNo,
+            score,
+            comment: COMMENTS[score] ?? null,
+            courierId: o.courierId,
+            courierName: o.courierName,
+            customerName: o.customerName,
+            createdAt: new Date(new Date(o.deliveredAt!).getTime() + 20 * 60_000).toISOString(),
+          };
+        })
+        .filter((r): r is OrderRating => r !== null);
+    },
+    async listApiKeys(accountId) {
+      return clone((await get()).apiKeys.filter((k) => k.accountId === accountId));
+    },
+    async createApiKey(accountId, profileId, name) {
+      const s = await get();
+      const owner = s.customers.find((c) => c.id === profileId);
+      if (!owner || owner.corporateAccountId !== accountId) throw new RepoError("Anahtar kullanıcısı bu kurumsal hesaba bağlı değil");
+      const key = generateApiKey();
+      s.apiKeys.unshift({
+        id: `key-${s.apiKeys.length + 1}`,
+        accountId,
+        name: name.trim() || "API",
+        prefix: keyPrefix(key),
+        profileId,
+        profileName: owner.fullName,
+        createdAt: new Date().toISOString(),
+        lastUsedAt: null,
+        revokedAt: null,
+      });
+      return { key };
+    },
+    async revokeApiKey(id) {
+      const k = (await get()).apiKeys.find((x) => x.id === id);
+      if (k) k.revokedAt = new Date().toISOString();
+    },
+    async getWebhook(accountId) {
+      const w = (await get()).webhooks.get(accountId);
+      return w ? { ...w } : null;
+    },
+    async saveWebhook(accountId, cfg) {
+      if (!/^https:\/\/\S+$/.test(cfg.url)) throw new RepoError("Webhook adresi https:// ile başlamalı");
+      (await get()).webhooks.set(accountId, { ...cfg });
+    },
+    async listWebhookDeliveries() {
+      return [];
+    },
+    async listLeads() {
+      return clone((await get()).leads);
+    },
+    async updateLead(id, patch) {
+      const l = (await get()).leads.find((x) => x.id === id);
+      if (!l) throw new RepoError("Başvuru bulunamadı");
+      if (patch.status) l.status = patch.status;
+      if (patch.adminNote !== undefined) l.adminNote = patch.adminNote;
+    },
+    async listCourierApplications() {
+      return clone((await get()).applications);
+    },
+    async updateCourierApplication(id, patch) {
+      const a = (await get()).applications.find((x) => x.id === id);
+      if (!a) throw new RepoError("Başvuru bulunamadı");
+      if (patch.status) a.status = patch.status;
+      if (patch.adminNote !== undefined) a.adminNote = patch.adminNote;
+    },
+    async approveCourierApplication(id, input) {
+      const a = (await get()).applications.find((x) => x.id === id);
+      if (!a) throw new RepoError("Başvuru bulunamadı");
+      if (!input.plate.trim()) throw new RepoError("Plaka zorunlu");
+      const { id: courierId } = await this.createCourier({ fullName: a.fullName, phone: a.phone, plate: input.plate, vehicleModel: input.vehicleModel });
+      a.status = "onaylandi";
+      a.courierId = courierId;
+      a.plate = input.plate;
+      return { courierId };
+    },
+    async applicationDocumentUrl(path) {
+      // Demo: gerçek dosya yok, yer tutucu görsel
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="480" height="300"><rect width="100%" height="100%" fill="#e7eef6"/><text x="50%" y="50%" text-anchor="middle" font-family="sans-serif" font-size="18" fill="#0f3d6e">Demo belge: ${path}</text></svg>`;
+      return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+    },
     async listConversations() {
       return clone((await get()).conversations);
     },

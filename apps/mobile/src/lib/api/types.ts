@@ -4,6 +4,7 @@ import type {
   PlaceSuggestion,
   PriceQuote,
   IstanbulSide,
+  ServiceLevel,
 } from "@yazgan/shared";
 
 export type UserRole = "musteri" | "kurye" | "admin";
@@ -32,7 +33,7 @@ export interface DraftPoint {
 export interface OrderInput {
   pickup: DraftPoint;
   dropoff: DraftPoint;
-  urgent: boolean;
+  serviceLevel: ServiceLevel;
   roundTrip: boolean;
   weightKg: number | null;
   largePackage: boolean;
@@ -86,6 +87,8 @@ export interface OrderDetail extends OrderSummary {
   paidKurus: number | null;
   invoicePdfUrl: string | null;
   trackingToken: string;
+  /** Müşterinin verdiği puan (1–5); verilmediyse null */
+  rating: number | null;
   courierName: string | null;
   courierPhone: string | null;
   cancelReason: string | null;
@@ -103,6 +106,13 @@ export interface CourierLocation {
   accuracy?: number | null;
   heading?: number | null;
   speed?: number | null;
+}
+
+/** Müşteriye gösterilen kurye konumu (yalnız teslimat sürerken) */
+export interface CourierPosition {
+  lat: number;
+  lng: number;
+  recordedAt: string;
 }
 
 /** Kuryenin teslim kanıtı: fotoğraf (cihazdaki dosya URI'si) ve/veya imza (SVG) */
@@ -149,8 +159,15 @@ export interface Api {
   getOrder(id: string): Promise<OrderDetail>;
   cancelOrder(id: string, reason: string): Promise<void>;
   /** Kartla ödeme sayfasını başlatır; demo modunda ödeme anında onaylanır (null döner) */
-  startPayment(orderId: string): Promise<{ paymentPageUrl: string } | null>;
+  startPayment(orderId: string, returnUrl?: string): Promise<{ paymentPageUrl: string } | null>;
   subscribeOrder(id: string, onChange: () => void): () => void;
+  /** Teslim edilen siparişi puanlar; 5 puanda Google yorum bağlantısı dönebilir */
+  rateOrder(order: { id: string; trackingToken: string }, score: number, comment?: string): Promise<{ googleReviewUrl: string | null }>;
+  /**
+   * Siparişin kurye konumunu izler: hemen ve her değişimde `cb` çağrılır (konum yoksa null).
+   * Konum yalnız kurye atandıktan teslime kadar görülebilir (RLS).
+   */
+  watchCourierLocation(orderId: string, cb: (pos: CourierPosition | null) => void): () => void;
   // Kurye
   getOpenShift(): Promise<Shift | null>;
   startShift(at?: CourierLocation | null): Promise<Shift>;

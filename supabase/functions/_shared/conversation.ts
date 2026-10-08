@@ -4,6 +4,7 @@ import { runAssistantTurn, type AssistantCustomer, type AssistantOptions, type T
 import { deliver, type Env } from "./channels.ts";
 import type { Ctx } from "./context.ts";
 import { notificationConfig } from "./dispatch.ts";
+import { kvkkUrl } from "../../../packages/shared/brand.ts";
 
 type MessageParam = Anthropic.Beta.Messages.BetaMessageParam;
 
@@ -20,26 +21,8 @@ export interface ConversationDeps {
   findOrCreateCustomer?: (phone: string) => Promise<{ profileId: string; fullName: string | null; isNew: boolean }>;
 }
 
-/** "905321234567" / "+90 532..." → "905321234567" */
-export const phoneKey = (phone: string) => {
-  const d = phone.replace(/\D/g, "").replace(/^0/, "");
-  return d.startsWith("90") ? d : `90${d}`;
-};
-
-export async function findOrCreateCustomerDefault(ctx: Ctx, phone: string) {
-  const key = phoneKey(phone);
-  const { data: existing } = await ctx.admin
-    .from("profiles")
-    .select("id, full_name")
-    .in("phone", [key, `+${key}`])
-    .limit(1)
-    .maybeSingle();
-  if (existing) return { profileId: existing.id as string, fullName: existing.full_name as string | null, isNew: false };
-  // WhatsApp numarası Meta tarafından doğrulanmıştır; telefonla müşteri hesabı açılır
-  const { data, error } = await ctx.admin.auth.admin.createUser({ phone: key, phone_confirm: true });
-  if (error || !data.user) throw new Error(`Müşteri oluşturulamadı: ${error?.message}`);
-  return { profileId: data.user.id, fullName: null, isNew: true };
-}
+export { findOrCreateCustomerDefault, phoneKey } from "./customers.ts";
+import { findOrCreateCustomerDefault } from "./customers.ts";
 
 async function customerContext(ctx: Ctx, profileId: string, fullName: string | null, isNew: boolean) {
   const [{ data: consents }, { data: profile }] = await Promise.all([
@@ -57,7 +40,7 @@ async function customerContext(ctx: Ctx, profileId: string, fullName: string | n
 
 export async function handleIncomingText(
   deps: ConversationDeps,
-  channel: "whatsapp" | "voice" | "app",
+  channel: "whatsapp" | "voice" | "app" | "email",
   externalId: string,
   phone: string,
   text: string,
@@ -112,12 +95,17 @@ export async function handleIncomingText(
     channel,
     handoff: null,
   };
+  // Kanal notu yalnız ilk mesajda (sistem istemi sabit kalır, önbellek bozulmaz)
+  const channelNote =
+    channel === "email"
+      ? "\n[Kanal: e-posta. Yanıtını düz metin e-posta olarak yaz: kısa selamlama, net bilgiler; başlık/tablo kullanma. Müşteri yazana kadar yanıt alamaz, bu yüzden eksik bilgileri tek seferde topluca sor.]"
+      : "";
   const userText =
-    history.length === 0 ? `${await customerContext(ctx, customer.profileId, customer.fullName, customer.isNew)}\n\n${text}` : text;
+    history.length === 0 ? `${await customerContext(ctx, customer.profileId, customer.fullName, customer.isNew)}${channelNote}\n\n${text}` : text;
   const opts: AssistantOptions = {
     model: deps.env("ASSISTANT_MODEL") || undefined,
     effort: (deps.env("ASSISTANT_EFFORT") as AssistantOptions["effort"]) || undefined,
-    kvkkUrl: deps.env("KVKK_URL") ?? "https://yazgankurye.com/kvkk",
+    kvkkUrl: deps.env("KVKK_URL") ?? kvkkUrl,
   };
 
   try {

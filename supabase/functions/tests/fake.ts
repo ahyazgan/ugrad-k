@@ -28,6 +28,15 @@ export function fakeDb(tables: Record<string, any>) {
         updatePatch = patch;
         return q;
       },
+      ilike: (col: string, pattern: string) => {
+        const want = pattern.replace(/\\(.)/g, "$1").toLowerCase();
+        rows = rows.filter((r) => String(r[col] ?? "").toLowerCase() === want);
+        return q;
+      },
+      is: (col: string, v: unknown) => {
+        rows = rows.filter((r) => (r[col] ?? null) === v);
+        return q;
+      },
       gte: () => q,
       lt: () => q,
       limit: () => q,

@@ -1,9 +1,10 @@
+import { BRAND } from "@yazgan/shared";
 import type { Metadata } from "next";
 import { AdminShell } from "@/components/AdminShell";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Yazgan Kurye — Yönetim",
+  title: `${BRAND.name} — Yönetim`,
   description: "Sipariş, kurye ve fiyat yönetimi",
   robots: { index: false, follow: false },
 };

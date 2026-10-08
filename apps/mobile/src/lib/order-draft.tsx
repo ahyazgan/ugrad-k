@@ -1,10 +1,11 @@
 import { createContext, useContext, useState, type ReactNode } from "react";
+import type { ServiceLevel } from "@yazgan/shared";
 import type { DraftPoint, OrderInput } from "./api";
 
 export interface Draft {
   pickup: DraftPoint | null;
   dropoff: DraftPoint | null;
-  urgent: boolean;
+  serviceLevel: ServiceLevel;
   roundTrip: boolean;
   weightKg: string;
   largePackage: boolean;
@@ -20,7 +21,7 @@ export interface Draft {
 const EMPTY: Draft = {
   pickup: null,
   dropoff: null,
-  urgent: false,
+  serviceLevel: "standart",
   roundTrip: false,
   weightKg: "",
   largePackage: false,
@@ -41,7 +42,7 @@ export function draftToInput(d: Draft): OrderInput | null {
   return {
     pickup: { ...d.pickup, contactName: d.pickupContactName || undefined, contactPhone: d.pickupContactPhone || undefined },
     dropoff: { ...d.dropoff, contactName: d.dropoffContactName || undefined, contactPhone: d.dropoffContactPhone || undefined },
-    urgent: d.urgent,
+    serviceLevel: d.serviceLevel,
     roundTrip: d.roundTrip,
     weightKg: weight ? Number(weight) : null,
     largePackage: d.largePackage,

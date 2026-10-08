@@ -1,6 +1,13 @@
 "use client";
 
-import { ORDER_STATUS_LABELS, ORDER_TRANSITIONS, formatTL, type OrderStatus } from "@yazgan/shared";
+import {
+  INELIGIBILITY_LABELS,
+  ORDER_STATUS_LABELS,
+  ORDER_TRANSITIONS,
+  formatTL,
+  rankCouriers,
+  type OrderStatus,
+} from "@yazgan/shared";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -34,8 +41,8 @@ function Info({ label, children }: { label: string; children: React.ReactNode })
 export default function SiparisDetayPage() {
   const { id } = useParams<{ id: string }>();
   const { data, error, reload } = useLoad(async () => {
-    const [order, couriers] = await Promise.all([repo.getOrder(id), repo.listCouriers()]);
-    return { order, couriers: couriers.filter((c) => c.active) };
+    const [order, couriers, ops] = await Promise.all([repo.getOrder(id), repo.listCouriers(), repo.getOpsSettings()]);
+    return { order, couriers: couriers.filter((c) => c.active), ops };
   }, [id]);
   useEffect(() => repo.subscribeOrders(reload), [reload]);
 
@@ -71,6 +78,27 @@ export default function SiparisDetayPage() {
   if (!order) return <p className="text-slate-500">Yükleniyor…</p>;
 
   const allowed = ORDER_TRANSITIONS[order.status].filter((s) => MANUAL.includes(s));
+  // Vardiyadaki kuryeler, otomatik atamayla aynı algoritmaya göre sıralı
+  const ranked = rankCouriers(
+    {
+      id: order.id,
+      pickupLat: order.pickupLat,
+      pickupLng: order.pickupLng,
+      urgent: order.urgent,
+      createdAt: order.createdAt,
+      scheduledPickupAt: order.scheduledPickupAt,
+      declinedBy: [],
+    },
+    data!.couriers
+      .filter((c) => c.isOnShift)
+      .map((c) => ({ id: c.id, name: c.fullName, lat: c.lastLat, lng: c.lastLng, locationAt: c.lastLocationAt, activeOrders: c.activeOrderCount })),
+    {
+      maxActiveOrdersPerCourier: data!.ops.maxActiveOrdersPerCourier,
+      maxPickupDistanceKm: data!.ops.maxPickupDistanceKm,
+      locationMaxAgeMinutes: data!.ops.locationMaxAgeMinutes,
+      now: new Date(),
+    },
+  );
   const awaitingPayment = order.paymentMethod === "kart" && order.paymentStatus !== "odendi";
   const canAssign = ["beklemede", "onaylandi", "kuryeye_atandi", "sorunlu"].includes(order.status) && !awaitingPayment;
   const trackingUrl = `${typeof window !== "undefined" ? window.location.origin : ""}/takip/${order.trackingToken}`;
@@ -78,7 +106,7 @@ export default function SiparisDetayPage() {
   return (
     <>
       <PageHeader
-        title={`${order.orderNo}${order.urgent ? " · ACİL" : ""}`}
+        title={`${order.orderNo}${order.urgent ? " · ACİL" : order.serviceLevel === "ekonomi" ? " · EKONOMİ" : ""}`}
         subtitle={`Oluşturma: ${fmtDateTime(order.createdAt)}`}
         actions={
           <Link href="/siparisler" className="text-sm text-brand underline">
@@ -99,10 +127,13 @@ export default function SiparisDetayPage() {
                 <div className="flex flex-wrap items-end gap-2">
                   <div className="min-w-60 flex-1">
                     <Select label="Kurye ata" value={courierId} onChange={(e) => setCourierId(e.target.value)}>
-                      <option value="">Kurye seçin…</option>
-                      {data!.couriers.map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {c.fullName} — {c.isOnShift ? `vardiyada, ${c.activeOrderCount} aktif iş` : "vardiya dışı"}
+                      <option value="">Kurye seçin… (öneri sırasıyla)</option>
+                      {ranked.map((r) => (
+                        <option key={r.courier.id} value={r.courier.id}>
+                          {r.eligible ? "★ " : ""}
+                          {r.courier.name} — {r.distanceKm != null ? `${r.distanceKm.toLocaleString("tr-TR")} km, ` : ""}
+                          {r.courier.activeOrders} aktif iş
+                          {r.reason ? ` (${INELIGIBILITY_LABELS[r.reason]})` : ""}
                         </option>
                       ))}
                     </Select>

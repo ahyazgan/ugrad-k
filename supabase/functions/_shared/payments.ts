@@ -1,4 +1,5 @@
 // Kartla ödeme akışı: payment-init → (iyzico ödeme sayfası) → payment-callback; iptalde payment-refund.
+import { BRAND } from "../../../packages/shared/brand.ts";
 import type { Ctx } from "./context.ts";
 import { HttpError, json, readJson } from "./http.ts";
 import {
@@ -19,7 +20,7 @@ const clientIp = (req: Request) => req.headers.get("x-forwarded-for")?.split(","
 
 function splitName(full: string | null): { name: string; surname: string } {
   const parts = (full ?? "").trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return { name: "Müşteri", surname: "Yazgan" };
+  if (parts.length === 0) return { name: "Müşteri", surname: BRAND.shortName };
   if (parts.length === 1) return { name: parts[0]!, surname: parts[0]! };
   return { name: parts.slice(0, -1).join(" "), surname: parts[parts.length - 1]! };
 }
@@ -29,8 +30,11 @@ export async function handlePaymentInit(req: Request, ctx: Ctx, deps: PaymentDep
   const cfg = iyzicoFromEnv(deps.env);
   if (!cfg) throw new HttpError(503, "Online ödeme henüz aktif değil. Lütfen kuryeye ödeme seçeneğini kullanın.");
 
-  const body = (await readJson(req)) as { orderId?: unknown };
+  const body = (await readJson(req)) as { orderId?: unknown; returnUrl?: unknown };
   if (typeof body.orderId !== "string") throw new HttpError(400, "orderId gerekli", "orderId");
+  // Tarayıcıdan sipariş (Expo web): ödeme sonrası uygulamaya değil bu web adresine dönülür
+  const returnUrl = typeof body.returnUrl === "string" ? safeReturnUrl(body.returnUrl, deps.env) : null;
+  if (typeof body.returnUrl === "string" && !returnUrl) throw new HttpError(400, "Geçersiz dönüş adresi", "returnUrl");
 
   const { data: o } = await ctx.admin
     .from("orders")
@@ -50,7 +54,7 @@ export async function handlePaymentInit(req: Request, ctx: Ctx, deps: PaymentDep
     name,
     surname,
     gsmNumber: `+90${digits}`,
-    email: p?.email || `musteri-${user.id.slice(0, 8)}@yazgankurye.com`,
+    email: p?.email || `musteri-${user.id.slice(0, 8)}@${BRAND.domain}`,
     // Bireysel müşteride TCKN istenmiyor; iyzico'nun kabul ettiği genel değer
     identityNumber: "11111111111",
     address: o.pickup_address,
@@ -58,7 +62,8 @@ export async function handlePaymentInit(req: Request, ctx: Ctx, deps: PaymentDep
     ip: clientIp(req),
   };
 
-  const callbackUrl = `${deps.env("SUPABASE_URL")}/functions/v1/payment-callback`;
+  const callbackUrl =
+    `${deps.env("SUPABASE_URL")}/functions/v1/payment-callback` + (returnUrl ? `?ret=${encodeURIComponent(returnUrl)}` : "");
   const init = await initializeCheckout(
     cfg,
     { orderId: o.id, orderNo: o.order_no, totalKurus: o.total_kurus, callbackUrl, buyer },
@@ -68,8 +73,34 @@ export async function handlePaymentInit(req: Request, ctx: Ctx, deps: PaymentDep
   return json({ paymentPageUrl: init.paymentPageUrl, token: init.token });
 }
 
-function resultPage(ok: boolean, orderId: string | null, message: string, deps: PaymentDeps) {
-  const appUrl = `yazgankurye://odeme?durum=${ok ? "basarili" : "hata"}${orderId ? `&siparis=${orderId}` : ""}`;
+/**
+ * Ödeme sonrası dönüş adresi yalnızca izin verilen web uygulaması kökenlerine olabilir
+ * (açık yönlendirme engeli). İzinli kökenler: BRAND.appUrl + APP_WEB_ORIGINS (virgülle).
+ */
+export function safeReturnUrl(raw: string, env: PaymentDeps["env"]): string | null {
+  let u: URL;
+  try {
+    u = new URL(raw);
+  } catch {
+    return null;
+  }
+  const allowed = [BRAND.appUrl, ...(env("APP_WEB_ORIGINS") ?? "").split(",")]
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .map((s) => {
+      try {
+        return new URL(s).origin;
+      } catch {
+        return null;
+      }
+    });
+  if (!allowed.includes(u.origin) || (u.protocol !== "https:" && u.hostname !== "localhost")) return null;
+  return `${u.origin}${u.pathname}`;
+}
+
+function resultPage(ok: boolean, orderId: string | null, message: string, deps: PaymentDeps, returnUrl: string | null = null) {
+  const query = `durum=${ok ? "basarili" : "hata"}${orderId ? `&siparis=${orderId}` : ""}`;
+  const appUrl = returnUrl ? `${returnUrl}?${query}` : `${BRAND.appScheme}://odeme?${query}`;
   const html = `<!doctype html><html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Ödeme ${ok ? "başarılı" : "başarısız"}</title>
 <meta http-equiv="refresh" content="1;url=${appUrl}"></head>
@@ -82,19 +113,21 @@ function resultPage(ok: boolean, orderId: string | null, message: string, deps: 
 
 /** iyzico, kullanıcıyı ödeme sonrası bu adrese POST eder (form: token). */
 export async function handlePaymentCallback(req: Request, ctx: Ctx, deps: PaymentDeps): Promise<Response> {
+  const retRaw = new URL(req.url).searchParams.get("ret");
+  const ret = retRaw ? safeReturnUrl(retRaw, deps.env) : null;
   const cfg = iyzicoFromEnv(deps.env);
-  if (!cfg) return resultPage(false, null, "Ödeme sistemi yapılandırılmamış.", deps);
+  if (!cfg) return resultPage(false, null, "Ödeme sistemi yapılandırılmamış.", deps, ret);
   const form = await req.formData().catch(() => null);
   const token = form?.get("token")?.toString() ?? new URL(req.url).searchParams.get("token");
-  if (!token) return resultPage(false, null, "Geçersiz istek.", deps);
+  if (!token) return resultPage(false, null, "Geçersiz istek.", deps, ret);
 
   const { data: o } = await ctx.admin
     .from("orders")
-    .select("id, total_kurus, payment_status, payment_token")
+    .select("id, status, total_kurus, payment_status, payment_token")
     .eq("payment_token", token)
     .single();
-  if (!o) return resultPage(false, null, "Sipariş bulunamadı.", deps);
-  if (o.payment_status === "odendi") return resultPage(true, o.id, "Ödeme daha önce alınmış.", deps);
+  if (!o) return resultPage(false, null, "Sipariş bulunamadı.", deps, ret);
+  if (o.payment_status === "odendi") return resultPage(true, o.id, "Ödeme daha önce alınmış.", deps, ret);
 
   try {
     // Sonuç her zaman iyzico'dan sunucu tarafında doğrulanır (istemciye güvenilmez)
@@ -102,11 +135,29 @@ export async function handlePaymentCallback(req: Request, ctx: Ctx, deps: Paymen
     const paidKurus = Math.round(Number(r.paidPrice) * 100);
     if (r.paymentStatus !== "SUCCESS" || r.basketId !== o.id) {
       await ctx.admin.from("orders").update({ payment_error: `Durum: ${r.paymentStatus}` }).eq("id", o.id);
-      return resultPage(false, o.id, "Kart ödemesi onaylanmadı. Tekrar deneyebilirsiniz.", deps);
+      return resultPage(false, o.id, "Kart ödemesi onaylanmadı. Tekrar deneyebilirsiniz.", deps, ret);
+    }
+    // Ödeme sırasında sipariş iptal edildiyse (ör. ödeme süresi doldu) tahsilat hemen iptal edilir
+    if (o.status === "iptal") {
+      try {
+        await cancelPayment(cfg, r.paymentId, clientIp(req), deps.fetchFn);
+        await ctx.admin
+          .from("orders")
+          .update({ payment_ref: r.paymentId, payment_status: "iade_edildi", payment_error: "Sipariş iptal edilmişti; ödeme iade edildi" })
+          .eq("id", o.id);
+        return resultPage(false, o.id, "Siparişiniz ödeme süresi dolduğu için iptal edilmişti; ödemeniz iade edildi.", deps, ret);
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        await ctx.admin
+          .from("orders")
+          .update({ payment_ref: r.paymentId, payment_status: "iade_bekliyor", payment_error: `İptal edilmiş siparişe ödeme: ${msg}` })
+          .eq("id", o.id);
+        return resultPage(false, o.id, "Siparişiniz iptal edilmişti; ödemeniz en kısa sürede iade edilecek.", deps, ret);
+      }
     }
     if (paidKurus !== o.total_kurus) {
       await ctx.admin.from("orders").update({ payment_error: `Tutar uyuşmazlığı: ${paidKurus}` }).eq("id", o.id);
-      return resultPage(false, o.id, "Ödeme tutarı uyuşmuyor; ekibimiz sizinle iletişime geçecek.", deps);
+      return resultPage(false, o.id, "Ödeme tutarı uyuşmuyor; ekibimiz sizinle iletişime geçecek.", deps, ret);
     }
     await ctx.admin
       .from("orders")
@@ -118,19 +169,22 @@ export async function handlePaymentCallback(req: Request, ctx: Ctx, deps: Paymen
         payment_error: null,
       })
       .eq("id", o.id);
-    return resultPage(true, o.id, "Siparişiniz işleme alındı.", deps);
+    return resultPage(true, o.id, "Siparişiniz işleme alındı.", deps, ret);
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     await ctx.admin.from("orders").update({ payment_error: msg }).eq("id", o.id);
-    return resultPage(false, o.id, "Ödeme doğrulanamadı.", deps);
+    return resultPage(false, o.id, "Ödeme doğrulanamadı.", deps, ret);
   }
 }
 
 /** İptal edilen ve kartla ödenmiş siparişin ödemesini iptal eder (müşteri veya yönetici). */
 export async function handlePaymentRefund(req: Request, ctx: Ctx, deps: PaymentDeps): Promise<Response> {
   const user = await ctx.getUser(req);
-  const body = (await readJson(req)) as { orderId?: unknown };
+  const body = (await readJson(req)) as { orderId?: unknown; returnUrl?: unknown };
   if (typeof body.orderId !== "string") throw new HttpError(400, "orderId gerekli", "orderId");
+  // Tarayıcıdan sipariş (Expo web): ödeme sonrası uygulamaya değil bu web adresine dönülür
+  const returnUrl = typeof body.returnUrl === "string" ? safeReturnUrl(body.returnUrl, deps.env) : null;
+  if (typeof body.returnUrl === "string" && !returnUrl) throw new HttpError(400, "Geçersiz dönüş adresi", "returnUrl");
 
   const { data: o } = await ctx.admin
     .from("orders")

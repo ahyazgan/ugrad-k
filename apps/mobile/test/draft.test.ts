@@ -4,7 +4,7 @@ import { draftToInput, type Draft } from "../src/lib/order-draft";
 const base: Draft = {
   pickup: { address: "A", lat: 41.1, lng: 29.1, district: "Beykoz" },
   dropoff: { address: "B", lat: 41.0, lng: 29.0, district: "Kadıköy" },
-  urgent: false,
+  serviceLevel: "standart",
   roundTrip: false,
   weightKg: "",
   largePackage: false,
@@ -27,6 +27,9 @@ describe("draftToInput", () => {
     expect(r.packageDescription).toBeUndefined();
     expect(r.pickup.contactPhone).toBe("0532");
     expect(r.dropoff.contactName).toBeUndefined();
+  });
+  it("hizmet seviyesini aktarır", () => {
+    expect(draftToInput({ ...base, serviceLevel: "ekonomi" })!.serviceLevel).toBe("ekonomi");
   });
   it("ağırlık boşsa null", () => {
     expect(draftToInput(base)!.weightKg).toBeNull();

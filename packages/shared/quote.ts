@@ -5,7 +5,7 @@
  */
 import { countBridgeCrossings, resolveSide, type IstanbulSide } from "./geo.ts";
 import type { MapsProvider } from "./maps.ts";
-import { calculatePrice, type Holiday, type PriceQuote, type PricingSettings } from "./pricing.ts";
+import { calculatePrice, SERVICE_LEVELS, type Holiday, type PriceQuote, type PricingSettings, type ServiceLevel } from "./pricing.ts";
 
 export interface OrderPoint {
   address: string;
@@ -20,6 +20,9 @@ export interface OrderPoint {
 export interface OrderRequest {
   pickup: OrderPoint;
   dropoff: OrderPoint;
+  /** ekonomi / standart / acil */
+  serviceLevel: ServiceLevel;
+  /** serviceLevel === "acil" (geriye uyumluluk) */
   urgent: boolean;
   roundTrip: boolean;
   weightKg: number | null;
@@ -110,10 +113,20 @@ export function parseOrderRequest(body: unknown, now: Date = new Date()): OrderR
     throw new ValidationError("Ödeme yöntemi geçersiz", "paymentMethod");
   }
 
+  // Eski istemciler yalnız `urgent` gönderir
+  let serviceLevel: ServiceLevel = b.urgent === true ? "acil" : "standart";
+  if (b.serviceLevel != null && b.serviceLevel !== "") {
+    if (!SERVICE_LEVELS.includes(b.serviceLevel as ServiceLevel)) {
+      throw new ValidationError("Hizmet seviyesi geçersiz (ekonomi, standart, acil)", "serviceLevel");
+    }
+    serviceLevel = b.serviceLevel as ServiceLevel;
+  }
+
   return {
     pickup: point(b.pickup, "pickup"),
     dropoff: point(b.dropoff, "dropoff"),
-    urgent: b.urgent === true,
+    serviceLevel,
+    urgent: serviceLevel === "acil",
     roundTrip: b.roundTrip === true,
     weightKg,
     largePackage: b.largePackage === true,
@@ -155,11 +168,12 @@ export async function buildQuote(req: OrderRequest, deps: QuoteDeps): Promise<Qu
       distanceMeters: outbound.distanceMeters,
       returnDistanceMeters: back?.distanceMeters,
       roundTrip: req.roundTrip,
-      urgent: req.urgent,
+      serviceLevel: req.serviceLevel,
       pickupAt: req.scheduledPickupAt ? new Date(req.scheduledPickupAt) : (deps.now ?? new Date()),
       weightKg: req.weightKg ?? undefined,
       largePackage: req.largePackage,
       bridgeCrossings,
+      pickupPoint: { lat: req.pickup.lat, lng: req.pickup.lng },
       holidays: deps.holidays,
     },
     deps.settings,
@@ -196,7 +210,8 @@ export function orderRowFromQuote(req: OrderRequest, q: QuoteResult) {
     package_description: req.packageDescription ?? null,
     weight_kg: req.weightKg,
     large_package: req.largePackage,
-    urgent: req.urgent,
+    urgent: req.serviceLevel === "acil",
+    service_level: req.serviceLevel,
     round_trip: req.roundTrip,
     bridge_crossings: q.bridgeCrossings,
     scheduled_pickup_at: req.scheduledPickupAt,

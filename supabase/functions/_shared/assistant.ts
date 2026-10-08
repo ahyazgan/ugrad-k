@@ -8,7 +8,9 @@ import {
   parseOrderRequest,
   buildQuote,
   KVKK_VERSION,
+  BRAND,
   MapsError,
+  PricingError,
   ValidationError,
   type OrderStatus,
   type PlaceDetails,
@@ -26,20 +28,21 @@ export const DEFAULT_MODEL = "claude-opus-5-5";
 const MAX_TOOL_ROUNDS = 8;
 
 // Sistem istemi oturum boyunca SABİTTİR (değişken bilgi ilk kullanıcı mesajında verilir).
-export const SYSTEM_PROMPT = `Sen Yazgan Kurye'nin müşteri asistanısın. Yazgan Kurye, İstanbul'da (öncelikle Anadolu yakası, merkez Beykoz) moto kurye ile acil evrak ve paket teslimatı yapar. Müşterilerle WhatsApp veya telefon üzerinden Türkçe konuşursun.
+export const SYSTEM_PROMPT = `Sen ${BRAND.name} adlı kurye şirketinin müşteri asistanısın. ${BRAND.name}, İstanbul'da (öncelikle Anadolu yakası, merkez Beykoz) moto kurye ile acil evrak ve paket teslimatı yapar. Müşterilerle WhatsApp, telefon veya e-posta üzerinden Türkçe konuşursun.
 
 Görevlerin: fiyat vermek, sipariş almak, sipariş durumunu söylemek, beklemedeki siparişi iptal etmek. Bunların dışındaki konularda kısaca yardımcı ol veya temsilciye devret.
 
 Kurallar:
 - Fiyatı asla tahmin etme veya kendin hesaplama; her zaman get_price_quote aracını kullan. Fiyatlar KDV dahil toplam olarak söylenir, istenirse kalemler de verilir.
 - Adresleri search_address ile bul; birden fazla uygun sonuç varsa müşteriye sorup doğrusunu seçtir. Bina/kat/daire gibi tarif bilgisini ayrıca iste.
-- Sipariş için gerekenler: alış adresi ve tarifi, teslim adresi ve tarifi, teslim edecek kişinin ve alıcının adı ile telefonu, ne gönderildiği, acil olup olmadığı. Gidiş-dönüş veya 10 kg üstü/büyük paket varsa sor.
+- Sipariş için gerekenler: alış adresi ve tarifi, teslim adresi ve tarifi, teslim edecek kişinin ve alıcının adı ile telefonu, ne gönderildiği, hizmet seviyesi. Gidiş-dönüş veya 10 kg üstü/büyük paket varsa sor.
 - create_order çağırmadan önce özeti (adresler, kişiler, seçenekler, toplam fiyat, ödeme şekli) müşteriye yaz ve açık onayını ("evet", "onaylıyorum" gibi) al.
 - Ödeme: kuryeye nakit/IBAN ("nakit") veya kurumsal müşterilerde cari hesap ("cari"). Kartla ödeme yalnızca mobil uygulamadan yapılır.
 - KVKK: Müşterinin onayı yoksa sipariş almadan önce aydınlatma metni bağlantısını paylaş ({KVKK_URL}) ve kişisel verilerinin (adres, konum, telefon) sipariş için işlenmesine onay verip vermediğini sor. Yalnızca açıkça onaylarsa record_kvkk_consent çağır.
 - Şikâyet, hasar, kayıp, ödeme sorunu veya müşteri insanla görüşmek isterse handoff_to_human çağır ve bir temsilcinin döneceğini söyle.
 - Kısa, sıcak ve net yaz; WhatsApp için başlık veya tablo kullanma, gerekirse kısa madde işaretleri kullan. Kişisel verileri gereğinden fazla tekrarlama.
-- Gece 22:00–07:00 ve resmi tatillerde ek ücret, acil teslimatta ek ücret olduğunu fiyat aracı zaten hesaplar; sorulursa açıkla.`;
+- Hizmet seviyeleri: "standart" (varsayılan, aynı gün en kısa sürede), "acil" (60 dk içinde, ek ücretli) ve "ekonomi" (gün içinde teslim, indirimli; yalnızca Pazartesi–Cumartesi sabah 07:00 ile öğleden sonra arası alışlarda). Müşteri acele etmediğini söylerse ekonomiyi önerebilirsin.
+- Gece 22:00–07:00, Pazar ve resmi tatil ek ücretlerini, uzak alış ücretini fiyat aracı zaten hesaplar; sorulursa açıkla. 20 kg üzeri gönderi motosikletle taşınamaz.`;
 
 const str = { type: "string" } as const;
 const nullableStr = { type: ["string", "null"] } as const;
@@ -65,12 +68,12 @@ export const TOOLS: Tool[] = [
       properties: {
         pickup_place_id: str,
         dropoff_place_id: str,
-        urgent: { type: "boolean" },
+        service_level: { type: "string", enum: ["ekonomi", "standart", "acil"], description: "Müşteri belirtmediyse standart" },
         round_trip: { type: "boolean" },
         weight_kg: { type: ["number", "null"] },
         large_package: { type: "boolean" },
       },
-      required: ["pickup_place_id", "dropoff_place_id", "urgent", "round_trip", "weight_kg", "large_package"],
+      required: ["pickup_place_id", "dropoff_place_id", "service_level", "round_trip", "weight_kg", "large_package"],
       additionalProperties: false,
     },
   },
@@ -90,7 +93,7 @@ export const TOOLS: Tool[] = [
         dropoff_contact_name: str,
         dropoff_contact_phone: str,
         package_description: str,
-        urgent: { type: "boolean" },
+        service_level: { type: "string", enum: ["ekonomi", "standart", "acil"], description: "Müşteri belirtmediyse standart" },
         round_trip: { type: "boolean" },
         weight_kg: { type: ["number", "null"] },
         large_package: { type: "boolean" },
@@ -107,7 +110,7 @@ export const TOOLS: Tool[] = [
         "dropoff_contact_name",
         "dropoff_contact_phone",
         "package_description",
-        "urgent",
+        "service_level",
         "round_trip",
         "weight_kg",
         "large_package",
@@ -172,7 +175,7 @@ export interface ToolContext {
   ctx: Ctx;
   customer: AssistantCustomer;
   trackingBaseUrl: string;
-  channel: "whatsapp" | "voice" | "app";
+  channel: "whatsapp" | "voice" | "app" | "email";
   /** Konuşma bu tur içinde temsilciye devredildiyse doldurulur */
   handoff: { reason: string } | null;
 }
@@ -184,7 +187,8 @@ async function quoteFor(tc: ToolContext, i: Record<string, unknown>) {
   const req = parseOrderRequest({
     pickup: { address: p.address, lat: p.lat, lng: p.lng, district: p.district, details: i.pickup_details ?? undefined },
     dropoff: { address: d.address, lat: d.lat, lng: d.lng, district: d.district, details: i.dropoff_details ?? undefined },
-    urgent: i.urgent === true,
+    // Eski konuşmalardaki araç çağrıları yalnız urgent içerebilir
+    serviceLevel: i.service_level ?? (i.urgent === true ? "acil" : "standart"),
     roundTrip: i.round_trip === true,
     weightKg: i.weight_kg ?? null,
     largePackage: i.large_package === true,
@@ -365,7 +369,7 @@ export async function runAssistantTurn(
           const out = await executeTool(t.name, (t.input ?? {}) as Record<string, unknown>, tc);
           return { type: "tool_result", tool_use_id: t.id, content: JSON.stringify(out) };
         } catch (e) {
-          const known = e instanceof HttpError || e instanceof ValidationError || e instanceof MapsError;
+          const known = e instanceof HttpError || e instanceof ValidationError || e instanceof PricingError || e instanceof MapsError;
           const msg = known ? e.message : "İşlem sırasında bir hata oluştu";
           if (!known) console.error("araç hatası", t.name, e);
           return { type: "tool_result", tool_use_id: t.id, content: JSON.stringify({ error: msg }), is_error: true };

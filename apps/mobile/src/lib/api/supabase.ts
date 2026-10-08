@@ -23,6 +23,8 @@ export function toE164(phone: string): string {
 
 type Row = Record<string, any>;
 
+const LOCATION_POLL_MS = 30_000;
+
 const toProfile = (r: Row): Profile => ({
   id: r.id,
   role: r.role,
@@ -175,7 +177,7 @@ export function createSupabaseApi(url: string, anonKey: string): Api & { client:
         // Kurye bilgisi RLS gereği yalnızca aktif teslimat sırasında döner
         client
           .from("orders")
-          .select("*, courier:couriers(plate, profile:profiles(full_name, phone)), invoice:invoices(pdf_url)")
+          .select("*, courier:couriers(plate, profile:profiles(full_name, phone)), invoice:invoices(pdf_url), rating:order_ratings(score)")
           .eq("id", id)
           .single(),
         client.from("order_status_history").select("to_status, created_at, note").eq("order_id", id).order("created_at"),
@@ -206,6 +208,7 @@ export function createSupabaseApi(url: string, anonKey: string): Api & { client:
         paidKurus: r!.paid_kurus ?? null,
         invoicePdfUrl: (Array.isArray(r!.invoice) ? r!.invoice[0] : r!.invoice)?.pdf_url ?? null,
         trackingToken: r!.tracking_token,
+        rating: (Array.isArray(r!.rating) ? r!.rating[0] : r!.rating)?.score ?? null,
         courierName: r!.courier?.profile?.full_name ?? null,
         courierPhone: r!.courier?.profile?.phone ?? null,
         cancelReason: r!.cancel_reason,
@@ -218,8 +221,18 @@ export function createSupabaseApi(url: string, anonKey: string): Api & { client:
       // Kartla ödenmişse ödeme iptal edilir (ödeme yoksa sunucu bir şey yapmaz)
       await invoke("payment-refund", { orderId: id }).catch(() => undefined);
     },
-    async startPayment(orderId) {
-      return invoke<{ paymentPageUrl: string }>("payment-init", { orderId });
+    async startPayment(orderId, returnUrl) {
+      return invoke<{ paymentPageUrl: string }>("payment-init", { orderId, ...(returnUrl ? { returnUrl } : {}) });
+    },
+    async rateOrder(order, score, comment) {
+      const r = await invoke<{ googleReviewUrl: string | null }>("site-api", {
+        action: "rate",
+        token: order.trackingToken,
+        score,
+        comment: comment?.trim() || undefined,
+        source: "uygulama",
+      });
+      return { googleReviewUrl: r.googleReviewUrl ?? null };
     },
     subscribeOrder(id, onChange) {
       const channel = client
@@ -227,6 +240,39 @@ export function createSupabaseApi(url: string, anonKey: string): Api & { client:
         .on("postgres_changes", { event: "UPDATE", schema: "public", table: "orders", filter: `id=eq.${id}` }, onChange)
         .subscribe();
       return () => {
+        client.removeChannel(channel);
+      };
+    },
+
+    watchCourierLocation(orderId, cb) {
+      let closed = false;
+      const fetchLatest = async () => {
+        const { data } = await client
+          .from("courier_locations")
+          .select("lat, lng, recorded_at")
+          .eq("order_id", orderId)
+          .order("recorded_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (!closed) cb(data ? { lat: data.lat, lng: data.lng, recordedAt: data.recorded_at } : null);
+      };
+      fetchLatest().catch(() => undefined);
+      // Realtime + yedek olarak periyodik okuma (bağlantı koparsa takip donmasın)
+      const timer = setInterval(() => fetchLatest().catch(() => undefined), LOCATION_POLL_MS);
+      const channel = client
+        .channel(`order-loc-${orderId}`)
+        .on(
+          "postgres_changes",
+          { event: "INSERT", schema: "public", table: "courier_locations", filter: `order_id=eq.${orderId}` },
+          (p) => {
+            const r = p.new as { lat: number; lng: number; recorded_at: string };
+            if (!closed) cb({ lat: r.lat, lng: r.lng, recordedAt: r.recorded_at });
+          },
+        )
+        .subscribe();
+      return () => {
+        closed = true;
+        clearInterval(timer);
         client.removeChannel(channel);
       };
     },

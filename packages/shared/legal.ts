@@ -1,6 +1,8 @@
 // Yasal metinler — TEK KAYNAK (mobil uygulama, web sayfaları, asistan).
 // Metin değiştiğinde KVKK_VERSION artırılır; kullanıcıdan yeniden onay alınır.
 // Not: Nihai metinler bir hukukçu tarafından gözden geçirilmelidir.
+import { BRAND } from "./brand.ts";
+
 export const KVKK_VERSION = "2026-10-08";
 
 export const COMPANY = {
@@ -8,7 +10,7 @@ export const COMPANY = {
   address: "Kılıçlı Mah. Şile Cad. No: 8A, Beykoz / İstanbul",
 };
 
-export const AYDINLATMA_METNI = `${COMPANY.title} ("Yazgan Kurye") olarak, 6698 sayılı Kişisel Verilerin Korunması Kanunu ("KVKK") kapsamında veri sorumlusu sıfatıyla kişisel verilerinizi aşağıda açıklanan şekilde işliyoruz.
+export const AYDINLATMA_METNI = `${COMPANY.title} ("${BRAND.name}") olarak, 6698 sayılı Kişisel Verilerin Korunması Kanunu ("KVKK") kapsamında veri sorumlusu sıfatıyla kişisel verilerinizi aşağıda açıklanan şekilde işliyoruz.
 
 1. İşlenen veriler
 • Kimlik ve iletişim: ad-soyad, cep telefonu, e-posta
@@ -47,10 +49,10 @@ Konum geçmişi en fazla 6 ay, vardiya kayıtları mevzuatın öngördüğü sü
 
 export const KURYE_KONUM_ONAYI = `Vardiyam açıkken konumumun işlenmesi ve aktif teslimat süresince müşteriyle paylaşılması hakkında bilgilendirildim.`;
 
-export const CONTACT_EMAIL = "kvkk@yazgankurye.com";
+export const CONTACT_EMAIL = BRAND.email.kvkk;
 
 /** Gizlilik politikası (mağaza listelemeleri için herkese açık sayfa) */
-export const GIZLILIK_POLITIKASI = `Bu politika, ${COMPANY.title} ("Yazgan Kurye") tarafından sunulan Yazgan Kurye mobil uygulaması, web sayfaları ve WhatsApp/telefon asistanı için geçerlidir.
+export const GIZLILIK_POLITIKASI = `Bu politika, ${COMPANY.title} ("${BRAND.name}") tarafından sunulan ${BRAND.name} mobil uygulaması, web sayfaları ve WhatsApp/telefon/e-posta asistanı için geçerlidir.
 
 Toplanan veriler
 • Hesap: telefon numarası (giriş için), ad-soyad, e-posta (isteğe bağlı)
@@ -58,16 +60,19 @@ Toplanan veriler
 • Ödeme: kartla ödemelerde kart bilgileri yalnızca iyzico tarafından işlenir; bize yalnızca ödeme sonucu ve işlem numarası iletilir
 • Kuryeler: vardiya süresince konum, vardiya başlangıç/bitiş zamanları, teslim fotoğrafı ve alıcı imzası
 • Cihaz: bildirim gönderebilmek için push bildirim anahtarı
-• Asistan: WhatsApp veya telefon asistanıyla yapılan yazışmalar
+• Asistan: WhatsApp, telefon veya e-posta asistanıyla yapılan yazışmalar
+• Değerlendirme: teslimattan sonra verdiğiniz puan ve yorum
+• Web formları: kurumsal başvuru/iletişim formunda verdiğiniz ad, firma, telefon, e-posta ve mesaj; kurye başvurusunda başvuru bilgileri ve yüklediğiniz belgeler
+• Kurumsal API: API ile gönderilen sipariş bilgileri ve dış referans numaraları
 
 Kullanım amaçları
 Kurye hizmetinin sunulması, fiyat hesabı, kurye ataması, canlı takip, bildirimler, faturalandırma, müşteri desteği ve yasal yükümlülükler (6475 sayılı Posta Hizmetleri Kanunu, BTK düzenlemeleri, vergi mevzuatı). Verileriniz reklam amacıyla satılmaz veya paylaşılmaz.
 
 Hizmet sağlayıcılar (veri işleyenler)
-Supabase (veritabanı ve barındırma), Google Maps Platform (adres ve mesafe), iyzico (ödeme), Paraşüt (e-fatura/e-arşiv), Netgsm (SMS), Meta WhatsApp Business (mesajlaşma), Expo (push bildirim), Anthropic (yapay zeka asistanı). Bazı sağlayıcıların sunucuları yurt dışındadır; aktarım KVKK'ya uygun şekilde yapılır.
+Supabase (veritabanı ve barındırma), Google Maps Platform (adres ve mesafe), iyzico (ödeme), Paraşüt (e-fatura/e-arşiv), Netgsm (SMS), Meta WhatsApp Business (mesajlaşma), Expo (push bildirim), Anthropic (yapay zeka asistanı), Postmark (e-posta), Vercel (web barındırma), OpenStreetMap veya seçilen harita karo sağlayıcısı (harita görüntüsü; tarayıcınızın IP adresi bu sağlayıcıya iletilir). Bazı sağlayıcıların sunucuları yurt dışındadır; aktarım KVKK'ya uygun şekilde yapılır.
 
 Saklama süreleri
-Sipariş ve fatura kayıtları vergi mevzuatı gereği 10 yıl; kurye konum geçmişi en fazla 6 ay; asistan yazışmaları 1 yıl saklanır. Süre sonunda silinir veya anonimleştirilir.
+Sipariş ve fatura kayıtları vergi mevzuatı gereği 10 yıl; kurye konum geçmişi en fazla 6 ay; asistan yazışmaları 1 yıl; işe alınmayan kurye başvuruları ve belgeleri en fazla 1 yıl; sonuçlanan kurumsal başvurular 2 yıl saklanır. Süre sonunda silinir veya anonimleştirilir.
 
 Haklarınız ve hesap silme
 KVKK m.11 kapsamındaki haklarınızı ${CONTACT_EMAIL} adresine veya ${COMPANY.address} adresine yazılı olarak iletebilirsiniz. Hesabınızı uygulamada Hesabım → Hesabımı sil adımıyla dilediğiniz zaman silebilirsiniz.
@@ -77,7 +82,7 @@ Hizmet 18 yaşından küçüklere yönelik değildir.
 
 İletişim: ${CONTACT_EMAIL} · ${COMPANY.address}`;
 
-export const HESAP_SILME = `Yazgan Kurye hesabınızı iki yolla silebilirsiniz:
+export const HESAP_SILME = `${BRAND.name} hesabınızı iki yolla silebilirsiniz:
 
 1. Uygulamadan: Hesabım → Hesabımı sil → Evet, hesabımı sil.
 2. E-posta ile: Kayıtlı telefon numaranızla birlikte ${CONTACT_EMAIL} adresine "Hesap silme talebi" konulu bir e-posta gönderin. Talebiniz en geç 30 gün içinde sonuçlandırılır.
@@ -86,3 +91,12 @@ Silinen veriler: ad-soyad, telefon, e-posta, kayıtlı adresler, bildirim anahta
 Saklanan veriler: geçmiş sipariş ve fatura kayıtları, vergi mevzuatı gereği 10 yıl boyunca anonim olarak; kurye vardiya kayıtları BTK yükümlülüğü süresince saklanır.
 
 Devam eden bir siparişiniz varsa hesap, sipariş tamamlandıktan sonra silinebilir.`;
+
+
+/** Web formları (kurumsal başvuru, iletişim) ve kurye başvurusu aydınlatması — sitede /kvkk sayfasında gösterilir */
+export const BASVURU_AYDINLATMA = `Web sitemizdeki formlar aracılığıyla verdiğiniz bilgiler ${COMPANY.title} tarafından aşağıdaki şekilde işlenir:
+
+• Kurumsal başvuru ve iletişim formu: ad-soyad, firma adı, telefon, e-posta, tahmini gönderi sayısı ve mesajınız; talebinizin değerlendirilmesi ve sizinle iletişime geçilmesi amacıyla (KVKK m.5/2-c sözleşme öncesi, m.5/2-f meşru menfaat). En fazla 2 yıl saklanır.
+• Kurye başvurusu: ad-soyad, telefon, e-posta, ilçe, doğum yılı, ehliyet sınıfı, araç bilgileri, deneyim ve yüklediğiniz belgeler (ehliyet, ruhsat, vesikalık); işe alım sürecinin yürütülmesi amacıyla (KVKK m.5/2-c). Adli sicil gibi özel nitelikli veriler bu formda istenmez. İşe alınmamanız halinde en fazla 1 yıl sonra silinir.
+
+Bu veriler yalnızca barındırma ve bildirim hizmeti sağlayıcılarımızla (Supabase, Vercel, SMS/WhatsApp) paylaşılır. KVKK m.11 kapsamındaki haklarınız için ${CONTACT_EMAIL} adresine yazabilirsiniz.`;

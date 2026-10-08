@@ -20,6 +20,13 @@ Kodun tamamı yazıldı ve testlerden geçti. Bu rehber, sistemi **gerçek hesap
 13. [Yasal yükümlülükler](#13-yasal-yükümlülükler)
 14. [Canlıya almadan önce kontrol listesi](#14-kontrol-listesi)
 15. [Tüm ortam değişkenleri](#15-tüm-ortam-değişkenleri)
+16. [Marka ve alan adı](#16-marka-ve-alan-adı)
+17. [Web sitesi (apps/web)](#17-web-sitesi)
+18. [Tarayıcıdan sipariş (app. alt alan adı)](#18-tarayıcıdan-sipariş)
+19. [Google İşletme Profili ve yorumlar](#19-google-işletme-profili-ve-yorumlar)
+20. [E-postayla sipariş (Postmark)](#20-e-postayla-sipariş)
+21. [Kurumsal API ve webhook](#21-kurumsal-api-ve-webhook)
+22. [Sistem izleme ve kesinti alarmı](#22-sistem-izleme)
 
 ---
 
@@ -65,6 +72,14 @@ Kodun tamamı yazıldı ve testlerden geçti. Bu rehber, sistemi **gerçek hesap
 
 Anahtar yalnızca sunucuda (Edge Function) kullanılır; uygulamaya gömülmez.
 
+### Harita görüntüsü (canlı harita, takip, mobil)
+Harita **görüntüsü** Google anahtarı gerektirmez: panel (Leaflet) ve mobil uygulama OpenStreetMap karolarını kullanır, demo modunda da çalışır.
+OSM'in ücretsiz karo sunucusu düşük trafik içindir ([kullanım politikası](https://operations.osmfoundation.org/policies/tiles/)); müşteri sayısı arttığında ticari bir karo sağlayıcısına geçin (ör. MapTiler, Stadia Maps, Thunderforest — aylık ücretsiz kotaları vardır) ve şu değişkenleri girin:
+- Panel (Vercel): `NEXT_PUBLIC_MAP_TILE_URL=https://api.maptiler.com/maps/streets-v2/256/{z}/{x}/{y}.png?key=...` ve `NEXT_PUBLIC_MAP_TILE_ATTRIBUTION=© MapTiler © OpenStreetMap katkıcıları`
+- Mobil (EAS): `EXPO_PUBLIC_MAP_TILE_URL`, `EXPO_PUBLIC_MAP_TILE_ATTRIBUTION` (aynı değerler)
+
+Karo anahtarı tarayıcıda/uygulamada görünür; sağlayıcı panelinden alan adı (`panel.yazgankurye.com`) ve uygulama kimliği kısıtlaması koyun.
+
 ## 4. SMS (Netgsm) ve telefonla giriş
 
 1. Netgsm hesabı → **SMS başlığı** (ör. YAZGANKURYE) onaylatın. API kullanıcısı oluşturun.
@@ -109,7 +124,42 @@ select cron.schedule('fatura-kuyrugu', '*/5 * * * *', $$
       (select decrypted_secret from vault.decrypted_secrets where name = 'notify_secret'))
   );
 $$);
+
+-- Otomatik onay + kurye atama (ayarlar: panel → Otomasyon)
+select cron.schedule('otomatik-dagitim', '* * * * *', $$
+  select net.http_post(
+    url := 'https://<ref>.supabase.co/functions/v1/auto-dispatch',
+    headers := jsonb_build_object('x-notify-secret',
+      (select decrypted_secret from vault.decrypted_secrets where name = 'notify_secret'))
+  );
+$$);
+
+-- Ödeme süresi dolan kart siparişlerini iptal et (süre: panel → Operasyon ayarları)
+select cron.schedule('odenmemis-kart-iptal', '*/5 * * * *', 'select public.cancel_unpaid_card_orders()');
+
+-- Kurumsal müşterilerin webhook'ları (§21)
+select cron.schedule('webhook-kuyrugu', '* * * * *', $$
+  select net.http_post(
+    url := 'https://<ref>.supabase.co/functions/v1/webhook-dispatch',
+    headers := jsonb_build_object('x-notify-secret',
+      (select decrypted_secret from vault.decrypted_secrets where name = 'notify_secret'))
+  );
+$$);
+
+-- Sistem denetimi: sorun olursa yöneticiye WhatsApp/SMS (§22)
+select cron.schedule('sistem-denetimi', '*/5 * * * *', $$
+  select net.http_post(
+    url := 'https://<ref>.supabase.co/functions/v1/health',
+    headers := jsonb_build_object('x-notify-secret',
+      (select decrypted_secret from vault.decrypted_secrets where name = 'notify_secret'))
+  );
+$$);
+
+-- Eski hız sınırı sayaçlarını temizle (günlük)
+select cron.schedule('hiz-siniri-temizlik', '17 4 * * *', 'select public.purge_rate_limits()');
 ```
+
+Panel → Otomasyon → **Sistem durumu** kartında her görevin en son ne zaman çalıştığı görünür; "hiç çalışmadı" yazan görevin cron kaydı eksiktir.
 
 ## 7. Mobil uygulama (EAS)
 
@@ -201,6 +251,14 @@ Buradaki kodlar birim/uçtan uca testlerle doğrulandı, ancak dış servislere 
 - [ ] Push bildirimi gerçek telefonda; kurye **arka plan konumu** (Android bildirimi, iOS "Her zaman" izni)
 - [ ] Teslim fotoğrafı/imza yüklenip panelde görüntüleniyor mu
 - [ ] Zamanlanmış görevler dakikada bir çalışıyor mu (Supabase → Edge Functions → Logs)
+- [ ] Haritalar: panel "Canlı harita"da vardiyadaki kurye görünüyor mu; müşteri uygulamasında kurye işareti teslimat boyunca ilerliyor mu (Realtime + 30 sn yedek okuma)
+- [ ] Raporlar: bir aylık gerçek veriyle ciro ve CSV (Excel'de Türkçe karakterler ve ondalık virgül doğru mu)
+- [ ] Web sitesi: fiyat hesaplayıcı gerçek adreslerle; kurumsal başvuru ve kurye başvurusu (belge yükleme) panelde Başvurular'a düşüyor mu
+- [ ] Tarayıcıdan sipariş: app.<alan adı> üzerinden giriş (SMS), sipariş ve kartla ödeme dönüşü
+- [ ] E-postayla sipariş: kayıtlı müşteri e-postasıyla deneme siparişi; yanıt aynı konuya geliyor mu
+- [ ] Kurumsal API: test anahtarıyla `/api/v1/ping`, sipariş aç, webhook'un imzasını doğrula
+- [ ] Değerlendirme: teslim SMS'indeki bağlantıdan puan; 5 puanda Google yorum sayfası açılıyor mu
+- [ ] Kesinti izleyicisi (UptimeRobot) kuruldu, test alarmı geldi
 
 ## 15. Tüm ortam değişkenleri
 
@@ -218,8 +276,85 @@ Buradaki kodlar birim/uçtan uca testlerle doğrulandı, ancak dış servislere 
 | | `PARASUT_CLIENT_ID`, `PARASUT_CLIENT_SECRET`, `PARASUT_USERNAME`, `PARASUT_PASSWORD`, `PARASUT_COMPANY_ID`, `PARASUT_PRODUCT_ID` (ops.) | Fatura |
 | | `ANTHROPIC_API_KEY`, `ASSISTANT_MODEL` (ops.), `ASSISTANT_EFFORT` (ops.) | Asistan |
 | | `VOICE_GATEWAY_SECRET` | Sesli asistan |
+| | `GOOGLE_REVIEW_URL` (ops.) | 5 puan verenlerin yönlendirildiği Google yorum bağlantısı (§19) |
+| | `APP_WEB_ORIGINS` (ops.) | Tarayıcıdan ödemede ek izinli dönüş kökenleri (§18) |
+| | `POSTMARK_SERVER_TOKEN`, `EMAIL_INBOUND_SECRET`, `EMAIL_FROM` (ops.), `EMAIL_OWN_DOMAINS` (ops.), `EMAIL_REQUIRE_AUTH` (ops.) | E-postayla sipariş (§20) |
 | Vercel (panel) | `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` | |
+| | `NEXT_PUBLIC_MAP_TILE_URL`, `NEXT_PUBLIC_MAP_TILE_ATTRIBUTION` (ops.) | Harita karoları (§3) |
+| Vercel (web sitesi) | `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `NEXT_PUBLIC_SITE_URL` (ops.), `NEXT_PUBLIC_APP_URL` (ops.), `NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION` (ops.) | §17 |
 | EAS (mobil) | `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY`, `EXPO_PUBLIC_TRACKING_BASE_URL` | |
+| | `EXPO_PUBLIC_MAP_TILE_URL`, `EXPO_PUBLIC_MAP_TILE_ATTRIBUTION` (ops.) | Harita karoları (§3) |
 | `app.json` | `expo.extra.eas.projectId` | Push bildirimleri |
 
 `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` Edge Function'lara Supabase tarafından otomatik verilir.
+
+## 16. Marka ve alan adı
+
+Marka adı ve alan adı **tek dosyada**: `packages/shared/brand.ts`. Yeni adı/alan adını aldığınızda yalnızca şunları değiştirin:
+
+- `DOMAIN` (ör. `ornekkurye.com`), `name`, `shortName`, `slogan`
+- `phone` ve `whatsapp` (doluysa sitede görünür), `googleReviewUrl` (§19)
+
+Web sitesi, panel, takip linkleri, SMS/WhatsApp metinleri, asistan ve yasal metinler buradan okur. Bu dosyadan türeyen adresler: site `https://<alan adı>`, panel ve takip `https://panel.<alan adı>`, tarayıcıdan sipariş `https://app.<alan adı>`, e-posta `siparis@`, `info@`, `kvkk@<alan adı>`.
+
+Ayrıca elle güncellenecekler:
+- `apps/mobile/app.json` → `name` (mağazada görünen ad). `scheme` ve paket kimliği (`com.yazgankurye.app`) mağazaya ilk gönderimden **önce** değiştirilebilir; sonra değiştirilemez. `scheme` değişirse `brand.ts → appScheme` de aynı yapılmalı.
+- SMS başlığı: Netgsm'de onaylı başlık (`NETGSM_HEADER`).
+- WhatsApp Business görünen adı (Meta onayı gerekir).
+
+## 17. Web sitesi
+
+`apps/web` tanıtım sitesidir: fiyat hesaplayıcı, fiyatlar, kurumsal başvuru, ilçe sayfaları (SEO), SSS, kurye başvurusu, API belgeleri, KVKK/gizlilik.
+
+1. Vercel → yeni proje → aynı repo → **Root Directory: `apps/web`**.
+2. Environment Variables: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` (girilmezse site örnek adreslerle **demo** çalışır).
+3. Alan adı: kök alan adı ve `www` → Vercel (www'yi köke yönlendirin).
+4. [Google Search Console](https://search.google.com/search-console) → alan adını ekleyin → doğrulama kodunu `NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION` olarak girin → **Site haritası**: `https://<alan adı>/sitemap.xml`.
+5. Fiyat hesaplayıcı girişsiz çalışır; Google maliyetine karşı IP başına (10 dakikada 30 fiyat) ve günlük toplam (3.000) sınır vardır (`supabase/functions/_shared/site.ts → SITE_LIMITS`).
+
+## 18. Tarayıcıdan sipariş
+
+Mobil uygulama tarayıcıda da çalışır (Expo web); sitedeki "Sipariş ver" düğmeleri buraya gider.
+
+1. Vercel → yeni proje → **Root Directory: `apps/mobile`** (`vercel.json` hazır: derleme ve tek sayfa yönlendirmesi).
+2. Environment Variables: `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY`, `EXPO_PUBLIC_TRACKING_BASE_URL=https://panel.<alan adı>/takip`.
+3. Alan adı: `app.<alan adı>`.
+4. Kartla ödemede iyzico, ödemeden sonra `https://app.<alan adı>/odeme` adresine döner. Başka bir adres kullanırsanız Supabase secrets'a `APP_WEB_ORIGINS=https://...` ekleyin (yalnız izinli adreslere dönülür).
+
+## 19. Google İşletme Profili ve yorumlar
+
+Yerel aramalarda ("Beykoz kurye", "Kadıköy moto kurye") görünmenin en etkili yolu:
+
+1. [business.google.com](https://business.google.com) → **Hizmet bölgesi işletmesi** olarak kaydolun (adres gizlenebilir). Kategori: **Kurye hizmeti**; ek kategori: Teslimat hizmeti.
+2. Hizmet bölgeleri: sitedeki ilçeler (`apps/web/src/lib/districts.ts`).
+3. Çalışma saatleri, telefon, web sitesi (`https://<alan adı>`), açıklama (`docs/magaza.md` açıklamasından uyarlayın), fotoğraflar (kurye, motor, logo).
+4. Doğrulama (posta kartı/video) sonrası **Yorum iste** → "yorum yazma" bağlantısını kopyalayın → `brand.ts → googleReviewUrl` veya Supabase secret `GOOGLE_REVIEW_URL`.
+5. Teslim SMS'inde değerlendirme bağlantısı gider; **5 puan** verenler bu Google bağlantısına davet edilir, **3 ve altı** puanlar size anında WhatsApp/SMS ile bildirilir. Puanlar: panel → Raporlar.
+
+## 20. E-postayla sipariş
+
+Kayıtlı müşteriler `siparis@<alan adı>` adresine yazar; yapay zeka asistanı (WhatsApp ile aynı) e-postayla yanıtlar, onay alınca siparişi açar.
+
+1. [postmarkapp.com](https://postmarkapp.com) hesabı → Server oluşturun.
+2. **Gönderim**: Sender Signatures → alan adınızı ekleyin, verilen **DKIM** ve **Return-Path** DNS kayıtlarını girin. Server API token → secret `POSTMARK_SERVER_TOKEN`.
+3. **Gelen**: Inbound stream → **Inbound domain**: `siparis.<alan adı>` için MX kaydı `inbound.postmarkapp.com` (öncelik 10). Kendi e-posta sağlayıcınızda `siparis@<alan adı>` → `x@siparis.<alan adı>` yönlendirmesi yapın (veya doğrudan Postmark'ın verdiği adrese yönlendirin).
+4. Inbound webhook URL: `https://postmark:<EMAIL_INBOUND_SECRET>@<ref>.supabase.co/functions/v1/email-inbound` — "Include raw email content" kapalı kalabilir. `EMAIL_INBOUND_SECRET` için uzun rastgele bir değer üretip secret olarak da girin.
+5. Güvenlik: yalnızca **profilindeki e-posta adresiyle eşleşen kayıtlı müşterilerin**, **SPF veya DKIM doğrulamasından geçen** e-postaları işlenir; diğerlerine yönlendirme yanıtı gider. Gönderen başına günde en fazla 40 e-posta işlenir. Müşteri e-posta adresini uygulamada Hesabım bölümünden ekler.
+6. Yazışmalar panel → Asistan konuşmaları'nda "E-posta" kanalıyla görünür.
+
+## 21. Kurumsal API ve webhook
+
+1. Panel → Müşteriler: firmanın kullanıcısını kurumsal hesaba bağlayın (siparişler onun adına açılır; kullanıcının uygulamada KVKK onayı vermiş olması gerekir).
+2. Panel → Kurumsal & fatura → **API ve webhook** → hesap seçin → **Anahtar oluştur**. Anahtar yalnızca bir kez gösterilir; firmaya güvenli kanaldan iletin. Gerekirse "İptal et".
+3. Webhook: firmanın verdiği `https://` adresini ve üretilen gizli anahtarı kaydedin; gizli anahtarı firmaya iletin (imza doğrulaması için).
+4. API adresi: `https://<alan adı>/api/v1` (web sitesi Supabase'e yönlendirir; `NEXT_PUBLIC_SUPABASE_URL` girilmiş olmalı). Belge: `https://<alan adı>/api-belgeleri`.
+5. API siparişleri cari hesaba işlenir, ay sonu faturasına girer. Webhook teslim kayıtları aynı kartta görünür.
+
+## 22. Sistem izleme
+
+- **İç denetim** (§6 `sistem-denetimi`): 5 dakikada bir kuyruklar, faturalar, webhook'lar, bekleyen siparişler, kurye konumları ve zamanlanmış görevler kontrol edilir. Yeni sorun ve düzelme `ADMIN_ALERT_PHONES`'a WhatsApp/SMS ile bildirilir (aynı sorun en fazla 6 saatte bir hatırlatılır). Panel → Otomasyon → Sistem durumu.
+- **Dış kesinti izleyicisi**: [uptimerobot.com](https://uptimerobot.com) (ücretsiz) → üç HTTP izleyici:
+  - `https://<ref>.supabase.co/functions/v1/health` — yanıt `"status":"ok"` içermeli (anahtar kelime izleyicisi). Ayrıntı vermez, herkese açıktır.
+  - `https://<alan adı>` ve `https://panel.<alan adı>/giris`
+  Bildirim kanalı olarak telefonunuzu (SMS/uygulama) ekleyin. Supabase tamamen erişilemezse iç denetim de çalışamayacağı için bu dış izleyici gereklidir.
+

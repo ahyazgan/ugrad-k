@@ -2,11 +2,13 @@
 // Kullanım: pnpm --filter @yazgan/mobile e2e:web  (önce export:web)
 const { chromium } = require('playwright');
 const fs = require('fs');
+const { stubTiles } = require('../../../scripts/e2e-tile-stub.cjs');
 const out = process.argv[2] || 'e2e/shots';
 fs.mkdirSync(out, { recursive: true });
 (async () => {
   const browser = await chromium.launch(process.env.CHROME_PATH ? { executablePath: process.env.CHROME_PATH } : {});
   const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  const tiles = await stubTiles(page.context());
   const errors = [];
   page.on('pageerror', e => errors.push(e.message));
   page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
@@ -37,7 +39,7 @@ fs.mkdirSync(out, { recursive: true });
     await tid('address-save').click();
     await tid('address-pickup').waitFor();
   }
-  await page.getByText('Acil (60 dk)').click();
+  await tid('level-acil').click();
   await shot('06-form-dolu');
   await tid('see-price').click();
   await page.getByText('Toplam', { exact: true }).waitFor();
@@ -50,6 +52,10 @@ fs.mkdirSync(out, { recursive: true });
   await page.getByText('Ödendi (kart)').waitFor();
   await shot('08-siparis-yeni');
   await page.getByText('Kuryeniz:', { exact: false }).waitFor({ timeout: 20000 });
+  // Canlı harita: kurye işareti ve konum yaşı görünür, karolar yüklenir
+  await tid('marker-courier').waitFor();
+  await page.getByText(/Kurye konumu · az önce/).waitFor();
+  if (!tiles.count) throw new Error('harita karoları istenmedi');
   await shot('09-siparis-ilerledi');
   console.log('DURUM:', (await page.locator('body').innerText()).match(/YK-\d+[\s\S]{0,40}/)?.[0]?.replace(/\n/g,' | '));
   if (errors.length) throw new Error('Tarayıcı hataları: ' + JSON.stringify(errors.slice(0, 10)));
@@ -61,6 +67,14 @@ fs.mkdirSync(out, { recursive: true });
   await tid('delete-account').click();
   await tid('delete-account-confirm').click();
   await page.getByText('Devam eden siparişiniz varken hesap silinemez').waitFor();
+  // Teslimden sonra değerlendirme (Siparişlerim → sipariş)
+  await page.getByText('Siparişlerim').first().click();
+  await page.getByText(/^YK-\d+/).first().click();
+  await page.getByText('Teslimatı nasıl buldunuz?').waitFor({ timeout: 40000 });
+  await tid('star-4').click();
+  await tid('rating-submit').click();
+  await tid('rating-thanks').waitFor();
+  await shot('09b-degerlendirme');
   console.log('✓ müşteri akışı geçti');
 
   // ───────── Kurye akışı
@@ -69,6 +83,7 @@ fs.mkdirSync(out, { recursive: true });
     permissions: ['geolocation'],
     geolocation: { latitude: 41.1295, longitude: 29.1135 },
   });
+  await stubTiles(ctx);
   const kp = await ctx.newPage();
   kp.on('pageerror', e => errors.push(e.message));
   kp.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
@@ -89,6 +104,9 @@ fs.mkdirSync(out, { recursive: true });
   await kp.getByText(/Aktif işler \(2\)/).waitFor();
   await kshot('10-kurye-isler');
   await kp.locator('[data-testid^="job-"]').first().click();
+  await kt('tile-map').waitFor();
+  await kt('marker-pickup').waitFor();
+  await kt('marker-dropoff').waitFor();
   await kt('waiting').fill('27');
   await kshot('11-kurye-is');
   await kt('pickup').click();

@@ -2,9 +2,10 @@ import { router, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import { Text, TextInput, View } from "react-native";
 import { StatusBadge } from "@/components/StatusBadge";
+import { TileMap, type MapMarker } from "@/components/TileMap";
 import { Button, Card, ErrorBox, Loading, Muted, Screen, Title, colors, styles } from "@/components/ui";
 import { api, ApiError, type OrderDetail } from "@/lib/api";
-import { setActiveOrderForLocation } from "@/lib/location";
+import { lastKnownPosition, setActiveOrderForLocation } from "@/lib/location";
 import { callPhone, openDirections } from "@/lib/navigation";
 
 function Stop({
@@ -40,6 +41,35 @@ function Stop({
           </View>
         ) : null}
       </View>
+    </Card>
+  );
+}
+
+/** Alış → teslim güzergâhı ve kuryenin kendi konumu */
+function JobMap({ order }: { order: OrderDetail }) {
+  const [me, setMe] = useState<{ lat: number; lng: number } | null>(null);
+  useEffect(() => {
+    let alive = true;
+    const tick = () => lastKnownPosition().then((p) => alive && setMe(p));
+    tick();
+    const timer = setInterval(tick, 30_000);
+    return () => {
+      alive = false;
+      clearInterval(timer);
+    };
+  }, []);
+  const markers: MapMarker[] = [
+    { kind: "pickup", lat: order.pickupLat, lng: order.pickupLng },
+    { kind: "dropoff", lat: order.dropoffLat, lng: order.dropoffLng },
+    ...(me ? [{ kind: "courier" as const, ...me }] : []),
+  ];
+  return (
+    <Card>
+      <TileMap markers={markers} height={200} />
+      <Muted>
+        A: alış · T: teslim
+        {me ? " · 🛵 siz" : ""}
+      </Muted>
     </Card>
   );
 }
@@ -109,6 +139,8 @@ export default function IsDetay() {
           </Text>
         ) : null}
       </Card>
+
+      {s !== "teslim_edildi" && s !== "iptal" ? <JobMap order={order} /> : null}
 
       <Stop
         title="1 · ALIŞ"

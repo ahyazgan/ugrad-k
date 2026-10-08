@@ -12,6 +12,7 @@ import {
   buildQuote,
   mockMapsProvider,
   parseOrderRequest,
+  PricingError,
   ValidationError,
   type OrderStatus,
 } from "@yazgan/shared";
@@ -20,6 +21,7 @@ import {
   type Api,
   type Shift,
   type ConsentType,
+  type CourierPosition,
   type OrderDetail,
   type OrderInput,
   type Profile,
@@ -30,6 +32,23 @@ const DEMO_CODE = "123456";
 export const DEMO_COURIER_PHONE = "5550000000";
 const ADVANCE_MS = 6_000;
 const FLOW: OrderStatus[] = ["beklemede", "onaylandi", "kuryeye_atandi", "alindi", "yolda", "teslim_edildi"];
+
+/** Demo: kurye atanınca alış noktasına yaklaşır, yolda iken teslim noktasına ilerler */
+function demoCourierPosition(o: OrderDetail | undefined): CourierPosition | null {
+  if (!o || !["kuryeye_atandi", "alindi", "yolda"].includes(o.status)) return null;
+  const since = (s: OrderStatus) => {
+    const at = [...o.history].reverse().find((h) => h.status === s)?.at;
+    return at ? Date.now() - new Date(at).getTime() : 0;
+  };
+  const lerp = (a: number, b: number, t: number) => a + (b - a) * Math.min(1, Math.max(0, t));
+  if (o.status === "yolda") {
+    const t = since("yolda") / (ADVANCE_MS * 1.2);
+    return { lat: lerp(o.pickupLat, o.dropoffLat, t), lng: lerp(o.pickupLng, o.dropoffLng, t), recordedAt: new Date().toISOString() };
+  }
+  if (o.status === "alindi") return { lat: o.pickupLat, lng: o.pickupLng, recordedAt: new Date().toISOString() };
+  const t = since("kuryeye_atandi") / (ADVANCE_MS * 1.2);
+  return { lat: lerp(o.pickupLat + 0.012, o.pickupLat, t), lng: lerp(o.pickupLng - 0.015, o.pickupLng, t), recordedAt: new Date().toISOString() };
+}
 
 export function createDemoApi(): Api {
   const maps = mockMapsProvider();
@@ -87,6 +106,7 @@ export function createDemoApi(): Api {
     paymentStatus: "odenmedi",
     paidKurus: null,
     invoicePdfUrl: null,
+    rating: null,
     trackingToken: "demo".padEnd(32, "0"),
     courierName: null,
     courierPhone: null,
@@ -100,6 +120,7 @@ export function createDemoApi(): Api {
       return { req, q: await buildQuote(req, { maps, settings: DEFAULT_PRICING_SETTINGS, holidays: [] }) };
     } catch (e) {
       if (e instanceof ValidationError) throw new ApiError(e.message, e.field, 400);
+      if (e instanceof PricingError) throw new ApiError(e.message, undefined, 400);
       throw e;
     }
   };
@@ -118,7 +139,7 @@ export function createDemoApi(): Api {
       const { req, q } = await quoteFor({
         pickup: { ...pickup, contactName: "Ayşe Gönderici", contactPhone: "+905321112233" },
         dropoff: { ...dropoff, contactName: "Ali Alıcı", contactPhone: "+905334445566" },
-        urgent,
+        serviceLevel: urgent ? "acil" : "standart",
         roundTrip: false,
         weightKg: null,
         largePackage: false,
@@ -285,11 +306,27 @@ export function createDemoApi(): Api {
       notify(orderId);
       return null;
     },
+    async rateOrder(order, score) {
+      const o = orders.get(order.id);
+      if (!o) throw new ApiError("Sipariş bulunamadı", undefined, 404);
+      if (o.status !== "teslim_edildi") throw new ApiError("Sipariş teslim edildikten sonra değerlendirebilirsiniz");
+      if (o.rating) throw new ApiError("Bu sipariş zaten değerlendirildi");
+      o.rating = score;
+      notify(o.id);
+      return { googleReviewUrl: score === 5 ? "https://www.google.com/maps" : null };
+    },
     subscribeOrder(id, onChange) {
       const set = orderListeners.get(id) ?? new Set();
       set.add(onChange);
       orderListeners.set(id, set);
       return () => set.delete(onChange);
+    },
+
+    watchCourierLocation(orderId, cb) {
+      const tick = () => cb(demoCourierPosition(orders.get(orderId)));
+      tick();
+      const timer = setInterval(tick, 2_000);
+      return () => clearInterval(timer);
     },
 
     // ───────── Kurye

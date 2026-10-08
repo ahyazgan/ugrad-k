@@ -44,3 +44,27 @@ describe("asistan yazışması", () => {
     ]);
   });
 });
+
+import { formatKmTiers, parseCap, parseKmTiers } from "../src/lib/pricing-form";
+
+describe("fiyat formu", () => {
+  it("km kademeleri metin ↔ yapı", () => {
+    const t = parseKmTiers("10:25, *:18")!;
+    expect(t).toEqual([{ uptoKm: 10, perKmKurus: 2500 }, { uptoKm: null, perKmKurus: 1800 }]);
+    expect(formatKmTiers(t)).toBe("10:25, *:18");
+    expect(parseKmTiers("10:22.5")).toEqual([{ uptoKm: 10, perKmKurus: 2250 }]);
+    expect(parseKmTiers("")).toEqual([]);
+  });
+  it("geçersiz kademeler", () => {
+    expect(parseKmTiers("10")).toBeNull();
+    expect(parseKmTiers("abc:5")).toBeNull();
+    expect(parseKmTiers("*:5, *:6")).toBeNull();
+    expect(parseKmTiers("10:5, 10:6")).toBeNull();
+    expect(parseKmTiers("10:-1")).toBeNull();
+  });
+  it("tavan", () => {
+    expect(parseCap("")).toBeNull();
+    expect(parseCap("75")).toBe(75);
+    expect(parseCap("x")).toBeUndefined();
+  });
+});

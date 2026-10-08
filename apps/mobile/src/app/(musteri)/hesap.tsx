@@ -41,7 +41,7 @@ function HesapForm() {
         <Title>Bilgilerim</Title>
         <Muted>{profile?.phone}</Muted>
         <Field label="Ad Soyad" value={fullName} onChangeText={setFullName} />
-        <Field label="E-posta (fatura için)" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" />
+        <Field label="E-posta (fatura ve e-postayla sipariş için)" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" />
         <ErrorBox message={error} />
         {msg ? <Muted>{msg}</Muted> : null}
         <Button title="Kaydet" onPress={save} loading={saving} />

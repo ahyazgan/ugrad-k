@@ -1,4 +1,14 @@
-import type { Holiday, MonthlyInvoice, OrderStatus, PriceQuote, PricingSettings } from "@yazgan/shared";
+import type {
+  Holiday,
+  IstanbulSide,
+  MonthlyInvoice,
+  OrderStatus,
+  PlaceDetails,
+  PlaceSuggestion,
+  PriceQuote,
+  PricingSettings,
+  ServiceLevel,
+} from "@yazgan/shared";
 
 export interface AdminOrder {
   id: string;
@@ -6,10 +16,15 @@ export interface AdminOrder {
   status: OrderStatus;
   createdAt: string;
   urgent: boolean;
+  serviceLevel: ServiceLevel;
   roundTrip: boolean;
   pickupAddress: string;
   pickupSide: "anadolu" | "avrupa" | null;
+  pickupLat: number;
+  pickupLng: number;
   dropoffAddress: string;
+  dropoffLat: number;
+  dropoffLng: number;
   dropoffSide: "anadolu" | "avrupa" | null;
   customerId: string;
   customerName: string | null;
@@ -122,7 +137,7 @@ export interface Invoice {
 
 export interface Conversation {
   id: string;
-  channel: "whatsapp" | "voice" | "app";
+  channel: "whatsapp" | "voice" | "app" | "email";
   externalId: string;
   status: "active" | "closed" | "handoff";
   handoffReason: string | null;
@@ -131,12 +146,160 @@ export interface Conversation {
   transcript: Array<{ role: "user" | "assistant"; text: string }>;
 }
 
+export interface PhoneCustomer {
+  id: string;
+  fullName: string | null;
+  email: string | null;
+  corporateAccountId: string | null;
+  hasConsent: boolean;
+  recentAddresses: Array<{
+    address: string;
+    details: string | null;
+    lat: number;
+    lng: number;
+    contactName: string | null;
+    contactPhone: string | null;
+  }>;
+}
+
+/** quote / create-order gövdesi (packages/shared/quote.ts parseOrderRequest) */
+export interface OrderRequestInput {
+  pickup: { address: string; details?: string; lat: number; lng: number; district?: string | null; contactName?: string; contactPhone?: string };
+  dropoff: { address: string; details?: string; lat: number; lng: number; district?: string | null; contactName?: string; contactPhone?: string };
+  serviceLevel: ServiceLevel;
+  roundTrip: boolean;
+  weightKg: number | null;
+  largePackage: boolean;
+  packageDescription?: string;
+  customerNote?: string;
+  scheduledPickupAt: string | null;
+  paymentMethod: "nakit" | "cari" | "kart";
+}
+
+export interface AdminQuote {
+  quote: PriceQuote;
+  distanceMeters: number;
+  durationSeconds: number;
+  bridgeCrossings: number;
+  pickupSide: IstanbulSide;
+  dropoffSide: IstanbulSide;
+}
+
+export interface OpsSettings {
+  unpaidCardTimeoutMinutes: number;
+  autoApprove: boolean;
+  autoAssign: boolean;
+  maxActiveOrdersPerCourier: number;
+  maxPickupDistanceKm: number;
+  locationMaxAgeMinutes: number;
+  unassignedAlertMinutes: number;
+}
+
+export interface DispatchResult {
+  approved: number;
+  assigned: Array<{ orderId: string; courierId: string; distanceKm: number }>;
+  unassigned: string[];
+}
+
 export interface OrderFilter {
   statuses?: OrderStatus[];
   search?: string;
   /** YYYY-MM-DD (İstanbul) */
   from?: string;
   to?: string;
+  /** En fazla kaç sipariş (varsayılan 500; raporlar için daha fazlası sayfalanarak okunur) */
+  limit?: number;
+}
+
+export interface ApiKeyInfo {
+  id: string;
+  name: string;
+  prefix: string;
+  profileId: string;
+  profileName: string | null;
+  createdAt: string;
+  lastUsedAt: string | null;
+  revokedAt: string | null;
+}
+export interface WebhookConfig {
+  url: string;
+  secret: string;
+  active: boolean;
+}
+export interface WebhookDelivery {
+  id: number;
+  event: string;
+  status: "pending" | "processing" | "delivered" | "failed";
+  attempts: number;
+  lastError: string | null;
+  responseStatus: number | null;
+  orderNo: string | null;
+  createdAt: string;
+  deliveredAt: string | null;
+}
+
+export interface SystemHealth {
+  snapshot: {
+    checked_at: string;
+    orders_waiting: number;
+    orders_problem: number;
+    notifications_stuck: number;
+    invoices_failed: number;
+    webhooks_failed_24h: number;
+    couriers_on_shift: number;
+    couriers_stale: number;
+    heartbeats: Record<string, string>;
+  };
+  issues: Array<{ key: string; severity: "critical" | "warning"; message: string }>;
+}
+
+export interface OrderRating {
+  orderId: string;
+  orderNo: string;
+  score: number;
+  comment: string | null;
+  courierId: string | null;
+  courierName: string | null;
+  customerName: string | null;
+  createdAt: string;
+}
+
+export type LeadStatus = "yeni" | "arandi" | "kazanildi" | "kaybedildi";
+export interface Lead {
+  id: string;
+  kind: "kurumsal" | "iletisim";
+  companyName: string | null;
+  contactName: string;
+  phone: string;
+  email: string | null;
+  monthlyVolume: string | null;
+  message: string | null;
+  sourcePage: string | null;
+  status: LeadStatus;
+  adminNote: string | null;
+  createdAt: string;
+}
+
+export type ApplicationStatus = "yeni" | "gorusme" | "onaylandi" | "reddedildi";
+export interface CourierApplication {
+  id: string;
+  fullName: string;
+  phone: string;
+  email: string | null;
+  district: string | null;
+  birthYear: number | null;
+  licenseClass: string | null;
+  hasMotorcycle: boolean;
+  plate: string | null;
+  vehicleModel: string | null;
+  experienceYears: number | null;
+  availability: "tam_zamanli" | "yari_zamanli" | "hafta_sonu" | null;
+  message: string | null;
+  documents: Array<{ kind: string; path: string }>;
+  status: ApplicationStatus;
+  adminNote: string | null;
+  courierId: string | null;
+  createdAt: string;
 }
 
 export interface AdminRepo {
@@ -155,7 +318,7 @@ export interface AdminRepo {
   podUrl(path: string): Promise<string | null>;
   // Kuryeler
   listCouriers(): Promise<Courier[]>;
-  createCourier(input: { fullName: string; phone: string; plate: string; vehicleModel?: string }): Promise<void>;
+  createCourier(input: { fullName: string; phone: string; plate: string; vehicleModel?: string }): Promise<{ id: string }>;
   updateCourier(id: string, patch: { active?: boolean; plate?: string; vehicleModel?: string }): Promise<void>;
   listShifts(filter: { from: string; to: string; courierId?: string }): Promise<Shift[]>;
   // Müşteriler
@@ -168,6 +331,35 @@ export interface AdminRepo {
   listInvoices(): Promise<Invoice[]>;
   createMonthlyInvoice(corporateAccountId: string, month: string): Promise<void>;
   retryInvoice(id: string): Promise<void>;
+  // Otomasyon
+  getOpsSettings(): Promise<OpsSettings>;
+  saveOpsSettings(s: OpsSettings): Promise<void>;
+  runDispatch(): Promise<DispatchResult>;
+  getSystemHealth(): Promise<SystemHealth>;
+  // Telefon siparişi
+  searchPlaces(input: string, sessionToken: string): Promise<PlaceSuggestion[]>;
+  placeDetails(placeId: string, sessionToken: string): Promise<PlaceDetails>;
+  quote(order: OrderRequestInput): Promise<AdminQuote>;
+  lookupPhoneCustomer(phone: string): Promise<PhoneCustomer | null>;
+  createPhoneOrder(input: { phone: string; fullName: string; verbalConsent: boolean; order: OrderRequestInput }): Promise<{ id: string; orderNo: string }>;
+  /** Tarih aralığındaki değerlendirmeler (YYYY-MM-DD, İstanbul) */
+  listRatings(filter: { from: string; to: string }): Promise<OrderRating[]>;
+  // Kurumsal API
+  listApiKeys(corporateAccountId: string): Promise<ApiKeyInfo[]>;
+  /** Anahtarı üretir; düz metin yalnız bu dönüşte görülür */
+  createApiKey(corporateAccountId: string, profileId: string, name: string): Promise<{ key: string }>;
+  revokeApiKey(id: string): Promise<void>;
+  getWebhook(corporateAccountId: string): Promise<WebhookConfig | null>;
+  saveWebhook(corporateAccountId: string, cfg: WebhookConfig): Promise<void>;
+  listWebhookDeliveries(corporateAccountId: string): Promise<WebhookDelivery[]>;
+  // Başvurular (web sitesi)
+  listLeads(): Promise<Lead[]>;
+  updateLead(id: string, patch: { status?: LeadStatus; adminNote?: string | null }): Promise<void>;
+  listCourierApplications(): Promise<CourierApplication[]>;
+  updateCourierApplication(id: string, patch: { status?: ApplicationStatus; adminNote?: string | null }): Promise<void>;
+  /** Başvuruyu onaylar: kurye hesabı açılır, başvuru "onaylandı" olur */
+  approveCourierApplication(id: string, input: { plate: string; vehicleModel?: string }): Promise<{ courierId: string }>;
+  applicationDocumentUrl(path: string): Promise<string | null>;
   // Asistan
   listConversations(): Promise<Conversation[]>;
   closeConversation(id: string): Promise<void>;

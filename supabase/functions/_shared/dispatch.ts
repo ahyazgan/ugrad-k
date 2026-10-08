@@ -4,6 +4,7 @@ import {
   type NotificationConfig,
   type NotificationOrder,
   type OrderStatus,
+  trackingBaseUrl,
 } from "../../../packages/shared/index.ts";
 import { deliver, type DeliveryResult, type Env } from "./channels.ts";
 import type { Ctx } from "./context.ts";
@@ -39,7 +40,7 @@ export function toNotificationOrder(r: Row): NotificationOrder {
 
 export function notificationConfig(env: Env): NotificationConfig {
   return {
-    trackingBaseUrl: env("PUBLIC_TRACKING_BASE_URL") ?? "https://panel.yazgankurye.com/takip",
+    trackingBaseUrl: env("PUBLIC_TRACKING_BASE_URL") ?? trackingBaseUrl,
     adminPhones: (env("ADMIN_ALERT_PHONES") ?? "")
       .split(",")
       .map((s) => s.trim())
@@ -54,6 +55,7 @@ export async function handleNotifyDispatch(
 ): Promise<Response> {
   const secret = deps.env("NOTIFY_SECRET");
   if (!secret || req.headers.get("x-notify-secret") !== secret) throw new HttpError(401, "Yetkisiz");
+  await ctx.admin.rpc("record_heartbeat", { p_name: "notify-dispatch" });
 
   const { data: claimed, error } = await ctx.admin.rpc("claim_notifications", { p_limit: 20 });
   if (error) throw new Error(`Kuyruk okunamadı: ${error.message}`);

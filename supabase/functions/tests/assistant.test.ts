@@ -59,7 +59,7 @@ Deno.test("asistan: fiyat aracı döngüsü, istek biçimi ve sona ekleme", asyn
     toolUse("tu1", "get_price_quote", {
       pickup_place_id: "mock-beykoz",
       dropoff_place_id: "mock-levent",
-      urgent: true,
+      service_level: "acil",
       round_trip: false,
       weight_kg: null,
       large_package: false,
@@ -107,7 +107,7 @@ Deno.test("asistan: araç hatası is_error ile modele döner", async () => {
     toolUse("tu1", "get_price_quote", {
       pickup_place_id: "yok",
       dropoff_place_id: "mock-levent",
-      urgent: false,
+      service_level: "standart",
       round_trip: false,
       weight_kg: null,
       large_package: false,
@@ -135,7 +135,7 @@ Deno.test("araçlar: KVKK onayı olmadan sipariş oluşturulmaz", async () => {
         dropoff_contact_name: "Ali",
         dropoff_contact_phone: "05334445566",
         package_description: "Evrak",
-        urgent: false,
+        service_level: "standart",
         round_trip: false,
         weight_kg: null,
         large_package: false,
@@ -178,7 +178,7 @@ Deno.test("araçlar: onay kaydı, sipariş ve durum", async () => {
       dropoff_contact_name: "Ali",
       dropoff_contact_phone: "05334445566",
       package_description: "Evrak",
-      urgent: false,
+      service_level: "standart",
       round_trip: false,
       weight_kg: null,
       large_package: false,
@@ -193,6 +193,16 @@ Deno.test("araçlar: onay kaydı, sipariş ve durum", async () => {
   assertEquals(row.customer_id, "u1");
   assertEquals(row.pickup_contact_name, "Ayşe");
   assertEquals(row.payment_method, "nakit");
+  assertEquals(row.service_level, "standart");
+  assertEquals(row.urgent, false);
+
+  // Eski konuşmadaki araç çağrısı (yalnız urgent) hâlâ çalışır
+  const legacy = (await executeTool(
+    "get_price_quote",
+    { pickup_place_id: "mock-beykoz", dropoff_place_id: "mock-levent", urgent: true, round_trip: false, weight_kg: null, large_package: false },
+    tc,
+  )) as Json;
+  assert(legacy.lines.some((l: string) => l.startsWith("Acil")));
 
   const handoff = (await executeTool("handoff_to_human", { reason: "hasar" }, tc)) as Json;
   assertEquals(handoff.handed_off, true);

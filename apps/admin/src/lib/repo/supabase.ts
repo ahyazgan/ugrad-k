@@ -3,10 +3,13 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import {
   calculateMonthlyInvoice,
+  monthlyInvoiceItem,
   holidayFromRow,
   pricingSettingsFromRow,
   pricingSettingsToRow,
   type OrderStatus,
+  type PlaceDetails,
+  type PlaceSuggestion,
 } from "@yazgan/shared";
 import { istDayEndUtc, istDayStartUtc, istMonthRangeUtc } from "../dates";
 import {
@@ -15,11 +18,21 @@ import {
   type AdminOrderDetail,
   type AdminRepo,
   type CorporateAccount,
+  type AdminQuote,
+  type DispatchResult,
   type Conversation,
   type Courier,
+  type CourierApplication,
   type Invoice,
+  type Lead,
+  type PhoneCustomer,
+  type ApiKeyInfo,
+  type OrderRating,
+  type SystemHealth,
+  type WebhookDelivery,
 } from "./types";
 import { toTranscript } from "./transcript";
+import { generateApiKey, keyPrefix, sha256Hex } from "../api-keys";
 
 // Supabase'den gelen tipsiz satırlar (şema tipi üretilene kadar)
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -34,10 +47,15 @@ export const toAdminOrder = (r: Row): AdminOrder => ({
   status: r.status,
   createdAt: r.created_at,
   urgent: r.urgent,
+  serviceLevel: r.service_level ?? (r.urgent ? "acil" : "standart"),
   roundTrip: r.round_trip,
   pickupAddress: r.pickup_address,
   pickupSide: r.pickup_side,
+  pickupLat: r.pickup_lat,
+  pickupLng: r.pickup_lng,
   dropoffAddress: r.dropoff_address,
+  dropoffLat: r.dropoff_lat,
+  dropoffLng: r.dropoff_lng,
   dropoffSide: r.dropoff_side,
   customerId: r.customer_id,
   customerName: r.customer?.full_name ?? null,
@@ -72,6 +90,16 @@ function check<T>(res: { data: T; error: { message: string } | null }, msg: stri
 
 export function createSupabaseRepo(url: string, anonKey: string): AdminRepo & { client: SupabaseClient } {
   const client = createClient(url, anonKey);
+
+  async function invoke<T>(name: string, body: object): Promise<T> {
+    const { data, error } = await client.functions.invoke(name, { body: body as Record<string, unknown> });
+    if (error) {
+      const ctx = (error as { context?: Response }).context;
+      const payload = ctx ? await ctx.json().catch(() => ({})) : {};
+      throw new RepoError(payload.error ?? "İşlem başarısız");
+    }
+    return data as T;
+  }
 
   async function accessToken() {
     const { data } = await client.auth.getSession();
@@ -108,15 +136,28 @@ export function createSupabaseRepo(url: string, anonKey: string): AdminRepo & { 
     },
 
     async listOrders(filter = {}) {
-      let q = client.from("orders").select(ORDER_SELECT).order("created_at", { ascending: false }).limit(500);
-      if (filter.statuses?.length) q = q.in("status", filter.statuses);
-      if (filter.from) q = q.gte("created_at", istDayStartUtc(filter.from));
-      if (filter.to) q = q.lt("created_at", istDayEndUtc(filter.to));
-      if (filter.search) {
-        const s = filter.search.replace(/[%,()]/g, " ").trim();
-        q = q.or(`order_no.ilike.%${s}%,pickup_address.ilike.%${s}%,dropoff_address.ilike.%${s}%`);
+      const limit = filter.limit ?? 500;
+      const PAGE = 1000; // PostgREST tek istekte en fazla 1000 satır döndürür
+      const rows: Row[] = [];
+      for (let offset = 0; offset < limit; offset += PAGE) {
+        let q = client
+          .from("orders")
+          .select(ORDER_SELECT)
+          .order("created_at", { ascending: false })
+          .order("id")
+          .range(offset, Math.min(offset + PAGE, limit) - 1);
+        if (filter.statuses?.length) q = q.in("status", filter.statuses);
+        if (filter.from) q = q.gte("created_at", istDayStartUtc(filter.from));
+        if (filter.to) q = q.lt("created_at", istDayEndUtc(filter.to));
+        if (filter.search) {
+          const s = filter.search.replace(/[%,()]/g, " ").trim();
+          q = q.or(`order_no.ilike.%${s}%,pickup_address.ilike.%${s}%,dropoff_address.ilike.%${s}%`);
+        }
+        const page = (check(await q, "Siparişler okunamadı") ?? []) as Row[];
+        rows.push(...page);
+        if (page.length < Math.min(PAGE, limit - offset)) break;
       }
-      return (check(await q, "Siparişler okunamadı") ?? []).map(toAdminOrder);
+      return rows.map(toAdminOrder);
     },
     async getOrder(id) {
       const [o, h] = await Promise.all([
@@ -208,7 +249,9 @@ export function createSupabaseRepo(url: string, anonKey: string): AdminRepo & { 
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${await accessToken()}` },
         body: JSON.stringify(input),
       });
-      if (!res.ok) throw new RepoError((await res.json().catch(() => ({}))).error ?? "Kurye eklenemedi");
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new RepoError(data.error ?? "Kurye eklenemedi");
+      return { id: data.id as string };
     },
     async updateCourier(id, patch) {
       check(
@@ -296,13 +339,17 @@ export function createSupabaseRepo(url: string, anonKey: string): AdminRepo & { 
           .order("delivered_at"),
         client.from("pricing_settings").select("*").eq("id", 1).single(),
       ]);
-      const orders = (check(o, "Siparişler okunamadı") ?? []).map(toAdminOrder);
+      const rows = check(o, "Siparişler okunamadı") ?? [];
+      const orders = rows.map(toAdminOrder);
       const settings = pricingSettingsFromRow(check(s, "Fiyat ayarı okunamadı"));
       return {
         account: toCorporate(check(acc, "Hesap okunamadı")),
         month,
         orders,
-        invoice: calculateMonthlyInvoice(orders.map((x) => x.subtotalKurus), settings),
+        invoice: calculateMonthlyInvoice(
+          rows.map((r: Row) => monthlyInvoiceItem(r.subtotal_kurus, r.price_quote)),
+          settings,
+        ),
       };
     },
 
@@ -346,6 +393,223 @@ export function createSupabaseRepo(url: string, anonKey: string): AdminRepo & { 
         await client.from("invoices").update({ status: "pending", attempts: 0, last_error: null }).eq("id", id),
         "Fatura yeniden kuyruğa alınamadı",
       );
+    },
+
+    async getOpsSettings() {
+      const r = check(await client.from("ops_settings").select("*").eq("id", 1).single(), "Ayarlar okunamadı") as Row;
+      return {
+        unpaidCardTimeoutMinutes: r.unpaid_card_timeout_minutes,
+        autoApprove: r.auto_approve,
+        autoAssign: r.auto_assign,
+        maxActiveOrdersPerCourier: r.max_active_orders_per_courier,
+        maxPickupDistanceKm: Number(r.max_pickup_distance_km),
+        locationMaxAgeMinutes: r.location_max_age_minutes,
+        unassignedAlertMinutes: r.unassigned_alert_minutes,
+      };
+    },
+    async saveOpsSettings(s) {
+      check(
+        await client
+          .from("ops_settings")
+          .update({
+            unpaid_card_timeout_minutes: s.unpaidCardTimeoutMinutes,
+            auto_approve: s.autoApprove,
+            auto_assign: s.autoAssign,
+            max_active_orders_per_courier: s.maxActiveOrdersPerCourier,
+            max_pickup_distance_km: s.maxPickupDistanceKm,
+            location_max_age_minutes: s.locationMaxAgeMinutes,
+            unassigned_alert_minutes: s.unassignedAlertMinutes,
+          })
+          .eq("id", 1),
+        "Ayarlar kaydedilemedi",
+      );
+    },
+    runDispatch: () => invoke<DispatchResult>("auto-dispatch", {}),
+    getSystemHealth: () => invoke<SystemHealth>("health", {}),
+
+    async searchPlaces(input, sessionToken) {
+      return (await invoke<{ suggestions: PlaceSuggestion[] }>("places", { input, sessionToken })).suggestions;
+    },
+    async placeDetails(placeId, sessionToken) {
+      return (await invoke<{ place: PlaceDetails }>("places", { placeId, sessionToken })).place;
+    },
+    quote: (order) => invoke<AdminQuote>("quote", order),
+    async lookupPhoneCustomer(phone) {
+      return (await invoke<{ customer: PhoneCustomer | null }>("admin-order", { action: "lookup", phone })).customer;
+    },
+    async createPhoneOrder(input) {
+      const r = await invoke<{ order: { id: string; order_no: string } }>("admin-order", { action: "create", ...input });
+      return { id: r.order.id, orderNo: r.order.order_no };
+    },
+
+    async listRatings({ from, to }) {
+      const rows =
+        check(
+          await client
+            .from("order_ratings")
+            .select("*, order:orders(order_no, courier_id, courier:couriers(profile:profiles(full_name)), customer:profiles!orders_customer_id_fkey(full_name))")
+            .gte("created_at", istDayStartUtc(from))
+            .lt("created_at", istDayEndUtc(to))
+            .order("created_at", { ascending: false })
+            .limit(2000),
+          "Değerlendirmeler okunamadı",
+        ) ?? [];
+      return rows.map(
+        (r: Row): OrderRating => ({
+          orderId: r.order_id,
+          orderNo: r.order?.order_no ?? "",
+          score: r.score,
+          comment: r.comment,
+          courierId: r.order?.courier_id ?? null,
+          courierName: r.order?.courier?.profile?.full_name ?? null,
+          customerName: r.order?.customer?.full_name ?? null,
+          createdAt: r.created_at,
+        }),
+      );
+    },
+
+    // ───────── Kurumsal API
+    async listApiKeys(accountId) {
+      const rows =
+        check(
+          await client.from("api_keys").select("*, profile:profiles(full_name)").eq("corporate_account_id", accountId).order("created_at", { ascending: false }),
+          "API anahtarları okunamadı",
+        ) ?? [];
+      return rows.map(
+        (r: Row): ApiKeyInfo => ({
+          id: r.id,
+          name: r.name,
+          prefix: r.key_prefix,
+          profileId: r.profile_id,
+          profileName: r.profile?.full_name ?? null,
+          createdAt: r.created_at,
+          lastUsedAt: r.last_used_at,
+          revokedAt: r.revoked_at,
+        }),
+      );
+    },
+    async createApiKey(accountId, profileId, name) {
+      const key = generateApiKey();
+      check(
+        await client.from("api_keys").insert({
+          corporate_account_id: accountId,
+          profile_id: profileId,
+          name: name.trim() || "API",
+          key_prefix: keyPrefix(key),
+          key_hash: await sha256Hex(key),
+        }),
+        "API anahtarı oluşturulamadı",
+      );
+      return { key };
+    },
+    async revokeApiKey(id) {
+      check(await client.from("api_keys").update({ revoked_at: new Date().toISOString() }).eq("id", id), "Anahtar iptal edilemedi");
+    },
+    async getWebhook(accountId) {
+      const { data } = await client.from("corporate_webhooks").select("url, secret, active").eq("corporate_account_id", accountId).maybeSingle();
+      return data ? { url: data.url, secret: data.secret, active: data.active } : null;
+    },
+    async saveWebhook(accountId, cfg) {
+      if (!/^https:\/\/\S+$/.test(cfg.url)) throw new RepoError("Webhook adresi https:// ile başlamalı");
+      check(
+        await client.from("corporate_webhooks").upsert({ corporate_account_id: accountId, url: cfg.url, secret: cfg.secret, active: cfg.active }),
+        "Webhook kaydedilemedi",
+      );
+    },
+    async listWebhookDeliveries(accountId) {
+      const rows =
+        check(
+          await client
+            .from("webhook_deliveries")
+            .select("*, order:orders(order_no)")
+            .eq("corporate_account_id", accountId)
+            .order("created_at", { ascending: false })
+            .limit(30),
+          "Webhook kayıtları okunamadı",
+        ) ?? [];
+      return rows.map(
+        (r: Row): WebhookDelivery => ({
+          id: r.id,
+          event: r.event,
+          status: r.status,
+          attempts: r.attempts,
+          lastError: r.last_error,
+          responseStatus: r.response_status,
+          orderNo: r.order?.order_no ?? null,
+          createdAt: r.created_at,
+          deliveredAt: r.delivered_at,
+        }),
+      );
+    },
+
+    // ───────── Başvurular
+    async listLeads() {
+      const rows = check(await client.from("leads").select("*").order("created_at", { ascending: false }).limit(300), "Başvurular okunamadı") ?? [];
+      return rows.map(
+        (r: Row): Lead => ({
+          id: r.id,
+          kind: r.kind,
+          companyName: r.company_name,
+          contactName: r.contact_name,
+          phone: r.phone,
+          email: r.email,
+          monthlyVolume: r.monthly_volume,
+          message: r.message,
+          sourcePage: r.source_page,
+          status: r.status,
+          adminNote: r.admin_note,
+          createdAt: r.created_at,
+        }),
+      );
+    },
+    async updateLead(id, patch) {
+      check(await client.from("leads").update({ status: patch.status, admin_note: patch.adminNote }).eq("id", id), "Başvuru güncellenemedi");
+    },
+    async listCourierApplications() {
+      const rows =
+        check(await client.from("courier_applications").select("*").order("created_at", { ascending: false }).limit(300), "Kurye başvuruları okunamadı") ?? [];
+      return rows.map(
+        (r: Row): CourierApplication => ({
+          id: r.id,
+          fullName: r.full_name,
+          phone: r.phone,
+          email: r.email,
+          district: r.district,
+          birthYear: r.birth_year,
+          licenseClass: r.license_class,
+          hasMotorcycle: r.has_motorcycle,
+          plate: r.plate,
+          vehicleModel: r.vehicle_model,
+          experienceYears: r.experience_years,
+          availability: r.availability,
+          message: r.message,
+          documents: r.documents ?? [],
+          status: r.status,
+          adminNote: r.admin_note,
+          courierId: r.courier_id,
+          createdAt: r.created_at,
+        }),
+      );
+    },
+    async updateCourierApplication(id, patch) {
+      check(
+        await client.from("courier_applications").update({ status: patch.status, admin_note: patch.adminNote }).eq("id", id),
+        "Başvuru güncellenemedi",
+      );
+    },
+    async approveCourierApplication(id, input) {
+      const { data: a } = await client.from("courier_applications").select("full_name, phone").eq("id", id).single();
+      if (!a) throw new RepoError("Başvuru bulunamadı");
+      const { id: courierId } = await this.createCourier({ fullName: a.full_name, phone: a.phone, plate: input.plate, vehicleModel: input.vehicleModel });
+      check(
+        await client.from("courier_applications").update({ status: "onaylandi", courier_id: courierId, plate: input.plate }).eq("id", id),
+        "Başvuru güncellenemedi",
+      );
+      return { courierId };
+    },
+    async applicationDocumentUrl(path) {
+      const { data } = await client.storage.from("basvuru").createSignedUrl(path, 600);
+      return data?.signedUrl ?? null;
     },
 
     async listConversations() {

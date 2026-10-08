@@ -1,5 +1,6 @@
 import * as Linking from "expo-linking";
 import * as WebBrowser from "expo-web-browser";
+import { Platform } from "react-native";
 import { api } from "./api";
 
 /**
@@ -7,7 +8,9 @@ import { api } from "./api";
  * (payment-callback) doğrulanır; burada yalnızca sayfa kapanana kadar beklenir.
  */
 export async function payOrder(orderId: string) {
-  const r = await api.startPayment(orderId);
+  const redirect = Linking.createURL("odeme");
+  // Tarayıcıdan siparişte iyzico, ödeme sonrası bu web adresine döner (uygulama şeması tarayıcıda açılmaz)
+  const r = await api.startPayment(orderId, Platform.OS === "web" ? redirect : undefined);
   if (!r) return; // demo: anında ödendi
-  await WebBrowser.openAuthSessionAsync(r.paymentPageUrl, Linking.createURL("odeme"));
+  await WebBrowser.openAuthSessionAsync(r.paymentPageUrl, redirect);
 }

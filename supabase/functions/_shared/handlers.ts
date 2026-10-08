@@ -11,7 +11,7 @@ import {
 import type { Ctx } from "./context.ts";
 import { HttpError, json, readJson } from "./http.ts";
 
-function quoteResponse(q: QuoteResult) {
+export function quoteResponse(q: QuoteResult) {
   return {
     quote: q.quote,
     distanceMeters: q.distanceMeters,
@@ -35,7 +35,7 @@ export async function handleQuote(req: Request, ctx: Ctx): Promise<Response> {
  * Sipariş oluşturmanın tek yolu (uygulama, asistan, panel). KVKK rızası ve cari
  * hesap kontrol edilir; fiyat her zaman sunucuda pricing.ts ile yeniden hesaplanır.
  */
-export async function createOrderForCustomer(ctx: Ctx, userId: string, order: OrderRequest) {
+export async function createOrderForCustomer(ctx: Ctx, userId: string, order: OrderRequest, extra: Record<string, unknown> = {}) {
   const { data: profile, error: pErr } = await ctx.admin
     .from("profiles")
     .select("id, role, corporate_account_id")
@@ -67,10 +67,14 @@ export async function createOrderForCustomer(ctx: Ctx, userId: string, order: Or
       customer_id: userId,
       corporate_account_id: profile.corporate_account_id,
       payment_status: order.paymentMethod === "cari" ? "cari_hesap" : "odenmedi",
+      ...extra,
     })
     .select("id, order_no, status, total_kurus, tracking_token, created_at")
     .single();
-  if (error) throw new Error(`Sipariş kaydedilemedi: ${error.message}`);
+  if (error) {
+    if ((error as { code?: string }).code === "23505") throw new HttpError(409, "Bu dış referansla bir sipariş zaten var", "externalRef");
+    throw new Error(`Sipariş kaydedilemedi: ${error.message}`);
+  }
   return { order: data, quote: q };
 }
 

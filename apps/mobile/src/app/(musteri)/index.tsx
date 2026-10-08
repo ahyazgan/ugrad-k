@@ -1,6 +1,6 @@
 import { router } from "expo-router";
 import { Pressable, Text, View } from "react-native";
-import { Button, Card, Field, Muted, Screen, ToggleRow, colors } from "@/components/ui";
+import { Button, Card, Field, Muted, Screen, Segmented, ToggleRow, colors } from "@/components/ui";
 import type { DraftPoint } from "@/lib/api";
 import { useOrderDraft } from "@/lib/order-draft";
 
@@ -58,13 +58,24 @@ export default function YeniGonderi() {
           onChangeText={(v) => update({ packageDescription: v })}
         />
         <Field
-          label="Ağırlık (kg, isteğe bağlı)"
+          label="Ağırlık (kg, isteğe bağlı, en fazla 20)"
           placeholder="Örn. 2"
           keyboardType="decimal-pad"
           value={draft.weightKg}
           onChangeText={(v) => update({ weightKg: v })}
         />
-        <ToggleRow label="Acil (60 dk)" hint="+%50 ek ücret" value={draft.urgent} onChange={(v) => update({ urgent: v })} />
+        <Segmented
+          label="Hizmet"
+          testIDPrefix="level"
+          value={draft.serviceLevel}
+          onChange={(v) => update({ serviceLevel: v })}
+          options={[
+            { value: "ekonomi", label: "Ekonomi", hint: "Gün içinde, indirimli" },
+            { value: "standart", label: "Standart", hint: "En kısa sürede" },
+            { value: "acil", label: "Acil", hint: "60 dk, ek ücretli" },
+          ]}
+        />
+        {draft.serviceLevel === "ekonomi" ? <Muted>Ekonomi: Pazartesi–Cumartesi öğleden önce verilen siparişler aynı gün teslim edilir.</Muted> : null}
         <ToggleRow label="Gidiş-dönüş" hint="Dönüş ayağı %50 indirimli" value={draft.roundTrip} onChange={(v) => update({ roundTrip: v })} />
         <ToggleRow label="Büyük paket" hint="Motora sığan ama hacimli paketler, +150 TL" value={draft.largePackage} onChange={(v) => update({ largePackage: v })} />
         <Field

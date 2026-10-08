@@ -2,6 +2,7 @@
 
 import { formatTL } from "@yazgan/shared";
 import { useState, type FormEvent } from "react";
+import { ApiAccess } from "@/components/ApiAccess";
 import { Button, Card, ErrorText, Input, PageHeader, Select, Table, Td } from "@/components/ui";
 import { downloadCsv, kurusToCsv } from "@/lib/csv";
 import { fmtDateTime, istDate } from "@/lib/dates";
@@ -198,6 +199,9 @@ export default function KurumsalPage() {
             </form>
           </Card>
         ) : null}
+      </div>
+      <div className="mt-6">
+        <ApiAccess accounts={accounts ?? []} />
       </div>
     </>
   );

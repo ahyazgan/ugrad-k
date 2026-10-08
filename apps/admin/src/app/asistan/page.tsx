@@ -6,7 +6,7 @@ import { fmtDateTime } from "@/lib/dates";
 import { repo, type Conversation } from "@/lib/repo";
 import { useLoad } from "@/lib/use-load";
 
-const CHANNEL: Record<Conversation["channel"], string> = { whatsapp: "WhatsApp", voice: "Telefon", app: "Uygulama" };
+const CHANNEL: Record<Conversation["channel"], string> = { whatsapp: "WhatsApp", voice: "Telefon", app: "Uygulama", email: "E-posta" };
 
 export default function AsistanPage() {
   const { data, error, reload } = useLoad(() => repo.listConversations());
@@ -40,6 +40,10 @@ export default function AsistanPage() {
                 {c.channel === "whatsapp" ? (
                   <a className="text-brand underline" href={`https://wa.me/${c.externalId}`} target="_blank" rel="noreferrer">
                     WhatsApp&apos;ta aç
+                  </a>
+                ) : c.channel === "email" ? (
+                  <a className="text-brand underline" href={`mailto:${c.externalId}`}>
+                    E-posta yaz
                   </a>
                 ) : null}
                 <Button variant="ghost" onClick={() => setOpenId(openId === c.id ? null : c.id)}>
