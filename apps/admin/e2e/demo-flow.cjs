@@ -124,6 +124,14 @@ fs.mkdirSync(out, { recursive: true });
   await page.getByText("köşesi ezilmiş", { exact: false }).waitFor();
   await shot("06c-asistan");
 
+  // ───── Otomasyon: şimdi dağıt → bekleyen siparişler onaylanır, vardiyadaki kuryeye atanır
+  await nav("Otomasyon");
+  await page.getByTestId("run-dispatch").click();
+  const res = await page.getByTestId("dispatch-result").innerText();
+  console.log("DAGITIM", res);
+  if (!/\d+ sipariş kuryeye atandı/.test(res) || /^0 sipariş onaylandı · 0 sipariş kuryeye/.test(res)) throw new Error("dağıtım bir şey yapmadı: " + res);
+  await shot("06d-otomasyon");
+
   await nav("Fiyatlar");
   const kmTiers = page.getByLabel("Km kademeleri (toplam km'ye kadar : TL/km)");
   await kmTiers.waitFor();

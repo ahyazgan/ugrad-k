@@ -110,6 +110,15 @@ select cron.schedule('fatura-kuyrugu', '*/5 * * * *', $$
   );
 $$);
 
+-- Otomatik onay + kurye atama (ayarlar: panel → Otomasyon)
+select cron.schedule('otomatik-dagitim', '* * * * *', $$
+  select net.http_post(
+    url := 'https://<ref>.supabase.co/functions/v1/auto-dispatch',
+    headers := jsonb_build_object('x-notify-secret',
+      (select decrypted_secret from vault.decrypted_secrets where name = 'notify_secret'))
+  );
+$$);
+
 -- Ödeme süresi dolan kart siparişlerini iptal et (süre: panel → Operasyon ayarları)
 select cron.schedule('odenmemis-kart-iptal', '*/5 * * * *', 'select public.cancel_unpaid_card_orders()');
 ```

@@ -6,3 +6,4 @@ export * from "./maps.ts";
 export * from "./quote.ts";
 export * from "./notifications.ts";
 export * from "./legal.ts";
+export * from "./assignment.ts";

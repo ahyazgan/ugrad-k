@@ -12,6 +12,7 @@ import {
   mockMapsProvider,
   MOCK_PLACES,
   parseOrderRequest,
+  planAssignments,
   ValidationError,
   type Holiday,
   type OrderStatus,
@@ -29,6 +30,7 @@ import {
   type Conversation,
   type Customer,
   type Invoice,
+  type OpsSettings,
   type PhoneCustomer,
   type Shift,
 } from "./types";
@@ -47,6 +49,7 @@ interface State {
   shifts: Shift[];
   invoices: Invoice[];
   conversations: Conversation[];
+  ops: OpsSettings;
   /** KVKK onayı verilmiş müşteri kimlikleri */
   consented: Set<string>;
 }
@@ -123,6 +126,10 @@ async function seed(): Promise<State> {
       roundTrip: false,
       pickupAddress: p.address,
       pickupSide: p.side,
+      pickupLat: p.lat,
+      pickupLng: p.lng,
+      dropoffLat: d.lat,
+      dropoffLng: d.lng,
       dropoffAddress: d.address,
       dropoffSide: d.side,
       customerId,
@@ -191,6 +198,15 @@ async function seed(): Promise<State> {
   });
   return {
     signedIn: false,
+    ops: {
+      unpaidCardTimeoutMinutes: 30,
+      autoApprove: true,
+      autoAssign: true,
+      maxActiveOrdersPerCourier: 3,
+      maxPickupDistanceKm: 15,
+      locationMaxAgeMinutes: 10,
+      unassignedAlertMinutes: 10,
+    },
     consented: new Set(["cus-1", "cus-2"]),
     settings: { ...DEFAULT_PRICING_SETTINGS },
     holidays: (holidaysJson as Array<{ date: string; name: string; half_day: boolean }>).map((h) => ({
@@ -479,6 +495,58 @@ export function createDemoRepo(): AdminRepo {
       if (inv) Object.assign(inv, { status: "pending", attempts: 0, lastError: null });
     },
 
+    async getOpsSettings() {
+      return clone((await get()).ops);
+    },
+    async saveOpsSettings(o) {
+      (await get()).ops = clone(o);
+    },
+    async runDispatch() {
+      const s = await get();
+      let approved = 0;
+      if (s.ops.autoApprove) {
+        for (const o of s.orders) {
+          if (o.status === "beklemede" && (o.paymentMethod !== "kart" || o.paymentStatus === "odendi")) {
+            transition(o, "onaylandi", "Otomatik onay");
+            approved++;
+          }
+        }
+      }
+      if (!s.ops.autoAssign) return { approved, assigned: [], unassigned: [] };
+      refreshCounts(s);
+      const pending = s.orders.filter((o) => o.status === "onaylandi" && (o.paymentMethod !== "kart" || o.paymentStatus === "odendi"));
+      const plan = planAssignments(
+        pending.map((o) => ({
+          id: o.id,
+          pickupLat: o.pickupLat,
+          pickupLng: o.pickupLng,
+          urgent: o.urgent,
+          createdAt: o.createdAt,
+          scheduledPickupAt: o.scheduledPickupAt,
+          declinedBy: [],
+        })),
+        s.couriers
+          .filter((c) => c.active && c.isOnShift)
+          .map((c) => ({ id: c.id, name: c.fullName, lat: c.lastLat, lng: c.lastLng, locationAt: c.lastLocationAt, activeOrders: c.activeOrderCount })),
+        {
+          maxActiveOrdersPerCourier: s.ops.maxActiveOrdersPerCourier,
+          maxPickupDistanceKm: s.ops.maxPickupDistanceKm,
+          locationMaxAgeMinutes: s.ops.locationMaxAgeMinutes,
+          now: new Date(),
+        },
+      );
+      for (const a of plan.assignments) {
+        const o = s.orders.find((x) => x.id === a.orderId)!;
+        const c = s.couriers.find((x) => x.id === a.courierId)!;
+        o.courierId = c.id;
+        o.courierName = c.fullName;
+        transition(o, "kuryeye_atandi", `Otomatik atama (${a.distanceKm.toLocaleString("tr-TR")} km)`);
+      }
+      refreshCounts(s);
+      touchOrders();
+      return { approved, assigned: plan.assignments, unassigned: plan.unassigned };
+    },
+
     async searchPlaces(input) {
       return mockMapsProvider().autocomplete(input);
     },
@@ -555,6 +623,10 @@ export function createDemoRepo(): AdminRepo {
         roundTrip: req.roundTrip,
         pickupAddress: req.pickup.address,
         pickupSide: q.pickupSide,
+        pickupLat: req.pickup.lat,
+        pickupLng: req.pickup.lng,
+        dropoffLat: req.dropoff.lat,
+        dropoffLng: req.dropoff.lng,
         dropoffAddress: req.dropoff.address,
         dropoffSide: q.dropoffSide,
         customerId: c.id,

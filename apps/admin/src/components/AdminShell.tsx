@@ -15,6 +15,7 @@ const NAV = [
   { href: "/faturalar", label: "Faturalar" },
   { href: "/asistan", label: "Asistan konuşmaları" },
   { href: "/fiyatlar", label: "Fiyatlar" },
+  { href: "/otomasyon", label: "Otomasyon" },
 ];
 
 export function AdminShell({ children }: { children: ReactNode }) {

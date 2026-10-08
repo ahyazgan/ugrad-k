@@ -18,6 +18,7 @@ import {
   type AdminRepo,
   type CorporateAccount,
   type AdminQuote,
+  type DispatchResult,
   type Conversation,
   type Courier,
   type Invoice,
@@ -41,7 +42,11 @@ export const toAdminOrder = (r: Row): AdminOrder => ({
   roundTrip: r.round_trip,
   pickupAddress: r.pickup_address,
   pickupSide: r.pickup_side,
+  pickupLat: r.pickup_lat,
+  pickupLng: r.pickup_lng,
   dropoffAddress: r.dropoff_address,
+  dropoffLat: r.dropoff_lat,
+  dropoffLng: r.dropoff_lng,
   dropoffSide: r.dropoff_side,
   customerId: r.customer_id,
   customerName: r.customer?.full_name ?? null,
@@ -361,6 +366,37 @@ export function createSupabaseRepo(url: string, anonKey: string): AdminRepo & { 
         "Fatura yeniden kuyruğa alınamadı",
       );
     },
+
+    async getOpsSettings() {
+      const r = check(await client.from("ops_settings").select("*").eq("id", 1).single(), "Ayarlar okunamadı") as Row;
+      return {
+        unpaidCardTimeoutMinutes: r.unpaid_card_timeout_minutes,
+        autoApprove: r.auto_approve,
+        autoAssign: r.auto_assign,
+        maxActiveOrdersPerCourier: r.max_active_orders_per_courier,
+        maxPickupDistanceKm: Number(r.max_pickup_distance_km),
+        locationMaxAgeMinutes: r.location_max_age_minutes,
+        unassignedAlertMinutes: r.unassigned_alert_minutes,
+      };
+    },
+    async saveOpsSettings(s) {
+      check(
+        await client
+          .from("ops_settings")
+          .update({
+            unpaid_card_timeout_minutes: s.unpaidCardTimeoutMinutes,
+            auto_approve: s.autoApprove,
+            auto_assign: s.autoAssign,
+            max_active_orders_per_courier: s.maxActiveOrdersPerCourier,
+            max_pickup_distance_km: s.maxPickupDistanceKm,
+            location_max_age_minutes: s.locationMaxAgeMinutes,
+            unassigned_alert_minutes: s.unassignedAlertMinutes,
+          })
+          .eq("id", 1),
+        "Ayarlar kaydedilemedi",
+      );
+    },
+    runDispatch: () => invoke<DispatchResult>("auto-dispatch", {}),
 
     async searchPlaces(input, sessionToken) {
       return (await invoke<{ suggestions: PlaceSuggestion[] }>("places", { input, sessionToken })).suggestions;

@@ -18,7 +18,11 @@ export interface AdminOrder {
   roundTrip: boolean;
   pickupAddress: string;
   pickupSide: "anadolu" | "avrupa" | null;
+  pickupLat: number;
+  pickupLng: number;
   dropoffAddress: string;
+  dropoffLat: number;
+  dropoffLng: number;
   dropoffSide: "anadolu" | "avrupa" | null;
   customerId: string;
   customerName: string | null;
@@ -179,6 +183,22 @@ export interface AdminQuote {
   dropoffSide: IstanbulSide;
 }
 
+export interface OpsSettings {
+  unpaidCardTimeoutMinutes: number;
+  autoApprove: boolean;
+  autoAssign: boolean;
+  maxActiveOrdersPerCourier: number;
+  maxPickupDistanceKm: number;
+  locationMaxAgeMinutes: number;
+  unassignedAlertMinutes: number;
+}
+
+export interface DispatchResult {
+  approved: number;
+  assigned: Array<{ orderId: string; courierId: string; distanceKm: number }>;
+  unassigned: string[];
+}
+
 export interface OrderFilter {
   statuses?: OrderStatus[];
   search?: string;
@@ -216,6 +236,10 @@ export interface AdminRepo {
   listInvoices(): Promise<Invoice[]>;
   createMonthlyInvoice(corporateAccountId: string, month: string): Promise<void>;
   retryInvoice(id: string): Promise<void>;
+  // Otomasyon
+  getOpsSettings(): Promise<OpsSettings>;
+  saveOpsSettings(s: OpsSettings): Promise<void>;
+  runDispatch(): Promise<DispatchResult>;
   // Telefon siparişi
   searchPlaces(input: string, sessionToken: string): Promise<PlaceSuggestion[]>;
   placeDetails(placeId: string, sessionToken: string): Promise<PlaceDetails>;

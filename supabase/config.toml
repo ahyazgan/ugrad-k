@@ -472,3 +472,7 @@ verify_jwt = true
 
 [functions.admin-order]
 verify_jwt = true
+
+# Cron (x-notify-secret) veya yönetici JWT'si fonksiyon içinde doğrulanır
+[functions.auto-dispatch]
+verify_jwt = false

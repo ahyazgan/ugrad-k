@@ -65,7 +65,8 @@ Ek: `iptal`, `sorunlu`
 - `supabase/migrations/` — şema, RLS, RPC, storage, sabit veriler; `supabase/functions/` — Edge Functions (Deno, `packages/shared`'ı doğrudan import eder; deploy `--use-api`)
 - `apps/mobile/` — Expo SDK 57 + expo-router (`src/app/`). Supabase env yoksa **DEMO modu** (sahte veri, kod 123456). `pnpm --filter @yazgan/mobile e2e:web` tarayıcıda tam akışı test eder
 - `apps/admin/` — Next.js 16 + Tailwind 4 panel. Supabase env yoksa **DEMO modu** (admin@yazgankurye.com / demo1234). Kurye hesabı oluşturma `/api/kuryeler` (service role yalnız sunucuda). `pnpm --filter @yazgan/admin e2e:web`
-- Edge Functions: admin-order (telefon siparişi), quote, create-order, places, send-sms, reprice-order, notify-dispatch, payment-init/callback/refund, invoice-dispatch/monthly, whatsapp-webhook, assistant-voice, account-delete
+- Edge Functions: auto-dispatch (otomatik onay + kurye atama, `packages/shared/assignment.ts`), admin-order (telefon siparişi), quote, create-order, places, send-sms, reprice-order, notify-dispatch, payment-init/callback/refund, invoice-dispatch/monthly, whatsapp-webhook, assistant-voice, account-delete
+- Operasyon ayarları `ops_settings` (panel → Otomasyon): otomatik onay/atama, kapasite, mesafe, ödeme süresi
 - Kuyruklar (outbox): `notifications` ve `invoices` tabloları; dakikalık cron ile işlenir (docs/kurulum.md §6)
 - Yapay zeka asistanı: `supabase/functions/_shared/assistant.ts` (Claude, araçlar aynı sipariş API'sini kullanır; geçmiş yalnızca sona eklenir)
 - Kurulum ve canlıya alma: `docs/kurulum.md`; mağaza: `docs/magaza.md`
