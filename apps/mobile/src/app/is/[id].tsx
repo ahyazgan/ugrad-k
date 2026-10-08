@@ -4,6 +4,7 @@ import { Text, TextInput, View } from "react-native";
 import { FailedDeliveryForm } from "@/components/FailedDelivery";
 import { OfferCard } from "@/components/OfferCard";
 import { StatusBadge } from "@/components/StatusBadge";
+import { Sticker, type StickerName } from "@/components/Sticker";
 import { TileMap, type MapMarker } from "@/components/TileMap";
 import { Button, Card, ErrorBox, Loading, Muted, Screen, Title, colors, styles, font } from "@/components/ui";
 import { api, ApiError, type OrderDetail } from "@/lib/api";
@@ -14,6 +15,7 @@ import { currentPosition, lastKnownPosition, setActiveOrderForLocation } from "@
 import { callPhone, openDirections } from "@/lib/navigation";
 
 function Stop({
+  sticker,
   title,
   address,
   details,
@@ -22,6 +24,7 @@ function Stop({
   lat,
   lng,
 }: {
+  sticker: StickerName;
   title: string;
   address: string;
   details: string | null;
@@ -32,7 +35,10 @@ function Stop({
 }) {
   return (
     <Card>
-      <Muted>{title}</Muted>
+      <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+        <Muted>{title}</Muted>
+        <Sticker name={sticker} size={40} rotation={sticker === "pin" ? 8 : -6} style={{ marginTop: -18, marginBottom: -6 }} />
+      </View>
       <Text style={{ ...font("extrabold"), fontSize: 16 }}>{address}</Text>
       {details ? <Text style={styles.body}>{details}</Text> : null}
       {contactName || contactPhone ? <Muted>{[contactName, contactPhone].filter(Boolean).join(" · ")}</Muted> : null}
@@ -201,6 +207,7 @@ export default function IsDetay() {
       ) : null}
 
       <Stop
+        sticker="kutu"
         title="1 · ALIŞ"
         address={order.pickupAddress}
         details={order.pickupDetails}
@@ -210,6 +217,7 @@ export default function IsDetay() {
         lng={order.pickupLng}
       />
       <Stop
+        sticker="pin"
         title="2 · TESLİM"
         address={order.dropoffAddress}
         details={order.dropoffDetails}

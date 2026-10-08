@@ -45,7 +45,7 @@ export default function Dogrula() {
     <Screen>
       <View style={{ marginTop: 4 }}>
         <BigTitle size={64}>{"Kodu\ngir."}</BigTitle>
-        <Sticker name="clock" size={84} style={{ position: "absolute", right: 24, top: -8 }} />
+        <Sticker name="kronometre" size={72} rotation={10} style={{ position: "absolute", right: 24, top: -8 }} />
       </View>
       <Muted>{phone} numarasına SMS ile gönderdiğimiz 6 haneli kodu gir.</Muted>
       <TextInput

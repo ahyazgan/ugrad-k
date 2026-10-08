@@ -5,6 +5,7 @@ import { FlatList, Pressable, RefreshControl, Text, View } from "react-native";
 import { StatusBadge } from "@/components/StatusBadge";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { BigTitle, InkChip } from "@/components/Neo";
+import { Sticker } from "@/components/Sticker";
 import { Card, ErrorBox, Muted, colors, font, styles } from "@/components/ui";
 import { api, ApiError, type OrderSummary } from "@/lib/api";
 import { formatDateTime } from "@/lib/format";
@@ -51,7 +52,10 @@ export default function Siparisler() {
         ListHeaderComponent={
           <View style={{ gap: 12, marginBottom: 4 }}>
             <BigTitle size={52}>Siparişlerim.</BigTitle>
-            {orders && active ? <InkChip>{`AKTİF · ${active}`}</InkChip> : null}
+            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", minHeight: 40 }}>
+              {orders && active ? <InkChip>{`AKTİF · ${active}`}</InkChip> : <View />}
+              <Sticker name="kutu" size={76} rotation={-6} style={{ marginVertical: -16, marginRight: 6 }} />
+            </View>
             <ErrorBox message={error} />
           </View>
         }

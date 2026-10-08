@@ -3,6 +3,7 @@ import { router } from "expo-router";
 import { useEffect, useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import { BigTitle, HandTag, InkChip, InkPillBar, RouteCard, RouteStop } from "@/components/Neo";
+import { Sticker } from "@/components/Sticker";
 import { Button, Card, ErrorBox, Field, Loading, Muted, Row, Screen, Title, colors, font, radii } from "@/components/ui";
 import { api, ApiError, type OrderInput, type QuoteResponse } from "@/lib/api";
 import { draftToInput, useOrderDraft } from "@/lib/order-draft";
@@ -125,7 +126,10 @@ export default function Ozet() {
 
       {quote ? (
         <Card>
-          <Title>Fiyat</Title>
+          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+            <Title>Fiyat</Title>
+            <Sticker name="fis" size={48} rotation={8} style={{ marginVertical: -14 }} />
+          </View>
           {quote.quote.lines.map((l) => (
             <Row key={l.code} label={l.label} value={formatTL(l.amountKurus)} />
           ))}
@@ -140,7 +144,10 @@ export default function Ozet() {
       ) : null}
 
       <Card>
-        <Title>Nasıl ödersin?</Title>
+        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+          <Title>Nasıl ödersin?</Title>
+          <Sticker name="kart" size={60} rotation={-8} style={{ marginVertical: -12 }} />
+        </View>
         {PAYMENT_OPTIONS.filter((o) => !o.corporateOnly || profile?.corporateAccountId).map((o) => {
           const on = draft.paymentMethod === o.value;
           return (

@@ -3,6 +3,7 @@ import { router, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import { Linking, Pressable, Share, Text, TextInput, View } from "react-native";
 import { StatusBadge } from "@/components/StatusBadge";
+import { Sticker } from "@/components/Sticker";
 import { TileMap, type MapMarker } from "@/components/TileMap";
 import { Button, Card, ErrorBox, Loading, Muted, Row, Screen, Title, colors, styles, font } from "@/components/ui";
 import { api, ApiError, type CourierPosition, type OrderDetail } from "@/lib/api";
@@ -96,13 +97,17 @@ function OrderMap({ order }: { order: OrderDetail }) {
         </Muted>
       ) : null}
       <TileMap markers={markers} route={!courier} />
-      <Muted>
-        {courier
-          ? `🛵 Kurye konumu · ${ageLabel(courier.recordedAt)}`
-          : live
-            ? "Kurye konumu bekleniyor…"
-            : "A: alış · T: teslim noktası"}
-      </Muted>
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+        <Muted style={{ flex: 1 }}>
+          {courier
+            ? `🛵 Kurye konumu · ${ageLabel(courier.recordedAt)}`
+            : live
+              ? "Kurye konumu bekleniyor…"
+              : "A: alış · T: teslim noktası"}
+        </Muted>
+        <Sticker name="pin" size={40} rotation={-8} style={{ marginBottom: -8 }} />
+        <Sticker name="motor" size={76} rotation={4} style={{ marginBottom: -12 }} />
+      </View>
     </Card>
   );
 }
@@ -128,7 +133,10 @@ function RateCard({ order, onRated }: { order: OrderDetail; onRated: () => void 
   }
   return (
     <Card>
-      <Text style={{ ...font("extrabold") }}>Teslimatı nasıl buldunuz?</Text>
+      <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+        <Text style={{ ...font("extrabold"), flex: 1 }}>Teslimatı nasıl buldunuz?</Text>
+        <Sticker name="yildiz" size={48} rotation={10} style={{ marginVertical: -12 }} />
+      </View>
       <View style={{ flexDirection: "row", gap: 6 }} accessibilityRole="radiogroup">
         {[1, 2, 3, 4, 5].map((n) => (
           <Pressable key={n} onPress={() => setScore(n)} testID={`star-${n}`} accessibilityRole="radio" accessibilityLabel={`${n} yıldız`} hitSlop={6}>

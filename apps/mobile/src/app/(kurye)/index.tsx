@@ -1,7 +1,7 @@
 import { ORDER_STATUS_LABELS, type Compliance } from "@yazgan/shared";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Pressable, Text, View, useWindowDimensions } from "react-native";
 import { BusyAreas } from "@/components/BusyAreas";
 import { complianceFor, DocumentWarning } from "@/components/CourierDocs";
 import { BigTitle, InkChip, Wordmark } from "@/components/Neo";
@@ -32,6 +32,9 @@ export default function KuryeIsler() {
     const t = setInterval(() => setNow(Date.now()), 30_000);
     return () => clearInterval(t);
   }, []);
+  const { width } = useWindowDimensions();
+  // "gelsin!" satırının sağındaki boşluğa sığacak motor genişliği
+  const motorSize = Math.max(56, Math.min(120, width - 32 - 210));
 
   const load = useCallback(async () => {
     try {
@@ -125,7 +128,7 @@ export default function KuryeIsler() {
       </View>
       <View>
         <BigTitle size={56}>{"Kolay\ngelsin!"}</BigTitle>
-        <Sticker name="scooter" size={110} style={{ position: "absolute", right: 0, top: -6 }} />
+        <Sticker name="motor" size={motorSize} rotation={-4} style={{ position: "absolute", right: 0, top: -6 }} />
       </View>
       {shift?.break ? (
         <Card style={{ borderColor: colors.accent, backgroundColor: "#FEF3C7" }}>

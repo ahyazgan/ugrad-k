@@ -91,6 +91,11 @@ export default function YeniGonderi() {
   const ready = !!draft.pickup && !!draft.dropoff;
   const { width } = useWindowDimensions();
   const heroSize = Math.min(80, Math.max(56, Math.round(width * 0.2)));
+  // Çıkartmalar başlık satırlarının sonu ile sağdaki el yazısı etiketler arasındaki boşluğa sığdırılır;
+  // dar ekranlarda yer yoksa gösterilmez (yazının üstüne binmesin).
+  const contentWidth = width - 32;
+  const zarfSize = Math.round(Math.min(heroSize * 0.72, contentWidth - 76 - heroSize * 2.5 - 28));
+  const kutuSize = Math.round(Math.min(heroSize * 0.82, contentWidth - 102 - heroSize * 2.08 - 8));
 
   function start() {
     if (ready) router.push("/ozet");
@@ -118,6 +123,16 @@ export default function YeniGonderi() {
         <Text accessibilityRole="header" style={{ ...type.hero, fontSize: heroSize, lineHeight: heroSize * 0.94, letterSpacing: -heroSize * 0.056 }}>
           {"Hızlı.\nNet.\nKapında."}
         </Text>
+        {/* 3B çıkartmalar: satır sonlarındaki boşluklarda, el yazısı etiketlerin altında kalır */}
+        {zarfSize >= 40 ? (
+          <>
+            <Sticker name="zarf" size={zarfSize} rotation={-10} style={{ position: "absolute", left: heroSize * 2.5, top: heroSize * 0.02 }} />
+            <Sticker name="simsek" size={40} rotation={14} style={{ position: "absolute", left: heroSize * 2.5 + zarfSize - 16, top: -heroSize * 0.2 }} />
+          </>
+        ) : null}
+        {kutuSize >= 40 ? (
+          <Sticker name="kutu" size={kutuSize} rotation={6} style={{ position: "absolute", left: heroSize * 2.08 + 2, top: heroSize * 1.0 }} />
+        ) : null}
         <HandTag tone="none" rotate={-12} style={{ position: "absolute", right: 0, top: 0 }}>
           {"Daha\nfazlasını\ntaşır :)"}
         </HandTag>
@@ -127,7 +142,6 @@ export default function YeniGonderi() {
         <HandTag tone="white" rotate={-12} style={{ position: "absolute", right: 0, bottom: 0 }}>
           {"BUGÜN\nORADA ✓"}
         </HandTag>
-        <Sticker name="box" size={110} style={{ position: "absolute", right: 70, top: 10 }} />
       </View>
 
       <InkPillBar
@@ -147,6 +161,7 @@ export default function YeniGonderi() {
           onPress={() => update({ serviceLevel: draft.serviceLevel === "acil" ? "standart" : "acil" })}
           hint="60 dakikada kapında."
         >
+          <Sticker name="kronometre" size={36} rotation={8} style={{ position: "absolute", right: 8, top: 8 }} />
           <Text style={{ ...font("black"), fontSize: 30, lineHeight: 29, letterSpacing: -1.2, color: colors.ink }}>{"Acil\n60 dk"}</Text>
         </QuickCard>
         <QuickCard
@@ -157,6 +172,7 @@ export default function YeniGonderi() {
           onPress={() => update({ roundTrip: !draft.roundTrip })}
           hint="Daha akıllı gönderim."
         >
+          <Sticker name="donus" size={36} rotation={-8} style={{ position: "absolute", right: 14, bottom: 8 }} />
           <Text style={{ ...font("black"), fontSize: 16, lineHeight: 17, letterSpacing: -0.4, color: colors.ink }}>
             Gidiş-dönüş, dönüşü <Text style={{ backgroundColor: colors.lime }}>yarı fiyat</Text>
           </Text>
