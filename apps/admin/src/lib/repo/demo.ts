@@ -72,6 +72,7 @@ async function seed(): Promise<State> {
   ];
   const customers: Customer[] = [
     { id: "cus-1", fullName: "Ayşe Yılmaz", phone: "+905321112233", email: null, corporateAccountId: null, createdAt: hoursAgo(400), orderCount: 0 },
+    { id: "cus-3", fullName: "Kaan Öztürk", phone: "+905367778899", email: null, corporateAccountId: null, createdAt: hoursAgo(800), orderCount: 0 },
     { id: "cus-2", fullName: "Av. Murat Demir", phone: "+905334445566", email: "murat@ornek-hukuk.com", corporateAccountId: "corp-1", createdAt: hoursAgo(900), orderCount: 0 },
   ];
   const couriers: Courier[] = [
@@ -94,11 +95,39 @@ async function seed(): Promise<State> {
       i % 2 ? "kur-1" : "kur-2",
     ]),
   ];
+  // Raporlar için ~4 haftalık geçmiş: sabit tohumlu sözde rastgele (her açılışta aynı veri)
+  let rnd = 7;
+  const next = () => ((rnd = (rnd * 1103515245 + 12345) % 2 ** 31) / 2 ** 31);
+  const pick = <T,>(xs: T[]) => xs[Math.floor(next() * xs.length)]!;
+  const HOURS = [8, 9, 9, 10, 10, 10, 11, 11, 12, 13, 14, 14, 15, 15, 16, 16, 17, 18, 19, 21, 23];
+  const ANADOLU = ["mock-beykoz", "mock-kadikoy", "mock-uskudar", "mock-atasehir", "mock-umraniye", "mock-kartal"];
+  const ALL = [...ANADOLU, "mock-levent", "mock-sisli", "mock-taksim", "mock-bakirkoy"];
+  const deliveryMin = new Map<number, number>();
+  for (let day = 7; day <= 28; day++) {
+    const dow = new Date(Date.now() - day * 86_400_000).getUTCDay();
+    const n = dow === 0 ? 0 : dow === 6 ? 1 : 1 + Math.floor(next() * 3);
+    for (let k = 0; k < n; k++) {
+      const at = new Date(Date.now() - day * 86_400_000);
+      at.setUTCHours(pick(HOURS) - 3, Math.floor(next() * 60), 0, 0);
+      const cancelled = next() < 0.08;
+      const urgent = next() < 0.3;
+      deliveryMin.set(specs.length, urgent ? 32 + Math.floor(next() * 40) : 45 + Math.floor(next() * 75));
+      specs.push([
+        next() < 0.6 ? "cus-3" : "cus-1",
+        pick(ANADOLU),
+        pick(ALL),
+        cancelled ? "iptal" : "teslim_edildi",
+        (Date.now() - at.getTime()) / 3_600_000,
+        urgent,
+        cancelled ? null : next() < 0.55 ? "kur-1" : "kur-2",
+      ]);
+    }
+  }
   const orders: AdminOrderDetail[] = [];
   let no = 1000;
-  for (const [customerId, from, to, status, ago, urgent, courierId] of specs) {
+  for (const [idx, [customerId, from, to, status, ago, urgent, courierId]] of specs.entries()) {
     const p = place(from);
-    const d = place(to);
+    const d = place(to === from ? "mock-levent" : to);
     const createdAt = hoursAgo(ago);
     const q = await buildQuote(
       {
@@ -116,7 +145,7 @@ async function seed(): Promise<State> {
     const cust = customers.find((c) => c.id === customerId)!;
     cust.orderCount++;
     const flow: OrderStatus[] = ["beklemede", "onaylandi", "kuryeye_atandi", "alindi", "yolda", "teslim_edildi"];
-    const reached = flow.slice(0, flow.indexOf(status) + 1);
+    const reached = status === "iptal" ? (["beklemede", "iptal"] as OrderStatus[]) : flow.slice(0, flow.indexOf(status) + 1);
     orders.push({
       id: `ord-${++no}`,
       orderNo: `YK-${no}`,
@@ -145,7 +174,7 @@ async function seed(): Promise<State> {
       paidKurus: null,
       distanceMeters: q.distanceMeters,
       scheduledPickupAt: null,
-      deliveredAt: status === "teslim_edildi" ? hoursAgo(ago - 1) : null,
+      deliveredAt: status === "teslim_edildi" ? hoursAgo(ago - (deliveryMin.get(idx) ?? 60) / 60) : null,
       pickupDetails: "Kat 2",
       pickupContactName: cust.fullName,
       pickupContactPhone: cust.phone,
@@ -158,7 +187,7 @@ async function seed(): Promise<State> {
       waitingMinutes: 0,
       priceQuote: q.quote,
       trackingToken: `demo${no}`.padEnd(32, "0"),
-      cancelReason: null,
+      cancelReason: status === "iptal" ? "Müşteri vazgeçti" : null,
       problemNote: null,
       paymentRef: null,
       paymentError: null,
@@ -207,7 +236,7 @@ async function seed(): Promise<State> {
       locationMaxAgeMinutes: 10,
       unassignedAlertMinutes: 10,
     },
-    consented: new Set(["cus-1", "cus-2"]),
+    consented: new Set(["cus-1", "cus-2", "cus-3"]),
     settings: { ...DEFAULT_PRICING_SETTINGS },
     holidays: (holidaysJson as Array<{ date: string; name: string; half_day: boolean }>).map((h) => ({
       date: h.date,
@@ -336,7 +365,8 @@ export function createDemoRepo(): AdminRepo {
                 x.toLocaleLowerCase("tr-TR").includes(search),
               ),
           )
-          .sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
+          .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+          .slice(0, filter.limit ?? 500),
       ) as AdminOrder[];
     },
     async getOrder(id) {
@@ -655,7 +685,7 @@ export function createDemoRepo(): AdminRepo {
         waitingMinutes: 0,
         priceQuote: q.quote,
         trackingToken: `demo${n}`.padEnd(32, "0"),
-        cancelReason: null,
+        cancelReason: status === "iptal" ? "Müşteri vazgeçti" : null,
         problemNote: null,
         paymentRef: null,
         paymentError: null,

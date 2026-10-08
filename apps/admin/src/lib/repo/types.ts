@@ -205,6 +205,8 @@ export interface OrderFilter {
   /** YYYY-MM-DD (İstanbul) */
   from?: string;
   to?: string;
+  /** En fazla kaç sipariş (varsayılan 500; raporlar için daha fazlası sayfalanarak okunur) */
+  limit?: number;
 }
 
 export interface AdminRepo {

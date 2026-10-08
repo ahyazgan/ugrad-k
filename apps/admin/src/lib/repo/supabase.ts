@@ -127,15 +127,28 @@ export function createSupabaseRepo(url: string, anonKey: string): AdminRepo & { 
     },
 
     async listOrders(filter = {}) {
-      let q = client.from("orders").select(ORDER_SELECT).order("created_at", { ascending: false }).limit(500);
-      if (filter.statuses?.length) q = q.in("status", filter.statuses);
-      if (filter.from) q = q.gte("created_at", istDayStartUtc(filter.from));
-      if (filter.to) q = q.lt("created_at", istDayEndUtc(filter.to));
-      if (filter.search) {
-        const s = filter.search.replace(/[%,()]/g, " ").trim();
-        q = q.or(`order_no.ilike.%${s}%,pickup_address.ilike.%${s}%,dropoff_address.ilike.%${s}%`);
+      const limit = filter.limit ?? 500;
+      const PAGE = 1000; // PostgREST tek istekte en fazla 1000 satır döndürür
+      const rows: Row[] = [];
+      for (let offset = 0; offset < limit; offset += PAGE) {
+        let q = client
+          .from("orders")
+          .select(ORDER_SELECT)
+          .order("created_at", { ascending: false })
+          .order("id")
+          .range(offset, Math.min(offset + PAGE, limit) - 1);
+        if (filter.statuses?.length) q = q.in("status", filter.statuses);
+        if (filter.from) q = q.gte("created_at", istDayStartUtc(filter.from));
+        if (filter.to) q = q.lt("created_at", istDayEndUtc(filter.to));
+        if (filter.search) {
+          const s = filter.search.replace(/[%,()]/g, " ").trim();
+          q = q.or(`order_no.ilike.%${s}%,pickup_address.ilike.%${s}%,dropoff_address.ilike.%${s}%`);
+        }
+        const page = (check(await q, "Siparişler okunamadı") ?? []) as Row[];
+        rows.push(...page);
+        if (page.length < Math.min(PAGE, limit - offset)) break;
       }
-      return (check(await q, "Siparişler okunamadı") ?? []).map(toAdminOrder);
+      return rows.map(toAdminOrder);
     },
     async getOrder(id) {
       const [o, h] = await Promise.all([

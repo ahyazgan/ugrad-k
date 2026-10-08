@@ -132,6 +132,29 @@ fs.mkdirSync(out, { recursive: true });
   if (!/\d+ sipariş kuryeye atandı/.test(res) || /^0 sipariş onaylandı · 0 sipariş kuryeye/.test(res)) throw new Error("dağıtım bir şey yapmadı: " + res);
   await shot("06d-otomasyon");
 
+  // ───── Raporlar: özet kutuları, grafik ipucu, tablo görünümü, CSV
+  await nav("Raporlar");
+  const totals = page.getByTestId("report-totals");
+  await totals.waitFor();
+  const totalsTxt = await totals.innerText();
+  console.log("RAPOR", totalsTxt.replace(/\n/g, " | ").slice(0, 300));
+  if (/Ciro \(KDV hariç\)\s*0,00 TL/.test(totalsTxt)) throw new Error("rapor cirosu boş");
+  const chart = page.getByRole("img", { name: "Günlük ciro" });
+  const box = await chart.boundingBox();
+  await page.mouse.move(box.x + box.width * 0.5, box.y + box.height * 0.6);
+  const tip = await page.getByRole("tooltip").innerText();
+  if (!/teslimat\n[\d.,]+ TL/.test(tip)) throw new Error("grafik ipucu hatalı: " + tip);
+  await shot("06e-raporlar");
+  await page.getByRole("button", { name: "Tablo" }).first().click();
+  await page.locator("th", { hasText: /^Gün$/ }).waitFor();
+  const [dl] = await Promise.all([page.waitForEvent("download"), page.getByTestId("csv").click()]);
+  const csvPath = `${out}/rapor.csv`;
+  await dl.saveAs(csvPath);
+  const csv = fs.readFileSync(csvPath, "utf8");
+  if (!csv.startsWith("\uFEFFSipariş no;") || csv.trim().split("\n").length < 10) throw new Error("CSV hatalı");
+  await page.getByRole("button", { name: "Son 7 gün" }).click();
+  await totals.waitFor();
+
   await nav("Fiyatlar");
   const kmTiers = page.getByLabel("Km kademeleri (toplam km'ye kadar : TL/km)");
   await kmTiers.waitFor();
