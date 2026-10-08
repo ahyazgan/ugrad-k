@@ -129,7 +129,8 @@ export default function ApiDocsPage() {
           <code className="font-mono">&quot;urgent&quot;: true</code> alanı hâlâ kabul edilir. 20 kg üzeri gönderiler <code className="font-mono">400</code> ile reddedilir.{" "}
           <code className="font-mono">declaredValueKurus</code>: gönderi değeri (kuruş); 1.000 TL üstü kısım için sigorta ücreti fiyata eklenir.{" "}
           <code className="font-mono">deliveryCode</code>: <code className="font-mono">true</code> ise alıcıya SMS ile 4 haneli teslim kodu gider, kurye kodu
-          almadan teslim edemez; kod oluşturma yanıtında <code className="font-mono">order.deliveryCode</code> olarak da döner.
+          almadan teslim edemez; kod oluşturma yanıtında <code className="font-mono">order.deliveryCode</code> olarak da döner.{" "}
+          <code className="font-mono">promoCode</code>: kampanya kodu (geçersizse <code className="font-mono">400</code>, alan <code className="font-mono">promoCode</code>).
         </p>
         <p className="mt-3">Yanıt:</p>
         <Code>{orderResponse}</Code>

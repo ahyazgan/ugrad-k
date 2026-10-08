@@ -489,6 +489,10 @@ verify_jwt = false
 [functions.webhook-dispatch]
 verify_jwt = false
 
+# Geri kazanma mesajı (günlük cron, x-notify-secret)
+[functions.winback]
+verify_jwt = false
+
 # Kurye hakedişi (cron x-notify-secret veya yönetici JWT'si, fonksiyon içinde)
 [functions.courier-earnings]
 verify_jwt = false

@@ -188,7 +188,9 @@ export type PriceLineCode =
   /** Değer beyanı sigortası */
   | "insurance"
   /** Önceki gecikmeli acil teslimin telafisi (eksi tutar) */
-  | "credit";
+  | "credit"
+  /** Kampanya veya davet indirimi (eksi tutar) */
+  | "promo";
 
 export interface PriceLine {
   code: PriceLineCode;
@@ -539,7 +541,7 @@ export function corporateTierFor(
 }
 
 /** Kurumsal indirime tabi kalemler (taşıma bedeli). Köprü, bekleme, ağır paket ve uzak alış indirimsizdir. */
-export const DISCOUNTABLE_LINE_CODES: PriceLineCode[] = ["base", "extra_km", "economy", "urgent", "night_holiday", "return_leg"];
+export const DISCOUNTABLE_LINE_CODES: PriceLineCode[] = ["base", "extra_km", "economy", "urgent", "night_holiday", "return_leg", "promo"];
 
 export function discountableKurus(quote: Pick<PriceQuote, "lines">): number {
   return quote.lines.filter((l) => DISCOUNTABLE_LINE_CODES.includes(l.code)).reduce((s, l) => s + l.amountKurus, 0);
@@ -555,10 +557,10 @@ export interface MonthlyInvoiceItem {
  * Müşteri kredisini (ör. acil taahhüt telafisi) teklife eksi satır olarak ekler; ara toplamı sıfırın altına indirmez.
  * Dönen `usedKurus` kullanılan kredi tutarıdır.
  */
-export function applyCredit(quote: PriceQuote, creditKurus: number, label: string): { quote: PriceQuote; usedKurus: number } {
+export function applyCredit(quote: PriceQuote, creditKurus: number, label: string, code: "credit" | "promo" = "credit"): { quote: PriceQuote; usedKurus: number } {
   const used = Math.max(0, Math.min(Math.round(creditKurus), quote.subtotalKurus));
   if (used === 0) return { quote, usedKurus: 0 };
-  const lines = [...quote.lines, { code: "credit" as const, label, amountKurus: -used }];
+  const lines = [...quote.lines, { code, label, amountKurus: -used }];
   const subtotalKurus = quote.subtotalKurus - used;
   const vatPct = quote.subtotalKurus > 0 ? Math.round((quote.vatKurus / quote.subtotalKurus) * 10_000) / 100 : DEFAULT_PRICING_SETTINGS.vatPct;
   const vatKurus = pct(subtotalKurus, vatPct);

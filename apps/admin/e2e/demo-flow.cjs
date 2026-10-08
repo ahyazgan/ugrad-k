@@ -234,6 +234,18 @@ fs.mkdirSync(out, { recursive: true });
   await page.getByRole("button", { name: "Son 7 gün" }).click();
   await totals.waitFor();
 
+  // Kampanyalar: yeni kod ve geri kazanma ayarı
+  await nav("Kampanyalar");
+  await page.getByTestId("promo-HOSGELDIN").waitFor();
+  await page.getByLabel("Kod", { exact: true }).fill("bahar20");
+  await page.getByTestId("promo-value").fill("10");
+  await page.getByTestId("create-promo").click();
+  await page.getByTestId("promo-BAHAR20").waitFor();
+  await page.getByTestId("winback-enabled").check();
+  await page.getByRole("button", { name: "Kaydet", exact: true }).click();
+  await page.getByText("Kaydedildi").waitFor();
+  await shot("07b-kampanyalar");
+
   await nav("Fiyatlar");
   const kmTiers = page.getByLabel("Km kademeleri (toplam km'ye kadar : TL/km)");
   await kmTiers.waitFor();

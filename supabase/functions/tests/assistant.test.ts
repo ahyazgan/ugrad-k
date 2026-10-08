@@ -308,3 +308,24 @@ Deno.test("sesli ağ geçidi: gizli anahtar ve alan kontrolü", async () => {
   );
   assertEquals(missing.status, 400);
 });
+
+Deno.test("konuşma: RET yazan müşterinin ticari ileti onayı kaldırılır, yapay zeka çağrılmaz", async () => {
+  const { client, requests } = fakeClaude([]);
+  const { ctx, inserted } = fakeCtx({ tables: {} });
+  const r = await handleIncomingText(
+    {
+      ctx,
+      client,
+      env: () => undefined,
+      findOrCreateCustomer: () => Promise.resolve({ profileId: "u1", fullName: "Ayşe", isNew: false }),
+    },
+    "whatsapp",
+    "905321112233",
+    "905321112233",
+    " RET ",
+  );
+  assert(r.reply.includes("listemizden çıkarıldınız"));
+  assertEquals(requests.length, 0);
+  assertEquals(inserted.consents![0]!.consent_type, "ticari_ileti");
+  assertEquals(inserted.consents![0]!.granted, false);
+});

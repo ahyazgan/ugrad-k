@@ -49,6 +49,14 @@ export async function handleIncomingText(
   const sleep = deps.sleep ?? ((ms: number) => new Promise((r) => setTimeout(r, ms)));
   const customer = await (deps.findOrCreateCustomer ?? ((p: string) => findOrCreateCustomerDefault(ctx, p)))(phone);
 
+  // Ticari ileti reddi (geri kazanma mesajlarındaki "RET yazın"): yapay zekaya gitmeden kaydedilir
+  if (/^(ret|iptal\s*ret|stop)$/i.test(text.trim())) {
+    await ctx.admin
+      .from("consents")
+      .insert({ profile_id: customer.profileId, consent_type: "ticari_ileti", granted: false, version: "ret-mesaji" });
+    return { reply: "Kampanya mesajları listemizden çıkarıldınız. Sipariş bilgilendirmeleri gelmeye devam eder.", handoff: false };
+  }
+
   // Aktif konuşmayı bul; uzun süre sessizse veya çok uzadıysa yenisini aç
   const since = new Date(Date.now() - IDLE_HOURS * 3600_000).toISOString();
   const { data: found } = await ctx.admin

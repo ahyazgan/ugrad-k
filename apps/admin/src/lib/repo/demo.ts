@@ -36,6 +36,7 @@ import {
   type CourierDocumentRecord,
   type CourierPayout,
   type EarningRow,
+  type PromoCodeRow,
   type Conversation,
   type Customer,
   type Invoice,
@@ -72,6 +73,7 @@ interface State {
   apiKeys: Array<ApiKeyInfo & { accountId: string }>;
   webhooks: Map<string, WebhookConfig>;
   costModel: CostModel;
+  promos: PromoCodeRow[];
   documents: CourierDocumentRecord[];
   earnings: EarningRow[];
   payouts: CourierPayout[];
@@ -357,6 +359,10 @@ async function seed(): Promise<State> {
       enforceCourierDocuments: true,
       documentWarnDays: 30,
       urgentSlaMinutes: 60,
+      referralRewardKurus: 10_000,
+      winbackEnabled: false,
+      winbackAfterDays: 30,
+      winbackDiscountPct: 15,
     },
     consented: new Set(["cus-1", "cus-2", "cus-3"]),
     apiKeys: [],
@@ -438,6 +444,27 @@ async function seed(): Promise<State> {
     ],
     settings: { ...DEFAULT_PRICING_SETTINGS },
     costModel: { ...DEFAULT_COST_MODEL },
+    promos: [
+      {
+        code: "HOSGELDIN",
+        description: "Yeni müşterilere ilk sipariş",
+        kind: "yuzde",
+        value: 20,
+        maxDiscountKurus: 20_000,
+        minSubtotalKurus: 0,
+        validFrom: null,
+        validUntil: null,
+        maxRedemptions: null,
+        perCustomerLimit: 1,
+        newCustomersOnly: true,
+        customerId: null,
+        active: true,
+        source: "panel",
+        createdAt: hoursAgo(300),
+        redemptions: 7,
+        discountKurus: 98_000,
+      },
+    ],
     documents: demoDocuments(),
     earnings,
     payouts,
@@ -1143,6 +1170,19 @@ export function createDemoRepo(): AdminRepo {
       o.paymentStatus = "odendi";
       o.paidKurus = o.totalKurus;
       touchOrders();
+    },
+
+    async listPromoCodes() {
+      return clone((await get()).promos);
+    },
+    async createPromoCode(p) {
+      const s = await get();
+      if (s.promos.some((x) => x.code === p.code)) throw new RepoError("Bu kod zaten var");
+      s.promos.unshift({ ...p, active: true, customerId: null, source: "panel", createdAt: new Date().toISOString(), redemptions: 0, discountKurus: 0 });
+    },
+    async setPromoActive(code, active) {
+      const p = (await get()).promos.find((x) => x.code === code);
+      if (p) p.active = active;
     },
 
     async getPricing() {

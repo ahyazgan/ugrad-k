@@ -6,6 +6,7 @@
  * 0555 000 00 00 numarasıyla giriş yapılırsa KURYE ekranları açılır.
  */
 import {
+  applyPromo,
   applyWaitingFee,
   courierBalance,
   courierEarning,
@@ -15,7 +16,10 @@ import {
   ORDER_TRANSITIONS,
   buildQuote,
   mockMapsProvider,
+  normalizeCode,
   parseOrderRequest,
+  promoDiscountKurus,
+  promoLabel,
   PricingError,
   ValidationError,
   type OrderStatus,
@@ -132,7 +136,14 @@ export function createDemoApi(): Api {
   const quoteFor = async (input: OrderInput) => {
     try {
       const req = parseOrderRequest(input);
-      return { req, q: await buildQuote(req, { maps, settings: DEFAULT_PRICING_SETTINGS, holidays: [] }) };
+      const q = await buildQuote(req, { maps, settings: DEFAULT_PRICING_SETTINGS, holidays: [] });
+      // Demo kampanya kodu: HOSGELDIN (%20); diğer kodlar bulunamaz
+      if (req.promoCode) {
+        if (normalizeCode(req.promoCode) !== "HOSGELDIN") throw new ApiError("Kod bulunamadı", "promoCode", 400);
+        const p = { code: "HOSGELDIN", kind: "yuzde" as const, value: 20, maxDiscountKurus: null };
+        q.quote = applyPromo(q.quote, promoLabel(p), promoDiscountKurus(p, q.quote));
+      }
+      return { req, q };
     } catch (e) {
       if (e instanceof ValidationError) throw new ApiError(e.message, e.field, 400);
       if (e instanceof PricingError) throw new ApiError(e.message, undefined, 400);
@@ -448,6 +459,10 @@ export function createDemoApi(): Api {
       }
       codeTries.set(orderId, tries + 1);
       return { ok: false, remaining: 4 - tries };
+    },
+    async myReferralCode() {
+      requireSession();
+      return "DEMO23";
     },
     async courierDocuments() {
       requireSession();

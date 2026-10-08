@@ -40,6 +40,7 @@ export interface OrderInput {
   largePackage: boolean;
   declaredValueKurus: number | null;
   deliveryCode: boolean;
+  promoCode?: string;
   packageDescription?: string;
   customerNote?: string;
   scheduledPickupAt: string | null;
@@ -210,6 +211,8 @@ export interface Api {
   ): Promise<void>;
   pushLocation(loc: CourierLocation, orderId: string | null): Promise<void>;
   courierEarnings(): Promise<CourierEarnings>;
+  /** Müşterinin davet kodu (yoksa üretilir) */
+  myReferralCode(): Promise<string>;
   /** Kurye alıcıdan aldığı teslim kodunu doğrular */
   verifyDeliveryCode(orderId: string, code: string): Promise<{ ok: boolean; remaining: number }>;
   /** Kuryenin kendi belgeleri (yönetici girer) */

@@ -28,6 +28,7 @@ import {
   type CourierDocumentRecord,
   type CourierPayout,
   type EarningRow,
+  type PromoCodeRow,
   type Invoice,
   type Receivable,
   type Lead,
@@ -500,6 +501,10 @@ export function createSupabaseRepo(url: string, anonKey: string): AdminRepo & { 
         enforceCourierDocuments: r.enforce_courier_documents ?? true,
         documentWarnDays: r.document_warn_days ?? 30,
         urgentSlaMinutes: r.urgent_sla_minutes ?? 60,
+        referralRewardKurus: r.referral_reward_kurus ?? 10_000,
+        winbackEnabled: !!r.winback_enabled,
+        winbackAfterDays: r.winback_after_days ?? 30,
+        winbackDiscountPct: Number(r.winback_discount_pct ?? 15),
       };
     },
     async saveOpsSettings(s) {
@@ -517,6 +522,10 @@ export function createSupabaseRepo(url: string, anonKey: string): AdminRepo & { 
             enforce_courier_documents: s.enforceCourierDocuments,
             document_warn_days: s.documentWarnDays,
             urgent_sla_minutes: s.urgentSlaMinutes,
+            referral_reward_kurus: s.referralRewardKurus,
+            winback_enabled: s.winbackEnabled,
+            winback_after_days: s.winbackAfterDays,
+            winback_discount_pct: s.winbackDiscountPct,
           })
           .eq("id", 1),
         "Ayarlar kaydedilemedi",
@@ -806,6 +815,60 @@ export function createSupabaseRepo(url: string, anonKey: string): AdminRepo & { 
           .eq("id", orderId),
         "Ödeme kaydedilemedi",
       );
+    },
+
+    async listPromoCodes() {
+      const [p, r] = await Promise.all([
+        client.from("promo_codes").select("*").order("created_at", { ascending: false }).limit(500),
+        client.from("promo_redemptions").select("code, amount_kurus").limit(20_000),
+      ]);
+      const uses = new Map<string, { n: number; sum: number }>();
+      for (const x of check(r, "Kullanımlar okunamadı") ?? []) {
+        const u = uses.get(x.code) ?? { n: 0, sum: 0 };
+        u.n++;
+        u.sum += x.amount_kurus;
+        uses.set(x.code, u);
+      }
+      return (check(p, "Kampanyalar okunamadı") ?? []).map((row: Row): PromoCodeRow => ({
+        code: row.code,
+        description: row.description,
+        kind: row.kind,
+        value: Number(row.value),
+        maxDiscountKurus: row.max_discount_kurus,
+        minSubtotalKurus: row.min_subtotal_kurus,
+        validFrom: row.valid_from,
+        validUntil: row.valid_until,
+        maxRedemptions: row.max_redemptions,
+        perCustomerLimit: row.per_customer_limit,
+        newCustomersOnly: row.new_customers_only,
+        customerId: row.customer_id,
+        active: row.active,
+        source: row.source,
+        createdAt: row.created_at,
+        redemptions: uses.get(row.code)?.n ?? 0,
+        discountKurus: uses.get(row.code)?.sum ?? 0,
+      }));
+    },
+    async createPromoCode(p) {
+      check(
+        await client.from("promo_codes").insert({
+          code: p.code,
+          description: p.description,
+          kind: p.kind,
+          value: p.value,
+          max_discount_kurus: p.maxDiscountKurus,
+          min_subtotal_kurus: p.minSubtotalKurus,
+          valid_from: p.validFrom,
+          valid_until: p.validUntil,
+          max_redemptions: p.maxRedemptions,
+          per_customer_limit: p.perCustomerLimit,
+          new_customers_only: p.newCustomersOnly,
+        }),
+        "Kampanya kaydedilemedi",
+      );
+    },
+    async setPromoActive(code, active) {
+      check(await client.from("promo_codes").update({ active }).eq("code", code), "Kampanya güncellenemedi");
     },
 
     async getPricing() {

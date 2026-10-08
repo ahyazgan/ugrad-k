@@ -11,6 +11,7 @@ import {
 import type { Ctx } from "./context.ts";
 import { markCreditsUsed, openCredits, withCredits } from "./credits.ts";
 import { HttpError, json, readJson } from "./http.ts";
+import { applyDiscountCode, recordRedemption } from "./promo.ts";
 
 export function quoteResponse(q: QuoteResult) {
   return {
@@ -29,8 +30,9 @@ export async function handleQuote(req: Request, ctx: Ctx): Promise<Response> {
   const order = parseOrderRequest(await readJson(req));
   const pricing = await ctx.loadPricing();
   const q = await buildQuote(order, { maps: ctx.maps, ...pricing });
-  // Müşterinin telafi kredisi teklifte de görünür (sipariş verince düşülür)
-  const { quote } = withCredits(q.quote, await openCredits(ctx, user.id));
+  // Kampanya/davet kodu ve telafi kredisi teklifte de görünür (sipariş verince düşülür)
+  const promo = await applyDiscountCode(ctx, user.id, order.promoCode, q.quote);
+  const { quote } = withCredits(promo.quote, await openCredits(ctx, user.id));
   return json(quoteResponse({ ...q, quote }));
 }
 
@@ -62,7 +64,8 @@ export async function createOrderForCustomer(ctx: Ctx, userId: string, order: Or
 
   const pricing = await ctx.loadPricing();
   const built = await buildQuote(order, { maps: ctx.maps, ...pricing });
-  const credit = withCredits(built.quote, await openCredits(ctx, userId));
+  const promo = await applyDiscountCode(ctx, userId, order.promoCode, built.quote);
+  const credit = withCredits(promo.quote, await openCredits(ctx, userId));
   const q = { ...built, quote: credit.quote };
 
   const { data, error } = await ctx.admin
@@ -81,6 +84,7 @@ export async function createOrderForCustomer(ctx: Ctx, userId: string, order: Or
     throw new Error(`Sipariş kaydedilemedi: ${error.message}`);
   }
   await markCreditsUsed(ctx, credit.used, data.id);
+  await recordRedemption(ctx, userId, data.id, promo.redemption);
   return { order: data, quote: q };
 }
 

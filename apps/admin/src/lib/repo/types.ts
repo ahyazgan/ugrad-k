@@ -9,6 +9,7 @@ import type {
   CostModel,
   CourierDocumentKind,
   PricingSettings,
+  Promo,
   ServiceLevel,
 } from "@yazgan/shared";
 
@@ -260,6 +261,18 @@ export interface OpsSettings {
   documentWarnDays: number;
   /** Acil teslim taahhüdü (dakika) */
   urgentSlaMinutes: number;
+  /** Davet: yeni müşteriye ilk siparişte indirim ve davet edene kredi (kuruş) */
+  referralRewardKurus: number;
+  winbackEnabled: boolean;
+  winbackAfterDays: number;
+  winbackDiscountPct: number;
+}
+
+export interface PromoCodeRow extends Promo {
+  source: "panel" | "geri_kazanma";
+  createdAt: string;
+  redemptions: number;
+  discountKurus: number;
 }
 
 export interface CourierDocumentRecord {
@@ -461,6 +474,10 @@ export interface AdminRepo {
   listReceivables(): Promise<Receivable[]>;
   /** Kuryeye ödemeli siparişin ödemesi (IBAN veya sonradan nakit) alındı */
   markOrderPaid(orderId: string): Promise<void>;
+  // Kampanyalar
+  listPromoCodes(): Promise<PromoCodeRow[]>;
+  createPromoCode(p: Omit<Promo, "active" | "customerId">): Promise<void>;
+  setPromoActive(code: string, active: boolean): Promise<void>;
   // Fiyatlar
   getPricing(): Promise<{ settings: PricingSettings; holidays: Holiday[]; updatedAt: string | null }>;
   savePricing(settings: PricingSettings): Promise<void>;

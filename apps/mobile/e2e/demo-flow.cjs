@@ -46,6 +46,13 @@ fs.mkdirSync(out, { recursive: true });
   await tid('see-price').click();
   await page.getByText('Toplam', { exact: true }).waitFor();
   await page.getByText(/Değer beyanı sigortası/).waitFor();
+  // Kampanya kodu: bilinmeyen kod hata, geçerli kod indirim satırı
+  await tid('promo-code').fill('YOKKOD');
+  await tid('apply-promo').click();
+  await page.getByText('Kod bulunamadı').waitFor();
+  await tid('promo-code').fill('hosgeldin');
+  await tid('apply-promo').click();
+  await page.getByText('Kampanya HOSGELDIN (%20)').waitFor();
   await shot('07-ozet');
   const text = await page.locator('body').innerText();
   console.log('OZET:', text.match(/Fiyat[\s\S]*?Toplam\s*[\d.,]+ TL/)?.[0]?.replace(/\n+/g,' | '));
@@ -71,6 +78,7 @@ fs.mkdirSync(out, { recursive: true });
   await tid('address-pickup').waitFor();
   // Hesap silme: devam eden sipariş varken engellenir
   await page.getByText('Hesabım').click();
+  await page.getByText('Davet kodunuz: DEMO23').waitFor();
   await tid('delete-account').click();
   await tid('delete-account-confirm').click();
   await page.getByText('Devam eden siparişiniz varken hesap silinemez').waitFor();

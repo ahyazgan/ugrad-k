@@ -12,6 +12,8 @@ export interface Draft {
   /** TL, boşsa beyan yok */
   declaredValue: string;
   deliveryCode: boolean;
+  /** Kampanya veya davet kodu (özet ekranında) */
+  promoCode: string;
   packageDescription: string;
   customerNote: string;
   pickupContactName: string;
@@ -30,6 +32,7 @@ const EMPTY: Draft = {
   largePackage: false,
   declaredValue: "",
   deliveryCode: false,
+  promoCode: "",
   packageDescription: "",
   customerNote: "",
   pickupContactName: "",
@@ -54,6 +57,7 @@ export function draftToInput(d: Draft): OrderInput | null {
     largePackage: d.largePackage,
     declaredValueKurus: declared ? Math.round(Number(declared) * 100) : null,
     deliveryCode: d.deliveryCode,
+    promoCode: d.promoCode.trim() || undefined,
     packageDescription: d.packageDescription || undefined,
     customerNote: d.customerNote || undefined,
     scheduledPickupAt: null,

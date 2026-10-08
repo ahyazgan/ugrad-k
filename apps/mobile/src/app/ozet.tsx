@@ -2,7 +2,7 @@ import { formatTL } from "@yazgan/shared";
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
 import { Pressable, Text, View } from "react-native";
-import { Button, Card, ErrorBox, Loading, Muted, Row, Screen, Title, colors } from "@/components/ui";
+import { Button, Card, ErrorBox, Field, Loading, Muted, Row, Screen, Title, colors } from "@/components/ui";
 import { api, ApiError, type OrderInput, type QuoteResponse } from "@/lib/api";
 import { draftToInput, useOrderDraft } from "@/lib/order-draft";
 import { payOrder } from "@/lib/payment";
@@ -23,6 +23,7 @@ export default function Ozet() {
   const [result, setResult] = useState<{ key: string; quote?: QuoteResponse; error?: string } | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [codeText, setCodeText] = useState(draft.promoCode);
   const current = result?.key === key ? result : null;
   const quote = current?.quote ?? null;
   const error = submitError ?? current?.error ?? null;
@@ -81,6 +82,34 @@ export default function Ozet() {
             Sürüş mesafesi {km} km · yaklaşık {min} dk{quote.bridgeCrossings ? " · köprü geçişi" : ""}
           </Muted>
         ) : null}
+      </Card>
+
+      <Card>
+        <Field
+          label="Kampanya veya davet kodu"
+          placeholder="Varsa girin"
+          autoCapitalize="characters"
+          value={codeText}
+          onChangeText={setCodeText}
+          testID="promo-code"
+        />
+        <View style={{ flexDirection: "row", gap: 8 }}>
+          <View style={{ flex: 1 }}>
+            <Button title="Uygula" variant="secondary" onPress={() => update({ promoCode: codeText.trim() })} disabled={!codeText.trim()} testID="apply-promo" />
+          </View>
+          {draft.promoCode ? (
+            <View style={{ flex: 1 }}>
+              <Button
+                title="Kodu kaldır"
+                variant="secondary"
+                onPress={() => {
+                  setCodeText("");
+                  update({ promoCode: "" });
+                }}
+              />
+            </View>
+          ) : null}
+        </View>
       </Card>
 
       {error ? <ErrorBox message={error} /> : null}

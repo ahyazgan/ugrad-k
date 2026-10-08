@@ -10,6 +10,7 @@ const base: Draft = {
   largePackage: false,
   declaredValue: "",
   deliveryCode: false,
+  promoCode: "",
   packageDescription: "",
   customerNote: "",
   pickupContactName: "",

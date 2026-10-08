@@ -1,5 +1,6 @@
 import { router } from "expo-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { Share } from "react-native";
 import { DeleteAccount } from "@/components/DeleteAccount";
 import { Button, Card, ErrorBox, Field, Muted, Screen, Title } from "@/components/ui";
 import { api, ApiError } from "@/lib/api";
@@ -19,6 +20,10 @@ function HesapForm() {
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [referral, setReferral] = useState<string | null>(null);
+  useEffect(() => {
+    if (!profile?.corporateAccountId) api.myReferralCode().then(setReferral, () => undefined);
+  }, [profile?.corporateAccountId]);
 
   async function save() {
     setSaving(true);
@@ -46,6 +51,21 @@ function HesapForm() {
         {msg ? <Muted>{msg}</Muted> : null}
         <Button title="Kaydet" onPress={save} loading={saving} />
       </Card>
+      {referral ? (
+        <Card>
+          <Title>Davet kodunuz: {referral}</Title>
+          <Muted>
+            Arkadaşınız ilk siparişinde bu kodu girerse indirim kazanır; gönderisi teslim edilince size de kredi tanımlanır ve sonraki
+            siparişinizden düşülür.
+          </Muted>
+          <Button
+            title="Davet kodunu paylaş"
+            variant="secondary"
+            testID="share-referral"
+            onPress={() => Share.share({ message: `Kurye gönderilerinde ilk siparişine indirim: davet kodum ${referral}` })}
+          />
+        </Card>
+      ) : null}
       {profile?.corporateAccountId ? (
         <Card>
           <Title>Kurumsal hesap</Title>

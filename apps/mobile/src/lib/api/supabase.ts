@@ -406,6 +406,11 @@ export function createSupabaseApi(url: string, anonKey: string): Api & { client:
       if (error) throw new ApiError(error.message);
       return data as { ok: boolean; remaining: number };
     },
+    async myReferralCode() {
+      const { data, error } = await client.rpc("my_referral_code");
+      if (error) throw new ApiError(error.message);
+      return data as string;
+    },
     async courierDocuments() {
       const { data, error } = await client.from("courier_documents").select("kind, doc_number, expires_at").eq("courier_id", await uid());
       fail(error, "Belgeler okunamadı");

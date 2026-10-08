@@ -17,6 +17,7 @@ import {
 } from "../../../packages/shared/index.ts";
 import type { Ctx } from "./context.ts";
 import { openCredits, withCredits } from "./credits.ts";
+import { applyDiscountCode } from "./promo.ts";
 import { createOrderForCustomer } from "./handlers.ts";
 import { HttpError } from "./http.ts";
 
@@ -75,8 +76,9 @@ export const TOOLS: Tool[] = [
         weight_kg: { type: ["number", "null"] },
         large_package: { type: "boolean" },
         declared_value_tl: { type: ["number", "null"], description: "Müşteri gönderinin değerini söylediyse TL; yoksa null" },
+        promo_code: { ...nullableStr, description: "Müşterinin verdiği kampanya veya davet kodu; yoksa null" },
       },
-      required: ["pickup_place_id", "dropoff_place_id", "service_level", "round_trip", "weight_kg", "large_package", "declared_value_tl"],
+      required: ["pickup_place_id", "dropoff_place_id", "service_level", "round_trip", "weight_kg", "large_package", "declared_value_tl", "promo_code"],
       additionalProperties: false,
     },
   },
@@ -102,6 +104,7 @@ export const TOOLS: Tool[] = [
         large_package: { type: "boolean" },
         declared_value_tl: { type: ["number", "null"], description: "Müşteri gönderinin değerini söylediyse TL; yoksa null" },
         delivery_code: { type: "boolean", description: "Alıcıya SMS teslim kodu gönderilsin mi (değerli/önemli evrak)" },
+        promo_code: { ...nullableStr, description: "Müşterinin verdiği kampanya veya davet kodu; yoksa null" },
         payment_method: { type: "string", enum: ["nakit", "cari"] },
         customer_note: nullableStr,
       },
@@ -121,6 +124,7 @@ export const TOOLS: Tool[] = [
         "large_package",
         "declared_value_tl",
         "delivery_code",
+        "promo_code",
         "payment_method",
         "customer_note",
       ],
@@ -201,6 +205,7 @@ async function quoteFor(tc: ToolContext, i: Record<string, unknown>) {
     largePackage: i.large_package === true,
     declaredValueKurus: typeof i.declared_value_tl === "number" && i.declared_value_tl > 0 ? Math.round(i.declared_value_tl * 100) : null,
     deliveryCode: i.delivery_code === true,
+    promoCode: typeof i.promo_code === "string" && i.promo_code.trim() ? i.promo_code : undefined,
   });
   return { req, p, d };
 }
@@ -217,8 +222,9 @@ export async function executeTool(name: string, input: Record<string, unknown>, 
     case "get_price_quote": {
       const { req, p, d } = await quoteFor(tc, input);
       const built = await buildQuote(req, { maps: ctx.maps, ...(await ctx.loadPricing()) });
-      // Müşterinin gecikme telafisi kredisi varsa siparişte düşülecek; teklifte de gösterilir
-      const q = { ...built, quote: withCredits(built.quote, await openCredits(ctx, customer.profileId)).quote };
+      // Kampanya/davet kodu ve gecikme telafisi kredisi siparişte düşülecek; teklifte de gösterilir
+      const promo = await applyDiscountCode(ctx, customer.profileId, req.promoCode, built.quote);
+      const q = { ...built, quote: withCredits(promo.quote, await openCredits(ctx, customer.profileId)).quote };
       return {
         from: p.address,
         to: d.address,

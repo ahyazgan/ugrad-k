@@ -5,6 +5,7 @@
  */
 import { countBridgeCrossings, resolveSide, type IstanbulSide } from "./geo.ts";
 import type { MapsProvider } from "./maps.ts";
+import { normalizeCode } from "./promo.ts";
 import { calculatePrice, SERVICE_LEVELS, type Holiday, type PriceQuote, type PricingSettings, type ServiceLevel } from "./pricing.ts";
 
 export interface OrderPoint {
@@ -31,6 +32,8 @@ export interface OrderRequest {
   declaredValueKurus: number | null;
   /** Alıcıya SMS ile teslim kodu gider; kurye kodu girmeden teslim kapanmaz */
   deliveryCode: boolean;
+  /** Kampanya veya davet kodu (sunucuda doğrulanır) */
+  promoCode?: string;
   packageDescription?: string;
   customerNote?: string;
   /** ISO tarih; boşsa "hemen" */
@@ -145,6 +148,7 @@ export function parseOrderRequest(body: unknown, now: Date = new Date()): OrderR
     largePackage: b.largePackage === true,
     declaredValueKurus,
     deliveryCode: b.deliveryCode === true,
+    promoCode: str(b.promoCode, "promoCode", { max: 40 }),
     packageDescription: str(b.packageDescription, "packageDescription"),
     customerNote: str(b.customerNote, "customerNote", { max: 1000 }),
     scheduledPickupAt,
@@ -228,6 +232,7 @@ export function orderRowFromQuote(req: OrderRequest, q: QuoteResult) {
     large_package: req.largePackage,
     declared_value_kurus: req.declaredValueKurus,
     delivery_code_required: req.deliveryCode,
+    promo_code: req.promoCode ? normalizeCode(req.promoCode) : null,
     urgent: req.serviceLevel === "acil",
     service_level: req.serviceLevel,
     round_trip: req.roundTrip,

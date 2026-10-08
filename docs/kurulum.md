@@ -164,6 +164,15 @@ select cron.schedule('kurye-hakedis', '*/5 * * * *', $$
   );
 $$);
 
+-- Geri kazanma mesajı (günlük 11:00 İstanbul; panel → Kampanyalar'dan açılır, §27)
+select cron.schedule('geri-kazanma', '0 8 * * *', $$
+  select net.http_post(
+    url := 'https://<ref>.supabase.co/functions/v1/winback',
+    headers := jsonb_build_object('x-notify-secret',
+      (select decrypted_secret from vault.decrypted_secrets where name = 'notify_secret'))
+  );
+$$);
+
 -- Eski hız sınırı sayaçlarını temizle (günlük)
 select cron.schedule('hiz-siniri-temizlik', '17 4 * * *', 'select public.purge_rate_limits()');
 ```
@@ -193,6 +202,7 @@ Panel → Otomasyon → **Sistem durumu** kartında her görevin en son ne zaman
    | `alici_gonderi_yolda_kod` | `Merhaba {{1}}, size gönderilen paket Yazgan Kurye ile yola çıktı. Teslim kodunuz: {{2}} (paketi alırken kuryeye söyleyin). Canlı takip: {{3}}` |
    | `teslim_edildi` | `{{1}} numaralı gönderi teslim edildi. Teslim alan: {{2}}` |
    | `yonetici_uyari` | `Yazgan Kurye uyarı: {{1}}` |
+   | `geri_kazanma` (Kategori: *Marketing*) | `Merhaba {{1}}, sizi özledik! Sonraki gönderinizde {{2}} indirim: {{3}} (14 gün geçerli). Mesaj almak istemiyorsanız RET yazın.` |
    | `acil_gecikme` | `{{1}} numaralı acil gönderiniz gecikebilir, tahmini teslim {{2}}. Taahhüt aşılırsa acil ek ücreti sonraki siparişinizden düşülür. Takip: {{3}}` |
 
 4. Webhook: Callback URL `https://<ref>.supabase.co/functions/v1/whatsapp-webhook`, Verify token: kendi belirlediğiniz rastgele metin → **messages** alanına abone olun.
@@ -396,3 +406,11 @@ Kayıtlı müşteriler `siparis@<alan adı>` adresine yazar; yapay zeka asistan�
 - **Değer beyanı**: müşteri gönderinin değerini girerse ücretsiz güvenceyi (varsayılan 1.000 TL) aşan kısım için sigorta ücreti fiyata eklenir (varsayılan %0,5, en az 25 TL; en fazla 100.000 TL beyan). Tümü panel → Fiyatlar'dan değişir; kurumsal indirime tabi değildir. **Bu tutarların bir sigorta poliçesiyle (emtia/nakliyat sorumluluk) karşılanması gerekir**; teminat sınırını poliçenize göre ayarlayın.
 - **Teslim kodu**: "Teslim kodu ile teslim" seçilen siparişte 4 haneli kod üretilir. Müşteri uygulamada görür; alıcıya gönderi yola çıkınca SMS/WhatsApp ile gider (şablon `alici_gonderi_yolda_kod`). Kurye kodu teslim ekranında doğrular; 5 yanlış denemede kilitlenir. Kurye kodu göremez. Yönetici gerekirse siparişi panelden kodsuz kapatabilir (sipariş detayında kod ve yanlış deneme sayısı görünür).
 - **Kurumsal API**: `declaredValueKurus` ve `deliveryCode` alanları; kod oluşturma yanıtında `order.deliveryCode` olarak döner.
+
+## 27. Kampanya, davet ve geri kazanma
+
+- **Kampanya kodları**: panel → Kampanyalar. Yüzde veya tutar; en fazla indirim, en düşük sipariş, son gün, toplam kullanım ve "yalnız ilk sipariş" koşulları. Müşteri kodu uygulamada sipariş özetinde, WhatsApp/e-posta asistanında veya kurumsal API'de (`promoCode`) girer; kod sunucuda doğrulanır. İndirim taşıma bedeline uygulanır, köprü/bekleme/sigorta/uzak alış indirimsizdir; kurumsal ay sonu indirimi indirimli tutar üzerinden hesaplanır. İptal edilen siparişin kod kullanımı geri alınır.
+- **Davet**: her bireysel müşterinin uygulamada (Hesabım) davet kodu vardır. Yeni müşteri ilk siparişinde bu kodu girerse *Davet ödülü* kadar indirim alır; gönderisi teslim edilince davet edene aynı tutarda kredi yazılır ve sonraki siparişinden otomatik düşülür. Tutar panel → Kampanyalar'dan (0 = kapalı).
+- **Geri kazanma**: varsayılan **kapalı**. Açılırsa §6 `geri-kazanma` görevi günde bir kez, **ticari ileti onayı veren**, en az bir teslimatı olan ve belirlenen gün kadar sipariş vermeyen bireysel müşterilere kişiye özel, tek kullanımlık, 14 gün geçerli indirim kodu gönderir (aynı kişiye en fazla 60 günde bir).
+  - **Yasal**: ticari elektronik ileti için **İYS (iys.org.tr)** kaydı ve izin yüklemesi zorunludur; SMS sağlayıcınızda (Netgsm) İYS entegrasyonunu açın. WhatsApp şablonu *Marketing* kategorisinde onaylanmalıdır.
+  - Müşteri "RET" yazarsa onayı kaldırılır ve bir daha kampanya mesajı gitmez (sipariş bilgilendirmeleri devam eder).
