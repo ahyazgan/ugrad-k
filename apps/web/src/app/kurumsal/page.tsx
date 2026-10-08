@@ -2,6 +2,7 @@ import { BRAND } from "@yazgan/shared";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { LeadForm } from "@/components/LeadForm";
+import { Sticker } from "@/components/Sticker";
 import { corporateRows } from "@/lib/pricing-info";
 
 export const metadata: Metadata = {
@@ -24,7 +25,10 @@ export default function KurumsalPage() {
     <div className="mx-auto max-w-6xl px-4 py-12">
       <div className="grid gap-10 lg:grid-cols-2">
         <div>
-          <h1 className="text-3xl font-extrabold text-slate-900 sm:text-4xl">Kurumsal moto kurye</h1>
+          <div className="flex items-center justify-between gap-4">
+            <h1 className="text-3xl font-extrabold text-slate-900 sm:text-4xl">Kurumsal moto kurye</h1>
+            <Sticker name="hediye" priority className="w-16 shrink-0 rotate-6 sm:w-20" />
+          </div>
           <p className="mt-3 text-lg text-slate-600">
             Hukuk büroları, muhasebe ofisleri, ajanslar ve şirketler için düzenli ve acil evrak/paket teslimatı. Başvurunuzu bırakın, en kısa sürede sizi arayalım.
           </p>

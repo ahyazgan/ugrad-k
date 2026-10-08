@@ -1,6 +1,7 @@
 import { BRAND } from "@yazgan/shared";
 import type { Metadata } from "next";
 import { CourierApplyForm } from "@/components/CourierApplyForm";
+import { Sticker } from "@/components/Sticker";
 
 export const metadata: Metadata = {
   title: "Moto kurye iş ilanı — kurye olun",
@@ -18,7 +19,10 @@ export default function KuryeOlPage() {
   return (
     <div className="mx-auto grid max-w-6xl gap-10 px-4 py-12 lg:grid-cols-[1fr_560px]">
       <div>
-        <h1 className="text-3xl font-extrabold text-slate-900 sm:text-4xl">Moto kurye olun</h1>
+        <div className="flex items-center justify-between gap-4">
+          <h1 className="text-3xl font-extrabold text-slate-900 sm:text-4xl">Moto kurye olun</h1>
+          <Sticker name="kask" priority className="w-16 shrink-0 -rotate-6 sm:w-20" />
+        </div>
         <p className="mt-3 text-lg text-slate-600">{BRAND.name} ekibine katılın. Formu doldurun; başvurunuzu inceleyip görüşme için sizi arayalım.</p>
         <div className="mt-8 grid gap-4">
           {PERKS.map((p) => (

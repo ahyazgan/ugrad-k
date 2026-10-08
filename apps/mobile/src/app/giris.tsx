@@ -1,7 +1,7 @@
 import { router } from "expo-router";
 import { useState } from "react";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { Text, TextInput, View } from "react-native";
+import { Text, TextInput, View, useWindowDimensions } from "react-native";
 import { BigTitle, HandTag, InkChip, Wordmark } from "@/components/Neo";
 import { Sticker } from "@/components/Sticker";
 import { Button, Card, ErrorBox, Muted, Screen, colors, font, radii } from "@/components/ui";
@@ -11,6 +11,9 @@ export default function Giris() {
   const [phone, setPhone] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { width } = useWindowDimensions();
+  // "Selam." satırının sağındaki boşluğa sığacak çıkartma genişliği
+  const phoneSticker = Math.max(48, Math.min(104, width - 32 - 240));
 
   async function submit() {
     setError(null);
@@ -31,11 +34,11 @@ export default function Giris() {
         <Wordmark size={40} />
       </View>
       <View style={{ marginTop: 18, marginBottom: 6 }}>
+        <Sticker name="telefon" size={phoneSticker} rotation={10} style={{ position: "absolute", right: 6, top: -6 }} />
         <BigTitle size={68}>{"Selam.\nHadi\nbaşla."}</BigTitle>
         <HandTag rotate={-10} style={{ position: "absolute", right: 8, bottom: 14 }}>
           {"30 sn'de\ngiriş!"}
         </HandTag>
-        <Sticker name="box" size={130} style={{ position: "absolute", right: 0, top: -10 }} />
       </View>
       <Muted>Acil evrak ve paketlerin, moto kurye ile kapıdan kapıya.</Muted>
       {api.mode === "demo" ? (

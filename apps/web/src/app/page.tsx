@@ -1,16 +1,17 @@
 import { BRAND } from "@yazgan/shared";
 import Link from "next/link";
 import { PriceCalculator } from "@/components/PriceCalculator";
+import { Sticker, type StickerName } from "@/components/Sticker";
 import { DISTRICTS } from "@/lib/districts";
 import { FAQ } from "@/lib/faq";
 import { corporateRows } from "@/lib/pricing-info";
 import { APP_URL, whatsappLink } from "@/lib/site";
 
-const STEPS = [
-  { n: "1", title: "Adresleri girin", text: "Alış ve teslim adresini yazın; sürüş mesafesine göre fiyat anında çıkar." },
-  { n: "2", title: "Onaylayın", text: "Telefon numaranızla giriş yapın, kartla ya da teslimatta ödeyin." },
-  { n: "3", title: "Canlı takip edin", text: "Kuryeniz haritada; takip bağlantısını alıcıyla paylaşın." },
-  { n: "4", title: "Teslim kanıtı", text: "Teslimatta fotoğraf ve imza alınır, faturanız otomatik kesilir." },
+const STEPS: { n: string; title: string; text: string; sticker: StickerName }[] = [
+  { n: "1", sticker: "ev", title: "Adresleri girin", text: "Alış ve teslim adresini yazın; sürüş mesafesine göre fiyat anında çıkar." },
+  { n: "2", sticker: "telefon", title: "Onaylayın", text: "Telefon numaranızla giriş yapın, kartla ya da teslimatta ödeyin." },
+  { n: "3", sticker: "pin", title: "Canlı takip edin", text: "Kuryeniz haritada; takip bağlantısını alıcıyla paylaşın." },
+  { n: "4", sticker: "imza", title: "Teslim kanıtı", text: "Teslimatta fotoğraf ve imza alınır, faturanız otomatik kesilir." },
 ];
 
 const SERVICES = [
@@ -33,7 +34,11 @@ export default function Home() {
               <span className="h-2 w-2 rounded-full bg-accent" aria-hidden="true" />
               BEYKOZ · ANADOLU YAKASI ÖNCELİKLİ · TÜM İSTANBUL
             </p>
-            <h1 className="mt-5 text-[clamp(56px,9vw,112px)] leading-[0.9] font-black tracking-[-0.05em]">
+            <h1 className="relative mt-5 text-[clamp(56px,9vw,112px)] leading-[0.9] font-black tracking-[-0.05em]">
+              {/* 3B çıkartmalar: em birimiyle başlık boyutuna göre ölçeklenir, satır sonlarındaki boşluğa oturur */}
+              <Sticker name="zarf" priority className="absolute top-[0.02em] left-[2.6em] w-[max(56px,0.72em)] -rotate-12" />
+              <Sticker name="simsek" priority className="absolute top-[-0.18em] left-[calc(2.6em+max(56px,0.72em)-14px)] w-[max(36px,0.4em)] rotate-12" />
+              <Sticker name="kutu" priority className="absolute top-[0.98em] left-[2.3em] w-[max(56px,0.8em)] rotate-6" />
               Hızlı.
               <br />
               Net.
@@ -72,7 +77,10 @@ export default function Home() {
             </ul>
           </div>
           <div>
-            <h2 className="mb-3 text-2xl font-black">Fiyatı hemen hesaplayın</h2>
+            <div className="mb-3 flex items-end justify-between gap-3">
+              <h2 className="text-2xl font-black">Fiyatı hemen hesaplayın</h2>
+              <Sticker name="motor" priority className="-mt-4 -mb-2 w-28 shrink-0 -rotate-3 sm:w-40 lg:-mt-10 lg:w-48" />
+            </div>
             <PriceCalculator />
           </div>
         </div>
@@ -83,7 +91,10 @@ export default function Home() {
         <ol className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {STEPS.map((s) => (
             <li key={s.n} className="rounded-[26px] bg-white p-5">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-accent font-black text-brand">{s.n}</div>
+              <div className="relative h-10">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-accent font-black text-brand">{s.n}</div>
+                <Sticker name={s.sticker} className="absolute -top-3 right-0 w-14 rotate-6" />
+              </div>
               <div className="mt-3 text-lg font-black tracking-tight">{s.title}</div>
               <p className="mt-1 text-sm text-slate-600">{s.text}</p>
             </li>
@@ -107,14 +118,17 @@ export default function Home() {
 
       <section className="mx-auto max-w-6xl px-4 py-16">
         <div className="grid items-center gap-8 rounded-[32px] bg-brand p-8 text-white lg:grid-cols-[1fr_auto] lg:p-12">
-          <div>
-            <h2 className="text-2xl font-extrabold">Ayda 20&apos;den fazla gönderiniz mi var?</h2>
-            <p className="mt-2 max-w-2xl text-white/80">
-              Kurumsal hesapla {corporateRows()
-                .map((r) => `${r.label.toLocaleLowerCase("tr-TR")} ${r.value}`)
-                .join(", ")}
-              ; tüm ay tek faturada. Ekibiniz aynı hesaptan sipariş verir, isterseniz sisteminize API ile bağlanırız.
-            </p>
+          <div className="flex items-start gap-5">
+            <Sticker name="bina" className="hidden w-24 shrink-0 -rotate-6 sm:block" />
+            <div>
+              <h2 className="text-2xl font-extrabold">Ayda 20&apos;den fazla gönderiniz mi var?</h2>
+              <p className="mt-2 max-w-2xl text-white/80">
+                Kurumsal hesapla {corporateRows()
+                  .map((r) => `${r.label.toLocaleLowerCase("tr-TR")} ${r.value}`)
+                  .join(", ")}
+                ; tüm ay tek faturada. Ekibiniz aynı hesaptan sipariş verir, isterseniz sisteminize API ile bağlanırız.
+              </p>
+            </div>
           </div>
           <Link href="/kurumsal" className="flex min-h-14 items-center justify-center rounded-full bg-accent px-7 text-center text-lg font-extrabold text-brand hover:bg-accent-dark">
             Kurumsal teklif al

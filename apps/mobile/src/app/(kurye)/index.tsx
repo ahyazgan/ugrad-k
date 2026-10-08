@@ -1,7 +1,7 @@
 import { ORDER_STATUS_LABELS } from "@yazgan/shared";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Pressable, Text, View, useWindowDimensions } from "react-native";
 import { BigTitle, InkChip, Wordmark } from "@/components/Neo";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Sticker } from "@/components/Sticker";
@@ -18,6 +18,9 @@ export default function KuryeIsler() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [trackingMsg, setTrackingMsg] = useState<string | null>(null);
+  const { width } = useWindowDimensions();
+  // "gelsin!" satırının sağındaki boşluğa sığacak motor genişliği
+  const motorSize = Math.max(56, Math.min(120, width - 32 - 210));
 
   const load = useCallback(async () => {
     try {
@@ -81,7 +84,7 @@ export default function KuryeIsler() {
       </View>
       <View>
         <BigTitle size={56}>{"Kolay\ngelsin!"}</BigTitle>
-        <Sticker name="scooter" size={110} style={{ position: "absolute", right: 0, top: -6 }} />
+        <Sticker name="motor" size={motorSize} rotation={-4} style={{ position: "absolute", right: 0, top: -6 }} />
       </View>
       <Card style={shift ? { backgroundColor: colors.lime } : undefined}>
         <Title>{shift ? "Vardiyadasınız" : "Vardiya kapalı"}</Title>

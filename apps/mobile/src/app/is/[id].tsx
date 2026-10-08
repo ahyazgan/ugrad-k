@@ -2,6 +2,7 @@ import { router, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import { Text, TextInput, View } from "react-native";
 import { StatusBadge } from "@/components/StatusBadge";
+import { Sticker, type StickerName } from "@/components/Sticker";
 import { TileMap, type MapMarker } from "@/components/TileMap";
 import { Button, Card, ErrorBox, Loading, Muted, Screen, Title, colors, styles, font } from "@/components/ui";
 import { api, ApiError, type OrderDetail } from "@/lib/api";
@@ -9,6 +10,7 @@ import { lastKnownPosition, setActiveOrderForLocation } from "@/lib/location";
 import { callPhone, openDirections } from "@/lib/navigation";
 
 function Stop({
+  sticker,
   title,
   address,
   details,
@@ -17,6 +19,7 @@ function Stop({
   lat,
   lng,
 }: {
+  sticker: StickerName;
   title: string;
   address: string;
   details: string | null;
@@ -27,7 +30,10 @@ function Stop({
 }) {
   return (
     <Card>
-      <Muted>{title}</Muted>
+      <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+        <Muted>{title}</Muted>
+        <Sticker name={sticker} size={40} rotation={sticker === "pin" ? 8 : -6} style={{ marginTop: -18, marginBottom: -6 }} />
+      </View>
       <Text style={{ ...font("extrabold"), fontSize: 16 }}>{address}</Text>
       {details ? <Text style={styles.body}>{details}</Text> : null}
       {contactName || contactPhone ? <Muted>{[contactName, contactPhone].filter(Boolean).join(" · ")}</Muted> : null}
@@ -143,6 +149,7 @@ export default function IsDetay() {
       {s !== "teslim_edildi" && s !== "iptal" ? <JobMap order={order} /> : null}
 
       <Stop
+        sticker="kutu"
         title="1 · ALIŞ"
         address={order.pickupAddress}
         details={order.pickupDetails}
@@ -152,6 +159,7 @@ export default function IsDetay() {
         lng={order.pickupLng}
       />
       <Stop
+        sticker="pin"
         title="2 · TESLİM"
         address={order.dropoffAddress}
         details={order.dropoffDetails}

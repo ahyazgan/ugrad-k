@@ -1,6 +1,8 @@
 import { router } from "expo-router";
 import { DeleteAccount } from "@/components/DeleteAccount";
+import { View } from "react-native";
 import { BigTitle } from "@/components/Neo";
+import { Sticker } from "@/components/Sticker";
 import { Button, Card, Muted, Screen, Title } from "@/components/ui";
 import { api } from "@/lib/api";
 import { COMPANY } from "@/lib/kvkk";
@@ -12,10 +14,13 @@ export default function KuryeHesap() {
   return (
     <Screen safeTop>
       <BigTitle size={52}>Hesabım.</BigTitle>
-      <Card>
-        <Title>{profile?.fullName ?? "Kurye"}</Title>
-        <Muted>{profile?.phone}</Muted>
-        <Muted>Bilgilerinizde değişiklik için yöneticinize başvurun.</Muted>
+      <Card style={{ flexDirection: "row", alignItems: "center" }}>
+        <View style={{ flex: 1, gap: 6 }}>
+          <Title>{profile?.fullName ?? "Kurye"}</Title>
+          <Muted>{profile?.phone}</Muted>
+          <Muted>Bilgilerinizde değişiklik için yöneticinize başvurun.</Muted>
+        </View>
+        <Sticker name="kask" size={76} rotation={-8} />
       </Card>
       <Button
         title="Çıkış yap"

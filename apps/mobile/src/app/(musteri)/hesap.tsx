@@ -1,7 +1,9 @@
 import { router } from "expo-router";
 import { useState } from "react";
+import { View } from "react-native";
 import { DeleteAccount } from "@/components/DeleteAccount";
 import { BigTitle } from "@/components/Neo";
+import { Sticker } from "@/components/Sticker";
 import { Button, Card, ErrorBox, Field, Muted, Screen, Title, colors } from "@/components/ui";
 import { api, ApiError } from "@/lib/api";
 import { COMPANY } from "@/lib/kvkk";
@@ -49,14 +51,20 @@ function HesapForm() {
         <Button title="Kaydet" onPress={save} loading={saving} />
       </Card>
       {profile?.corporateAccountId ? (
-        <Card style={{ backgroundColor: colors.lime }}>
-          <Title>Kurumsal hesap</Title>
-          <Muted>Ayda 20+ teslimatta %15, 50+ teslimatta %25 indirim ay sonu faturanıza yansır.</Muted>
+        <Card style={{ backgroundColor: colors.lime, flexDirection: "row", alignItems: "center" }}>
+          <View style={{ flex: 1, gap: 6 }}>
+            <Title>Kurumsal hesap</Title>
+            <Muted>Ayda 20+ teslimatta %15, 50+ teslimatta %25 indirim ay sonu faturanıza yansır.</Muted>
+          </View>
+          <Sticker name="hediye" size={72} rotation={8} />
         </Card>
       ) : (
-        <Card>
-          <Title>Kurumsal müşteri misiniz?</Title>
-          <Muted>Aylık tek fatura ve hacim indirimi için bizimle iletişime geçin.</Muted>
+        <Card style={{ flexDirection: "row", alignItems: "center" }}>
+          <View style={{ flex: 1, gap: 6 }}>
+            <Title>Kurumsal müşteri misiniz?</Title>
+            <Muted>Aylık tek fatura ve hacim indirimi için bizimle iletişime geçin.</Muted>
+          </View>
+          <Sticker name="hediye" size={72} rotation={8} />
         </Card>
       )}
       <Button

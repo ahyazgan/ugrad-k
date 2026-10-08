@@ -1,6 +1,7 @@
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect } from "react";
 import { Text } from "react-native";
+import { Sticker } from "@/components/Sticker";
 import { Button, Card, Muted, Screen, colors, font } from "@/components/ui";
 
 /**
@@ -20,6 +21,7 @@ export default function OdemeDonus() {
 
   return (
     <Screen>
+      <Sticker name="kart" size={120} rotation={-8} style={{ alignSelf: "center", marginTop: 12 }} />
       <Card>
         <Text style={{ fontSize: 20, ...font("black"), color: ok ? colors.success : colors.danger }}>
           {ok ? "Ödemeniz alındı" : "Ödeme tamamlanamadı"}
