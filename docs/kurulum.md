@@ -109,6 +109,9 @@ select cron.schedule('fatura-kuyrugu', '*/5 * * * *', $$
       (select decrypted_secret from vault.decrypted_secrets where name = 'notify_secret'))
   );
 $$);
+
+-- Ödeme süresi dolan kart siparişlerini iptal et (süre: panel → Operasyon ayarları)
+select cron.schedule('odenmemis-kart-iptal', '*/5 * * * *', 'select public.cancel_unpaid_card_orders()');
 ```
 
 ## 7. Mobil uygulama (EAS)

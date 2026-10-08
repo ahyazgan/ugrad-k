@@ -133,3 +133,19 @@ Deno.test("payment-refund: başarılı iptal", async () => {
   assertEquals((await res.json()).refunded, true);
   assertEquals(updated.orders![0]!.payment_status, "iade_edildi");
 });
+
+Deno.test("payment-callback: iptal edilmiş siparişe gelen ödeme hemen iade edilir", async () => {
+  const { ctx, updated } = fakeCtx({ tables: { orders: [{ ...order, status: "iptal", payment_token: "tok" }] } });
+  const calls: string[] = [];
+  const fetchFn = ((url: string) => {
+    calls.push(url);
+    if (url.includes("/detail")) {
+      return Promise.resolve(Response.json({ status: "success", paymentStatus: "SUCCESS", paymentId: "p9", paidPrice: 410.5, basketId: "o1" }));
+    }
+    return Promise.resolve(Response.json({ status: "success", paymentId: "p9" }));
+  }) as unknown as typeof fetch;
+  const html = await (await handlePaymentCallback(callbackReq("tok"), ctx, { env: env(iyzi), fetchFn })).text();
+  assert(html.includes("iade edildi"));
+  assert(calls.some((u) => u.endsWith("/payment/cancel")));
+  assertEquals(updated.orders![0]!.payment_status, "iade_edildi");
+});

@@ -152,6 +152,9 @@ export default function SiparisDetay() {
       </Card>
 
       {order.paymentMethod === "kart" && order.paymentStatus === "odenmedi" && order.status !== "iptal" ? (
+        <Muted style={{ textAlign: "center" }}>Ödemesi tamamlanmayan siparişler kısa süre sonra otomatik iptal edilir.</Muted>
+      ) : null}
+      {order.paymentMethod === "kart" && order.paymentStatus === "odenmedi" && order.status !== "iptal" ? (
         <Button
           title="Ödemeyi tamamla"
           testID="pay"

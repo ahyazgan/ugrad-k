@@ -90,7 +90,7 @@ export async function handlePaymentCallback(req: Request, ctx: Ctx, deps: Paymen
 
   const { data: o } = await ctx.admin
     .from("orders")
-    .select("id, total_kurus, payment_status, payment_token")
+    .select("id, status, total_kurus, payment_status, payment_token")
     .eq("payment_token", token)
     .single();
   if (!o) return resultPage(false, null, "Sipariş bulunamadı.", deps);
@@ -103,6 +103,24 @@ export async function handlePaymentCallback(req: Request, ctx: Ctx, deps: Paymen
     if (r.paymentStatus !== "SUCCESS" || r.basketId !== o.id) {
       await ctx.admin.from("orders").update({ payment_error: `Durum: ${r.paymentStatus}` }).eq("id", o.id);
       return resultPage(false, o.id, "Kart ödemesi onaylanmadı. Tekrar deneyebilirsiniz.", deps);
+    }
+    // Ödeme sırasında sipariş iptal edildiyse (ör. ödeme süresi doldu) tahsilat hemen iptal edilir
+    if (o.status === "iptal") {
+      try {
+        await cancelPayment(cfg, r.paymentId, clientIp(req), deps.fetchFn);
+        await ctx.admin
+          .from("orders")
+          .update({ payment_ref: r.paymentId, payment_status: "iade_edildi", payment_error: "Sipariş iptal edilmişti; ödeme iade edildi" })
+          .eq("id", o.id);
+        return resultPage(false, o.id, "Siparişiniz ödeme süresi dolduğu için iptal edilmişti; ödemeniz iade edildi.", deps);
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        await ctx.admin
+          .from("orders")
+          .update({ payment_ref: r.paymentId, payment_status: "iade_bekliyor", payment_error: `İptal edilmiş siparişe ödeme: ${msg}` })
+          .eq("id", o.id);
+        return resultPage(false, o.id, "Siparişiniz iptal edilmişti; ödemeniz en kısa sürede iade edilecek.", deps);
+      }
     }
     if (paidKurus !== o.total_kurus) {
       await ctx.admin.from("orders").update({ payment_error: `Tutar uyuşmazlığı: ${paidKurus}` }).eq("id", o.id);
