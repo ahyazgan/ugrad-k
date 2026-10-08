@@ -335,3 +335,31 @@ export function formatTL(kurus: number): string {
     " TL"
   );
 }
+
+/**
+ * Alışta oluşan beklemeyi onaylanmış teklife ekler (veya günceller). Diğer kalemler
+ * sipariş anındaki gibi kalır; yalnızca bekleme satırı ve toplamlar yeniden hesaplanır.
+ */
+export function applyWaitingFee(
+  quote: PriceQuote,
+  waitingMinutes: number,
+  settings: PricingSettings = DEFAULT_PRICING_SETTINGS,
+): PriceQuote {
+  const fee = waitingFeeKurus(waitingMinutes, settings);
+  const lines = quote.lines.filter((l) => l.code !== "waiting");
+  if (fee > 0) {
+    const waitingLine: PriceLine = {
+      code: "waiting",
+      label: `Bekleme (${waitingMinutes} dk, ilk ${settings.waitingFreeMinutes} dk ücretsiz)`,
+      amountKurus: fee,
+    };
+    // Köprü satırından önce, değilse sona
+    const bridgeIdx = lines.findIndex((l) => l.code === "bridge");
+    lines.splice(bridgeIdx === -1 ? lines.length : bridgeIdx, 0, waitingLine);
+  }
+  const subtotalKurus = lines.reduce((s, l) => s + l.amountKurus, 0);
+  // KDV oranı teklifin kendisinden korunur (sipariş anındaki oran)
+  const vatPct = quote.subtotalKurus > 0 ? Math.round((quote.vatKurus / quote.subtotalKurus) * 10_000) / 100 : settings.vatPct;
+  const vatKurus = pct(subtotalKurus, vatPct);
+  return { ...quote, lines, subtotalKurus, vatKurus, totalKurus: subtotalKurus + vatKurus };
+}

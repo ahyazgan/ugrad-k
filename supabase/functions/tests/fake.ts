@@ -7,13 +7,24 @@ type Row = Record<string, unknown>;
 
 export function fakeDb(tables: Record<string, Row[]>) {
   const inserted: Record<string, Row[]> = {};
+  const updated: Record<string, Row[]> = {};
   const from = (table: string) => {
     let rows = [...(tables[table] ?? [])];
     let insertRow: Row | null = null;
+    let updatePatch: Row | null = null;
     const q = {
       select: () => q,
       eq: (col: string, v: unknown) => {
         rows = rows.filter((r) => r[col] === v);
+        if (updatePatch) {
+          for (const r of rows) Object.assign(r, updatePatch);
+          (updated[table] ??= []).push(...rows);
+          return Promise.resolve({ data: null, error: null });
+        }
+        return q;
+      },
+      update: (patch: Row) => {
+        updatePatch = patch;
         return q;
       },
       gte: () => q,
@@ -35,7 +46,7 @@ export function fakeDb(tables: Record<string, Row[]>) {
     };
     return q;
   };
-  return { client: { from } as unknown as Ctx["admin"], inserted };
+  return { client: { from } as unknown as Ctx["admin"], inserted, updated };
 }
 
 export function fakeCtx(opts: { userId?: string | null; tables?: Record<string, Row[]> } = {}) {
@@ -49,5 +60,5 @@ export function fakeCtx(opts: { userId?: string | null; tables?: Record<string, 
         : Promise.resolve({ id: opts.userId ?? "u1" }),
     loadPricing: () => Promise.resolve({ settings: DEFAULT_PRICING_SETTINGS, holidays: [] }),
   };
-  return { ctx, inserted: db.inserted };
+  return { ctx, inserted: db.inserted, updated: db.updated };
 }

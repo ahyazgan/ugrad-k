@@ -1,8 +1,10 @@
 // İş mantığı — Deno.serve'den bağımsız, sahte Ctx ile test edilebilir.
 import {
+  applyWaitingFee,
   buildQuote,
   orderRowFromQuote,
   parseOrderRequest,
+  type PriceQuote,
   type QuoteResult,
 } from "../../../packages/shared/index.ts";
 import type { Ctx } from "./context.ts";
@@ -84,4 +86,46 @@ export async function handlePlaces(req: Request, ctx: Ctx): Promise<Response> {
   if (input.length < 3) return json({ suggestions: [] });
   if (input.length > 200) throw new HttpError(400, "Arama metni çok uzun");
   return json({ suggestions: await ctx.maps.autocomplete(input, sessionToken) });
+}
+
+/**
+ * Kurye alışta bekleme süresini girdikten sonra çağrılır: bekleme ücretini
+ * teklife ekler. İdempotenttir; siparişin güncel bekleme süresinden hesaplar.
+ */
+export async function handleRepriceOrder(req: Request, ctx: Ctx): Promise<Response> {
+  const user = await ctx.getUser(req);
+  const body = (await readJson(req)) as { orderId?: unknown };
+  if (typeof body.orderId !== "string") throw new HttpError(400, "orderId gerekli", "orderId");
+
+  const { data: order, error } = await ctx.admin
+    .from("orders")
+    .select("id, courier_id, status, waiting_minutes, price_quote, total_kurus")
+    .eq("id", body.orderId)
+    .single();
+  if (error || !order) throw new HttpError(404, "Sipariş bulunamadı");
+
+  if (order.courier_id !== user.id) {
+    const { data: p } = await ctx.admin.from("profiles").select("role").eq("id", user.id).single();
+    if (p?.role !== "admin") throw new HttpError(403, "Bu sipariş için yetkiniz yok");
+  }
+  if (["teslim_edildi", "iptal"].includes(order.status) && order.courier_id === user.id) {
+    throw new HttpError(409, "Kapanmış siparişin fiyatı değiştirilemez");
+  }
+
+  const { settings } = await ctx.loadPricing();
+  const quote: PriceQuote = applyWaitingFee(order.price_quote, order.waiting_minutes ?? 0, settings);
+  const changed = quote.totalKurus !== order.total_kurus;
+  if (changed) {
+    const { error: uErr } = await ctx.admin
+      .from("orders")
+      .update({
+        price_quote: quote,
+        subtotal_kurus: quote.subtotalKurus,
+        vat_kurus: quote.vatKurus,
+        total_kurus: quote.totalKurus,
+      })
+      .eq("id", order.id);
+    if (uErr) throw new Error(`Fiyat güncellenemedi: ${uErr.message}`);
+  }
+  return json({ quote, changed });
 }

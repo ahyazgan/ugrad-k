@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   DEFAULT_PRICING_SETTINGS as S,
   PricingError,
+  applyWaitingFee,
   calculateMonthlyInvoice,
   calculatePrice,
   corporateTierFor,
@@ -243,5 +244,31 @@ describe("kurumsal ay sonu fatura", () => {
 describe("formatTL", () => {
   it("Türkçe biçim", () => {
     expect(formatTL(123_450)).toBe("1.234,50 TL");
+  });
+});
+
+describe("applyWaitingFee", () => {
+  const base = calculatePrice({ distanceMeters: 5_000, bridgeCrossings: 1, pickupAt: DAY }, { ...S, bridgeFeeKurus: 2_500 });
+
+  it("ücretsiz süre içinde teklif değişmez", () => {
+    expect(applyWaitingFee(base, 10, S)).toEqual(base);
+  });
+
+  it("bekleme satırı köprüden önce eklenir, KDV yeniden hesaplanır", () => {
+    const q = applyWaitingFee(base, 32, S);
+    expect(q.lines.map((l) => l.code)).toEqual(["base", "extra_km", "waiting", "bridge"]);
+    expect(q.subtotalKurus).toBe(base.subtotalKurus + 10_000);
+    expect(q.vatKurus).toBe(Math.round(q.subtotalKurus * 0.2));
+  });
+
+  it("tekrar çağrılınca çift eklemez (idempotent), azalırsa günceller", () => {
+    const once = applyWaitingFee(base, 32, S);
+    expect(applyWaitingFee(once, 32, S)).toEqual(once);
+    expect(applyWaitingFee(once, 5, S).subtotalKurus).toBe(base.subtotalKurus);
+  });
+
+  it("tarife sonradan değişse de diğer kalemler korunur", () => {
+    const q = applyWaitingFee(base, 20, { ...S, perKmKurus: 99_999 });
+    expect(q.lines.find((l) => l.code === "extra_km")!.amountKurus).toBe(6_000);
   });
 });

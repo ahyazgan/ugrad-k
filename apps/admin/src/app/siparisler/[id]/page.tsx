@@ -35,12 +35,14 @@ export default function SiparisDetayPage() {
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [podUrl, setPodUrl] = useState<string | null>(null);
+  const [signatureUrl, setSignatureUrl] = useState<string | null>(null);
 
   const order = data?.order;
 
   useEffect(() => {
     if (order?.podPhotoPath) repo.podUrl(order.podPhotoPath).then(setPodUrl);
-  }, [order?.podPhotoPath]);
+    if (order?.podSignaturePath) repo.podUrl(order.podSignaturePath).then(setSignatureUrl);
+  }, [order?.podPhotoPath, order?.podSignaturePath]);
 
   async function act(fn: () => Promise<void>) {
     setBusy(true);
@@ -152,6 +154,17 @@ export default function SiparisDetayPage() {
                 <Info label="Teslim alan">{order.podReceiverName}</Info>
                 <Info label="Teslim zamanı">{fmtDateTime(order.deliveredAt)}</Info>
                 <Info label="Bekleme">{order.waitingMinutes} dk</Info>
+                <Info label="İmza">
+                  {signatureUrl ? (
+                    <a className="text-brand underline" href={signatureUrl} target="_blank" rel="noreferrer">
+                      Görüntüle
+                    </a>
+                  ) : order.podSignaturePath ? (
+                    "Yüklendi"
+                  ) : (
+                    "Yok"
+                  )}
+                </Info>
                 <Info label="Fotoğraf">
                   {podUrl ? (
                     <a className="text-brand underline" href={podUrl} target="_blank" rel="noreferrer">

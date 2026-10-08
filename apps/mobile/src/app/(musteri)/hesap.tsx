@@ -1,22 +1,23 @@
 import { router } from "expo-router";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Button, Card, ErrorBox, Field, Muted, Screen, Title } from "@/components/ui";
 import { api, ApiError } from "@/lib/api";
 import { COMPANY } from "@/lib/kvkk";
 import { useSession } from "@/lib/session";
 
 export default function Hesap() {
+  const { profile } = useSession();
+  // Profil yüklendiğinde form başlangıç değerleriyle yeniden kurulur
+  return <HesapForm key={profile ? `${profile.id}-${profile.fullName}-${profile.email}` : "yok"} />;
+}
+
+function HesapForm() {
   const { profile, refresh } = useSession();
   const [fullName, setFullName] = useState(profile?.fullName ?? "");
   const [email, setEmail] = useState(profile?.email ?? "");
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    setFullName(profile?.fullName ?? "");
-    setEmail(profile?.email ?? "");
-  }, [profile]);
 
   async function save() {
     setSaving(true);

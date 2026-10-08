@@ -4,6 +4,8 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { colors } from "@/components/ui";
 import { OrderDraftProvider } from "@/lib/order-draft";
 import { SessionProvider } from "@/lib/session";
+// Arka plan konum görevi uygulama açılışında tanımlanmalı
+import "@/lib/location";
 
 export default function RootLayout() {
   return (
@@ -28,6 +30,9 @@ export default function RootLayout() {
             <Stack.Screen name="adres" options={{ title: "Adres seç", presentation: "modal" }} />
             <Stack.Screen name="ozet" options={{ title: "Fiyat ve onay" }} />
             <Stack.Screen name="siparis/[id]" options={{ title: "Sipariş" }} />
+            <Stack.Screen name="(kurye)" options={{ headerShown: false }} />
+            <Stack.Screen name="is/[id]" options={{ title: "İş detayı" }} />
+            <Stack.Screen name="teslim/[id]" options={{ title: "Teslim et" }} />
           </Stack>
         </OrderDraftProvider>
       </SessionProvider>

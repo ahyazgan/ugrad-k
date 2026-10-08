@@ -23,10 +23,7 @@ export default function AdresSec() {
 
   useEffect(() => {
     if (timer.current) clearTimeout(timer.current);
-    if (query.trim().length < 3) {
-      setItems([]);
-      return;
-    }
+    if (query.trim().length < 3) return;
     timer.current = setTimeout(async () => {
       setLoading(true);
       try {
@@ -80,7 +77,7 @@ export default function AdresSec() {
       />
       {loading ? <ActivityIndicator color={colors.primary} /> : null}
       <ErrorBox message={error} />
-      {items.length > 0 ? (
+      {items.length > 0 && query.trim().length >= 3 ? (
         <Card style={{ padding: 0, gap: 0 }}>
           {items.map((s, i) => (
             <Pressable

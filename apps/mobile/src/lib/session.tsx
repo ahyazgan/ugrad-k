@@ -41,11 +41,11 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const refresh = useCallback(async () => load(await api.getSession()), [load]);
 
   useEffect(() => {
-    refresh();
+    api.getSession().then(load);
     return api.onSessionChange((s) => {
       load(s);
     });
-  }, [refresh, load]);
+  }, [load]);
 
   return <Ctx.Provider value={{ ...state, refresh }}>{children}</Ctx.Provider>;
 }

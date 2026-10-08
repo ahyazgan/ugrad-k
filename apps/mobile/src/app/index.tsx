@@ -8,6 +8,6 @@ export default function Index() {
   if (loading) return <Loading />;
   if (!session) return <Redirect href="/giris" />;
   if (!consented) return <Redirect href="/kvkk" />;
-  if (profile?.role === "kurye") return <Redirect href="/(musteri)" />; // Faz 4: kurye ekranları
+  if (profile?.role === "kurye") return <Redirect href="/(kurye)" />;
   return <Redirect href="/(musteri)" />;
 }

@@ -11,6 +11,7 @@ import {
   type Profile,
   type QuoteResponse,
   type Session,
+  type Shift,
 } from "./types";
 
 /** "0532 123 45 67" → "+905321234567" */
@@ -171,6 +172,11 @@ export function createSupabaseApi(url: string, anonKey: string): Api & { client:
       const r = o.data as Row;
       return {
         ...toSummary(r!),
+        pickupLat: r!.pickup_lat,
+        pickupLng: r!.pickup_lng,
+        dropoffLat: r!.dropoff_lat,
+        dropoffLng: r!.dropoff_lng,
+        waitingMinutes: r!.waiting_minutes ?? 0,
         pickupDetails: r!.pickup_details,
         dropoffDetails: r!.dropoff_details,
         pickupContactName: r!.pickup_contact_name,
@@ -203,6 +209,108 @@ export function createSupabaseApi(url: string, anonKey: string): Api & { client:
         .subscribe();
       return () => {
         client.removeChannel(channel);
+      };
+    },
+
+    // ───────── Kurye
+    async getOpenShift() {
+      const { data, error } = await client
+        .from("courier_shifts")
+        .select("id, started_at")
+        .eq("courier_id", await uid())
+        .is("ended_at", null)
+        .maybeSingle();
+      fail(error, "Vardiya okunamadı");
+      return data ? ({ id: data.id, startedAt: data.started_at } satisfies Shift) : null;
+    },
+    async startShift(at) {
+      const { data, error } = await client.rpc("start_shift", { p_lat: at?.lat ?? null, p_lng: at?.lng ?? null });
+      if (error) throw new ApiError(error.message);
+      return { id: data.id, startedAt: data.started_at };
+    },
+    async endShift(at) {
+      const { error } = await client.rpc("end_shift", { p_lat: at?.lat ?? null, p_lng: at?.lng ?? null });
+      if (error) throw new ApiError(error.message);
+    },
+    async listCourierJobs() {
+      const todayStart = new Date(Date.now() + 3 * 3600_000).toISOString().slice(0, 10) + "T00:00:00+03:00";
+      const { data, error } = await client
+        .from("orders")
+        .select("id, order_no, status, pickup_address, dropoff_address, total_kurus, urgent, created_at")
+        .eq("courier_id", await uid())
+        .or(`status.in.(kuryeye_atandi,alindi,yolda,sorunlu),delivered_at.gte.${new Date(todayStart).toISOString()}`)
+        .order("created_at", { ascending: true });
+      fail(error, "İşler okunamadı");
+      return (data ?? []).map(toSummary);
+    },
+    async courierAction(orderId, action) {
+      const rpc = async (p: Record<string, unknown>) => {
+        const { error } = await client.rpc("set_order_status", { p_order_id: orderId, ...p });
+        if (error) throw new ApiError(error.message);
+      };
+      switch (action.type) {
+        case "pickup":
+          await rpc({ p_status: "alindi", p_waiting_minutes: action.waitingMinutes });
+          // Bekleme ücreti sunucuda pricing.ts ile teklife eklenir
+          if (action.waitingMinutes > 0) await invoke("reprice-order", { orderId });
+          return;
+        case "on_the_way":
+          return rpc({ p_status: "yolda" });
+        case "problem":
+          return rpc({ p_status: "sorunlu", p_note: action.note });
+        case "release":
+          return rpc({ p_status: "onaylandi", p_note: action.note });
+        case "deliver": {
+          const stamp = Date.now();
+          let photoPath: string | null = null;
+          let signaturePath: string | null = null;
+          if (action.pod.photoUri) {
+            photoPath = `${orderId}/foto-${stamp}.jpg`;
+            const body = await (await fetch(action.pod.photoUri)).arrayBuffer();
+            const { error } = await client.storage.from("pod").upload(photoPath, body, { contentType: "image/jpeg" });
+            if (error) throw new ApiError(`Fotoğraf yüklenemedi: ${error.message}`);
+          }
+          if (action.pod.signatureSvg) {
+            signaturePath = `${orderId}/imza-${stamp}.svg`;
+            const { error } = await client.storage
+              .from("pod")
+              .upload(signaturePath, action.pod.signatureSvg, { contentType: "image/svg+xml" });
+            if (error) throw new ApiError(`İmza yüklenemedi: ${error.message}`);
+          }
+          return rpc({
+            p_status: "teslim_edildi",
+            p_pod_photo_path: photoPath,
+            p_pod_signature_path: signaturePath,
+            p_pod_receiver_name: action.pod.receiverName,
+          });
+        }
+      }
+    },
+    async pushLocation(loc, orderId) {
+      const { error } = await client.from("courier_locations").insert({
+        courier_id: await uid(),
+        order_id: orderId,
+        lat: loc.lat,
+        lng: loc.lng,
+        accuracy_m: loc.accuracy ?? null,
+        heading: loc.heading ?? null,
+        speed_mps: loc.speed ?? null,
+      });
+      if (error) throw new ApiError(error.message);
+    },
+    subscribeCourierJobs(onChange) {
+      let channel: ReturnType<typeof client.channel> | null = null;
+      let closed = false;
+      uid().then((id) => {
+        if (closed) return;
+        channel = client
+          .channel(`courier-${id}`)
+          .on("postgres_changes", { event: "*", schema: "public", table: "orders", filter: `courier_id=eq.${id}` }, onChange)
+          .subscribe();
+      }, () => undefined);
+      return () => {
+        closed = true;
+        if (channel) client.removeChannel(channel);
       };
     },
   };

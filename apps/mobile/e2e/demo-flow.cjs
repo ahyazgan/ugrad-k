@@ -51,8 +51,58 @@ fs.mkdirSync(out, { recursive: true });
   await shot('09-siparis-ilerledi');
   console.log('DURUM:', (await page.locator('body').innerText()).match(/YK-\d+[\s\S]{0,40}/)?.[0]?.replace(/\n/g,' | '));
   if (errors.length) throw new Error('Tarayıcı hataları: ' + JSON.stringify(errors.slice(0, 10)));
-  // Geri dönülebilmeli
+  // Geri tuşu müşteri sekmelerine dönmeli (giriş ekranına değil)
   await page.goBack();
-  console.log('✓ e2e akışı geçti');
+  await tid('address-pickup').waitFor();
+  console.log('✓ müşteri akışı geçti');
+
+  // ───────── Kurye akışı
+  const ctx = await browser.newContext({
+    viewport: { width: 390, height: 844 },
+    permissions: ['geolocation'],
+    geolocation: { latitude: 41.1295, longitude: 29.1135 },
+  });
+  const kp = await ctx.newPage();
+  kp.on('pageerror', e => errors.push(e.message));
+  kp.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
+  const kt = id => kp.getByTestId(id);
+  const kshot = async n => kp.screenshot({ path: `${out}/${n}.png`, fullPage: true });
+  await kp.goto(`http://localhost:${process.env.PORT || 8099}/`);
+  await kt('phone').fill('0555 000 00 00');
+  await kt('send-otp').click();
+  await kt('otp').fill('123456');
+  await kt('verify').click();
+  await kp.getByText('Konum bilgilendirmesi').waitFor();
+  await kp.getByRole('checkbox').nth(0).click();
+  await kp.getByRole('checkbox').nth(1).click();
+  await kt('kvkk-accept').click();
+  await kp.getByText('Vardiya kapalı').waitFor();
+  await kt('shift-toggle').click();
+  await kp.getByText('Vardiyadasınız').waitFor();
+  await kp.getByText(/Aktif işler \(2\)/).waitFor();
+  await kshot('10-kurye-isler');
+  await kp.locator('[data-testid^="job-"]').first().click();
+  await kt('waiting').fill('27');
+  await kshot('11-kurye-is');
+  await kt('pickup').click();
+  await kt('on-the-way').waitFor();
+  await kt('on-the-way').click();
+  await kt('deliver').click();
+  await kt('receiver').fill('Resepsiyon - Zeynep');
+  const pad = await kt('signature-pad').boundingBox();
+  await kp.mouse.move(pad.x + 30, pad.y + 100);
+  await kp.mouse.down();
+  for (let i = 1; i <= 12; i++) await kp.mouse.move(pad.x + 30 + i * 20, pad.y + 100 + (i % 2 ? -30 : 30), { steps: 3 });
+  await kp.mouse.up();
+  await kshot('12-kurye-teslim');
+  await kt('complete-delivery').click();
+  await kp.getByText(/Bugün teslim edilen \(1\)/).waitFor();
+  await kp.getByText(/Aktif işler \(1\)/).waitFor();
+  // Elde paket yokken vardiya kapatılabilir
+  await kt('shift-toggle').click();
+  await kp.getByText('Vardiya kapalı').waitFor();
+  await kshot('13-kurye-bitti');
+  if (errors.length) throw new Error('Tarayıcı hataları: ' + JSON.stringify(errors.slice(0, 10)));
+  console.log('✓ kurye akışı geçti');
   await browser.close();
 })().catch(e => { console.error('FAIL', e.message); process.exit(1); });

@@ -72,7 +72,7 @@ Ek: `iptal`, `sorunlu`
 - [x] Faz 1: Monorepo kurulumu, Supabase şeması, fiyat fonksiyonu + testleri
 - [x] Faz 2: Müşteri akışı (adres → fiyat → sipariş) — ödeme olmadan
 - [x] Faz 3: Yönetim paneli (sipariş listesi, kurye atama)
-- [ ] Faz 4: Kurye uygulaması (iş kabul, konum, teslim fotoğrafı)
+- [x] Faz 4: Kurye uygulaması (iş kabul, konum, teslim fotoğrafı)
 - [ ] Faz 5: Canlı takip linki + SMS/WhatsApp bildirimleri
 - [ ] Faz 6: iyzico ödeme + otomatik e-arşiv fatura
 - [ ] Faz 7: Yapay zeka sesli asistan ve WhatsApp botu → aynı sipariş API'sine bağlanır

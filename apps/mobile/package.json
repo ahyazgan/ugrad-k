@@ -11,7 +11,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "export:web": "expo export --platform web",
-    "e2e:web": "node e2e/serve.cjs \"$PWD/dist\" 8099 & SERVER=$!; node e2e/demo-flow.cjs e2e/shots; CODE=$?; kill $SERVER; exit $CODE"
+    "e2e:web": "node e2e/serve.cjs \"$PWD/dist\" 8099 & SERVER=$!; node e2e/demo-flow.cjs e2e/shots; CODE=$?; kill $SERVER; exit $CODE",
+    "lint": "eslint src"
   },
   "dependencies": {
     "@expo/metro-runtime": "~57.0.16",
@@ -22,20 +23,26 @@
     "expo": "~57.0.27",
     "expo-constants": "~57.0.21",
     "expo-crypto": "~57.0.3",
+    "expo-image-picker": "~57.0.20",
     "expo-linking": "~57.0.12",
+    "expo-location": "~57.0.20",
     "expo-router": "~57.0.25",
     "expo-status-bar": "~57.0.1",
+    "expo-task-manager": "~57.0.21",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-native": "0.86.3",
     "react-native-safe-area-context": "~5.7.0",
     "react-native-screens": "~4.26.0",
+    "react-native-svg": "15.15.4",
     "react-native-web": "~0.21.0"
   },
   "devDependencies": {
     "@types/react": "~19.2.2",
     "typescript": "~6.0.3",
     "vitest": "3.2.4",
-    "playwright": "1.56.1"
+    "playwright": "1.56.1",
+    "eslint": "^9",
+    "eslint-config-expo": "~57.0.2"
   }
 }

@@ -26,7 +26,27 @@
       "output": "single",
       "bundler": "metro"
     },
-    "plugins": ["expo-router"],
+    "plugins": [
+      "expo-router",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Teslimat adreslerini ve kurye vardiyası sırasında konumunuzu göstermek için konumunuz kullanılır.",
+          "locationAlwaysAndWhenInUsePermission": "Kurye vardiyanız açıkken, uygulama arka plandayken de konumunuz müşteriyle paylaşılır. Vardiya kapanınca paylaşım durur.",
+          "isIosBackgroundLocationEnabled": true,
+          "isAndroidBackgroundLocationEnabled": true,
+          "isAndroidForegroundServiceEnabled": true
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "Teslimat kanıtı fotoğrafı çekmek için kamera kullanılır.",
+          "photosPermission": false,
+          "microphonePermission": false
+        }
+      ]
+    ],
     "experiments": {
       "typedRoutes": false
     }

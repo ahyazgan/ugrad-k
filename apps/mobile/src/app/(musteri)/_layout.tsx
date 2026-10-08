@@ -5,8 +5,8 @@ import { colors } from "@/components/ui";
 import { useSession } from "@/lib/session";
 
 export default function MusteriLayout() {
-  const { loading, session, consented } = useSession();
-  if (!loading && (!session || !consented)) return <Redirect href="/" />;
+  const { loading, session, consented, profile } = useSession();
+  if (!loading && (!session || !consented || profile?.role === "kurye")) return <Redirect href="/" />;
   return (
     <Tabs
       screenOptions={{

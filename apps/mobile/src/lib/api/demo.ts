@@ -3,8 +3,10 @@
  * Veriler bellekte tutulur; fiyat gerçek pricing.ts/quote.ts ile hesaplanır.
  * Giriş kodu her numara için 123456. Oluşturulan sipariş birkaç saniyede bir
  * otomatik olarak sonraki duruma geçer (canlı takip ekranını göstermek için).
+ * 0555 000 00 00 numarasıyla giriş yapılırsa KURYE ekranları açılır.
  */
 import {
+  applyWaitingFee,
   DEFAULT_PRICING_SETTINGS,
   ORDER_TRANSITIONS,
   buildQuote,
@@ -16,6 +18,7 @@ import {
 import {
   ApiError,
   type Api,
+  type Shift,
   type ConsentType,
   type OrderDetail,
   type OrderInput,
@@ -24,6 +27,7 @@ import {
 } from "./types";
 
 const DEMO_CODE = "123456";
+export const DEMO_COURIER_PHONE = "5550000000";
 const ADVANCE_MS = 6_000;
 const FLOW: OrderStatus[] = ["beklemede", "onaylandi", "kuryeye_atandi", "alindi", "yolda", "teslim_edildi"];
 
@@ -35,7 +39,11 @@ export function createDemoApi(): Api {
   const orders = new Map<string, OrderDetail>();
   const listeners = new Set<(s: Session | null) => void>();
   const orderListeners = new Map<string, Set<() => void>>();
+  const jobListeners = new Set<() => void>();
+  let shift: Shift | null = null;
   let seq = 1000;
+  let courierSeeded = false;
+  const notifyJobs = () => jobListeners.forEach((l) => l());
 
   const emit = () => listeners.forEach((l) => l(session));
   const notify = (id: string) => orderListeners.get(id)?.forEach((l) => l());
@@ -43,6 +51,46 @@ export function createDemoApi(): Api {
     if (!session) throw new ApiError("Oturum bulunamadı", undefined, 401);
     return session;
   };
+
+  const detailFrom = (
+    id: string,
+    req: ReturnType<typeof parseOrderRequest>,
+    q: Awaited<ReturnType<typeof buildQuote>>,
+    now: string,
+  ): OrderDetail => ({
+    id,
+    orderNo: `YK-${seq}`,
+    status: "beklemede",
+    pickupAddress: req.pickup.address,
+    dropoffAddress: req.dropoff.address,
+    pickupLat: req.pickup.lat,
+    pickupLng: req.pickup.lng,
+    dropoffLat: req.dropoff.lat,
+    dropoffLng: req.dropoff.lng,
+    waitingMinutes: 0,
+    totalKurus: q.quote.totalKurus,
+    urgent: req.urgent,
+    createdAt: now,
+    pickupDetails: req.pickup.details ?? null,
+    dropoffDetails: req.dropoff.details ?? null,
+    pickupContactName: req.pickup.contactName ?? null,
+    pickupContactPhone: req.pickup.contactPhone ?? null,
+    dropoffContactName: req.dropoff.contactName ?? null,
+    dropoffContactPhone: req.dropoff.contactPhone ?? null,
+    packageDescription: req.packageDescription ?? null,
+    customerNote: req.customerNote ?? null,
+    roundTrip: req.roundTrip,
+    weightKg: req.weightKg,
+    scheduledPickupAt: req.scheduledPickupAt,
+    priceQuote: q.quote,
+    paymentMethod: req.paymentMethod,
+    paymentStatus: "odenmedi",
+    trackingToken: "demo".padEnd(32, "0"),
+    courierName: null,
+    courierPhone: null,
+    cancelReason: null,
+    history: [{ status: "beklemede", at: now, note: null }],
+  });
 
   const quoteFor = async (input: OrderInput) => {
     try {
@@ -53,6 +101,57 @@ export function createDemoApi(): Api {
       throw e;
     }
   };
+
+  /** Demo kuryesine iki iş atar */
+  async function seedCourierJobs() {
+    if (courierSeeded) return;
+    courierSeeded = true;
+    const routes: [string, string, boolean][] = [
+      ["mock-beykoz", "mock-levent", true],
+      ["mock-uskudar", "mock-kadikoy", false],
+    ];
+    for (const [from, to, urgent] of routes) {
+      const pickup = await maps.placeDetails(from);
+      const dropoff = await maps.placeDetails(to);
+      const { req, q } = await quoteFor({
+        pickup: { ...pickup, contactName: "Ayşe Gönderici", contactPhone: "+905321112233" },
+        dropoff: { ...dropoff, contactName: "Ali Alıcı", contactPhone: "+905334445566" },
+        urgent,
+        roundTrip: false,
+        weightKg: null,
+        largePackage: false,
+        packageDescription: "İmzalı sözleşme zarfı",
+        customerNote: "Resepsiyona bırakılabilir",
+        scheduledPickupAt: null,
+        paymentMethod: "nakit",
+      });
+      const id = `demo-${++seq}`;
+      const now = new Date().toISOString();
+      orders.set(id, {
+        ...detailFrom(id, req, q, now),
+        status: "kuryeye_atandi",
+        courierName: "Demo Kurye",
+        history: [
+          { status: "beklemede", at: now, note: null },
+          { status: "onaylandi", at: now, note: null },
+          { status: "kuryeye_atandi", at: now, note: null },
+        ],
+      });
+    }
+  }
+
+  function move(id: string, to: OrderStatus, note: string | null = null) {
+    const o = orders.get(id);
+    if (!o) throw new ApiError("Sipariş bulunamadı", undefined, 404);
+    if (!ORDER_TRANSITIONS[o.status].includes(to)) {
+      throw new ApiError(`Bu işlem şu an yapılamaz (${o.status} → ${to})`);
+    }
+    o.status = to;
+    o.history.push({ status: to, at: new Date().toISOString(), note });
+    notify(id);
+    notifyJobs();
+    return o;
+  }
 
   function scheduleAdvance(id: string) {
     setTimeout(() => {
@@ -88,8 +187,16 @@ export function createDemoApi(): Api {
     },
     async verifyOtp(phone, code) {
       if (code !== DEMO_CODE) throw new ApiError(`Kod hatalı (demo kodu: ${DEMO_CODE})`, "code");
-      session = { userId: "demo-user", phone };
-      profile ??= { id: "demo-user", role: "musteri", fullName: null, phone, email: null, corporateAccountId: null };
+      const courier = phone.replace(/\D/g, "").endsWith(DEMO_COURIER_PHONE);
+      session = { userId: courier ? "demo-courier" : "demo-user", phone };
+      profile = {
+        id: session.userId,
+        role: courier ? "kurye" : "musteri",
+        fullName: courier ? "Demo Kurye" : (profile?.fullName ?? null),
+        phone,
+        email: null,
+        corporateAccountId: null,
+      };
       emit();
       return session;
     },
@@ -132,35 +239,7 @@ export function createDemoApi(): Api {
       const { req, q } = await quoteFor(input);
       const id = `demo-${++seq}`;
       const now = new Date().toISOString();
-      orders.set(id, {
-        id,
-        orderNo: `YK-${seq}`,
-        status: "beklemede",
-        pickupAddress: req.pickup.address,
-        dropoffAddress: req.dropoff.address,
-        totalKurus: q.quote.totalKurus,
-        urgent: req.urgent,
-        createdAt: now,
-        pickupDetails: req.pickup.details ?? null,
-        dropoffDetails: req.dropoff.details ?? null,
-        pickupContactName: req.pickup.contactName ?? null,
-        pickupContactPhone: req.pickup.contactPhone ?? null,
-        dropoffContactName: req.dropoff.contactName ?? null,
-        dropoffContactPhone: req.dropoff.contactPhone ?? null,
-        packageDescription: req.packageDescription ?? null,
-        customerNote: req.customerNote ?? null,
-        roundTrip: req.roundTrip,
-        weightKg: req.weightKg,
-        scheduledPickupAt: req.scheduledPickupAt,
-        priceQuote: q.quote,
-        paymentMethod: req.paymentMethod,
-        paymentStatus: "odenmedi",
-        trackingToken: "demo".padEnd(32, "0"),
-        courierName: null,
-        courierPhone: null,
-        cancelReason: null,
-        history: [{ status: "beklemede", at: now, note: null }],
-      });
+      orders.set(id, detailFrom(id, req, q, now));
       scheduleAdvance(id);
       return { id, orderNo: `YK-${seq}`, totalKurus: q.quote.totalKurus };
     },
@@ -189,6 +268,63 @@ export function createDemoApi(): Api {
       set.add(onChange);
       orderListeners.set(id, set);
       return () => set.delete(onChange);
+    },
+
+    // ───────── Kurye
+    async getOpenShift() {
+      return shift;
+    },
+    async startShift() {
+      shift ??= { id: "demo-shift", startedAt: new Date().toISOString() };
+      await seedCourierJobs();
+      notifyJobs();
+      return shift;
+    },
+    async endShift() {
+      shift = null;
+      notifyJobs();
+    },
+    async listCourierJobs() {
+      requireSession();
+      return [...orders.values()]
+        .filter((o) => o.courierName === "Demo Kurye")
+        .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+    },
+    async courierAction(orderId, action) {
+      switch (action.type) {
+        case "pickup": {
+          const o = move(orderId, "alindi");
+          o.waitingMinutes = action.waitingMinutes;
+          o.priceQuote = applyWaitingFee(o.priceQuote, action.waitingMinutes, DEFAULT_PRICING_SETTINGS);
+          o.totalKurus = o.priceQuote.totalKurus;
+          return;
+        }
+        case "on_the_way":
+          move(orderId, "yolda");
+          return;
+        case "problem":
+          move(orderId, "sorunlu", action.note);
+          return;
+        case "release": {
+          const o = move(orderId, "onaylandi", action.note);
+          o.courierName = null;
+          notifyJobs();
+          return;
+        }
+        case "deliver":
+          if (!action.pod.photoUri && !action.pod.signatureSvg) {
+            throw new ApiError("Teslim için fotoğraf veya imza gerekli");
+          }
+          move(orderId, "teslim_edildi");
+          return;
+      }
+    },
+    async pushLocation() {
+      // Demo: konum sunucuya gönderilmez
+    },
+    subscribeCourierJobs(onChange) {
+      jobListeners.add(onChange);
+      return () => jobListeners.delete(onChange);
     },
   };
 }

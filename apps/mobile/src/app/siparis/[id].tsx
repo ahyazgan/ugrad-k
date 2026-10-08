@@ -55,7 +55,7 @@ export default function SiparisDetay() {
   }, [id]);
 
   useEffect(() => {
-    load();
+    api.getOrder(id).then(setOrder, (e) => setError(e instanceof ApiError ? e.message : "Sipariş yüklenemedi"));
     return api.subscribeOrder(id, load);
   }, [id, load]);
 

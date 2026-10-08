@@ -33,3 +33,15 @@ Verilerinizin işlenip işlenmediğini öğrenme, bilgi talep etme, düzeltilmes
 export const ACIK_RIZA_KONUM = `Siparişlerimin alınması, fiyatlandırılması ve teslim edilmesi için girdiğim adreslerin konum bilgisinin işlenmesine ve harita hizmet sağlayıcısına (Google) aktarılmasına; ayrıca teslimat süresince takip linki ile paylaşılmasına açık rıza veriyorum. Bu rızayı dilediğim zaman geri alabilirim; bu durumda yeni sipariş oluşturulamaz.`;
 
 export const TICARI_ILETI = `Kampanya ve duyurular hakkında SMS, WhatsApp ve e-posta ile ticari elektronik ileti almak istiyorum. (İsteğe bağlı)`;
+
+// Kuryeler (çalışanlar) için ayrı aydınlatma: konum verisi yalnızca vardiya süresince işlenir.
+export const KURYE_AYDINLATMA_METNI = `${COMPANY.title} olarak, kurye hizmetinin yürütülmesi kapsamında aşağıdaki verilerinizi işliyoruz:
+
+• Kimlik ve iletişim: ad-soyad, telefon, araç plakası
+• Vardiya kayıtları: başlangıç/bitiş zamanı ve konumu — 6475 sayılı Kanun ve BTK düzenlemeleri gereği kurye çalışma saatlerinin kayıt altına alınması (hukuki yükümlülük, KVKK m.5/2-ç)
+• Konum: YALNIZCA vardiya açıkken; iş atama, müşteriye canlı takip ve teslimat güvenliği için (sözleşmenin ifası ve meşru menfaat, KVKK m.5/2-c ve f). Vardiya kapandığında konum toplanmaz.
+• Teslim kanıtları: teslim fotoğrafı ve alıcı imzası
+
+Konum geçmişi en fazla 6 ay, vardiya kayıtları mevzuatın öngördüğü süre boyunca saklanır. KVKK m.11 kapsamındaki haklarınız için ${COMPANY.address} adresine başvurabilirsiniz.`;
+
+export const KURYE_KONUM_ONAYI = `Vardiyam açıkken konumumun işlenmesi ve aktif teslimat süresince müşteriyle paylaşılması hakkında bilgilendirildim.`;

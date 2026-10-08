@@ -7,7 +7,7 @@ import { api, ApiError, type OrderInput, type QuoteResponse } from "@/lib/api";
 import { draftToInput, useOrderDraft } from "@/lib/order-draft";
 import { useSession } from "@/lib/session";
 
-const PAYMENT_OPTIONS: Array<{ value: OrderInput["paymentMethod"]; label: string; hint: string; corporateOnly?: boolean; disabled?: boolean }> = [
+const PAYMENT_OPTIONS: { value: OrderInput["paymentMethod"]; label: string; hint: string; corporateOnly?: boolean; disabled?: boolean }[] = [
   { value: "nakit", label: "Kuryeye ödeme", hint: "Nakit veya IBAN ile teslimatta" },
   { value: "cari", label: "Cari hesap", hint: "Ay sonu tek fatura", corporateOnly: true },
   { value: "kart", label: "Kartla online ödeme", hint: "Yakında", disabled: true },
@@ -17,37 +17,40 @@ export default function Ozet() {
   const { draft, update, reset } = useOrderDraft();
   const { profile } = useSession();
   const input = draftToInput(draft);
-  const [quote, setQuote] = useState<QuoteResponse | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  // Teklif, hesaplandığı girdinin anahtarıyla saklanır; girdi değişince eski teklif gösterilmez
+  const key = JSON.stringify({ ...input, paymentMethod: undefined });
+  const [result, setResult] = useState<{ key: string; quote?: QuoteResponse; error?: string } | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const current = result?.key === key ? result : null;
+  const quote = current?.quote ?? null;
+  const error = submitError ?? current?.error ?? null;
 
   useEffect(() => {
     if (!input) return;
     let alive = true;
-    setQuote(null);
-    setError(null);
-    api
-      .quote(input)
-      .then((q) => alive && setQuote(q))
-      .catch((e) => alive && setError(e instanceof ApiError ? e.message : "Fiyat hesaplanamadı"));
+    api.quote(input).then(
+      (q) => alive && setResult({ key, quote: q }),
+      (e) => alive && setResult({ key, error: e instanceof ApiError ? e.message : "Fiyat hesaplanamadı" }),
+    );
     return () => {
       alive = false;
     };
-    // Ödeme yöntemi fiyatı etkilemez
+    // Ödeme yöntemi fiyatı etkilemez; yalnızca anahtar değişince yeniden hesapla
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [JSON.stringify({ ...input, paymentMethod: undefined })]);
+  }, [key]);
 
   async function confirm() {
     if (!input) return;
     setSubmitting(true);
-    setError(null);
+    setSubmitError(null);
     try {
       const order = await api.createOrder(input);
       reset();
-      router.dismissAll();
-      router.push({ pathname: "/siparis/[id]", params: { id: order.id, yeni: "1" } });
+      // Özet ekranının yerine sipariş detayı: geri tuşu sekmelere döner
+      router.replace({ pathname: "/siparis/[id]", params: { id: order.id, yeni: "1" } });
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : "Sipariş oluşturulamadı");
+      setSubmitError(e instanceof ApiError ? e.message : "Sipariş oluşturulamadı");
     } finally {
       setSubmitting(false);
     }

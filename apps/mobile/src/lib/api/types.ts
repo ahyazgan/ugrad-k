@@ -64,6 +64,11 @@ export interface OrderSummary {
 }
 
 export interface OrderDetail extends OrderSummary {
+  pickupLat: number;
+  pickupLng: number;
+  dropoffLat: number;
+  dropoffLng: number;
+  waitingMinutes: number;
   pickupDetails: string | null;
   dropoffDetails: string | null;
   pickupContactName: string | null;
@@ -82,7 +87,27 @@ export interface OrderDetail extends OrderSummary {
   courierName: string | null;
   courierPhone: string | null;
   cancelReason: string | null;
-  history: Array<{ status: OrderStatus; at: string; note: string | null }>;
+  history: { status: OrderStatus; at: string; note: string | null }[];
+}
+
+export interface Shift {
+  id: string;
+  startedAt: string;
+}
+
+export interface CourierLocation {
+  lat: number;
+  lng: number;
+  accuracy?: number | null;
+  heading?: number | null;
+  speed?: number | null;
+}
+
+/** Kuryenin teslim kanıtı: fotoğraf (cihazdaki dosya URI'si) ve/veya imza (SVG) */
+export interface ProofOfDelivery {
+  photoUri?: string | null;
+  signatureSvg?: string | null;
+  receiverName: string;
 }
 
 export interface Session {
@@ -108,7 +133,7 @@ export interface Api {
   getProfile(): Promise<Profile>;
   updateProfile(patch: { fullName?: string; email?: string }): Promise<Profile>;
   getConsents(): Promise<Partial<Record<ConsentType, boolean>>>;
-  saveConsents(items: Array<{ type: ConsentType; granted: boolean }>, version: string): Promise<void>;
+  saveConsents(items: { type: ConsentType; granted: boolean }[], version: string): Promise<void>;
   // Adres
   searchPlaces(input: string, sessionToken: string): Promise<PlaceSuggestion[]>;
   placeDetails(placeId: string, sessionToken: string): Promise<PlaceDetails>;
@@ -119,4 +144,21 @@ export interface Api {
   getOrder(id: string): Promise<OrderDetail>;
   cancelOrder(id: string, reason: string): Promise<void>;
   subscribeOrder(id: string, onChange: () => void): () => void;
+  // Kurye
+  getOpenShift(): Promise<Shift | null>;
+  startShift(at?: CourierLocation | null): Promise<Shift>;
+  endShift(at?: CourierLocation | null): Promise<void>;
+  /** Atanmış aktif işler + bugün teslim edilenler */
+  listCourierJobs(): Promise<OrderSummary[]>;
+  courierAction(
+    orderId: string,
+    action:
+      | { type: "pickup"; waitingMinutes: number }
+      | { type: "on_the_way" }
+      | { type: "deliver"; pod: ProofOfDelivery }
+      | { type: "problem"; note: string }
+      | { type: "release"; note: string },
+  ): Promise<void>;
+  pushLocation(loc: CourierLocation, orderId: string | null): Promise<void>;
+  subscribeCourierJobs(onChange: () => void): () => void;
 }

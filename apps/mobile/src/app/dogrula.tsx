@@ -18,6 +18,8 @@ export default function Dogrula() {
     try {
       await api.verifyOtp(phone, code.trim());
       await refresh();
+      // Giriş ekranlarını yığından temizle
+      if (router.canDismiss()) router.dismissAll();
       router.replace("/");
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "Bir hata oluştu");

@@ -3,11 +3,12 @@ import { useState } from "react";
 import { ScrollView, Text } from "react-native";
 import { Button, Card, Checkbox, ErrorBox, Muted, Screen, Title, colors } from "@/components/ui";
 import { api, ApiError } from "@/lib/api";
-import { ACIK_RIZA_KONUM, AYDINLATMA_METNI, KVKK_VERSION, TICARI_ILETI } from "@/lib/kvkk";
+import { ACIK_RIZA_KONUM, AYDINLATMA_METNI, KURYE_AYDINLATMA_METNI, KURYE_KONUM_ONAYI, KVKK_VERSION, TICARI_ILETI } from "@/lib/kvkk";
 import { useSession } from "@/lib/session";
 
 export default function Kvkk() {
-  const { refresh } = useSession();
+  const { refresh, profile } = useSession();
+  const courier = profile?.role === "kurye";
   const [read, setRead] = useState(false);
   const [location, setLocation] = useState(false);
   const [marketing, setMarketing] = useState(false);
@@ -40,7 +41,7 @@ export default function Kvkk() {
       <Title>Aydınlatma metni</Title>
       <Card style={{ maxHeight: 320 }}>
         <ScrollView nestedScrollEnabled>
-          <Text style={{ color: colors.text, lineHeight: 21 }}>{AYDINLATMA_METNI}</Text>
+          <Text style={{ color: colors.text, lineHeight: 21 }}>{courier ? KURYE_AYDINLATMA_METNI : AYDINLATMA_METNI}</Text>
         </ScrollView>
       </Card>
       <Card>
@@ -48,12 +49,14 @@ export default function Kvkk() {
           <Text style={{ fontWeight: "600" }}>Aydınlatma metnini okudum, anladım.</Text>
         </Checkbox>
         <Checkbox checked={location} onChange={setLocation}>
-          <Text style={{ fontWeight: "600" }}>Açık rıza (zorunlu)</Text>
-          <Muted>{ACIK_RIZA_KONUM}</Muted>
+          <Text style={{ fontWeight: "600" }}>{courier ? "Konum bilgilendirmesi (zorunlu)" : "Açık rıza (zorunlu)"}</Text>
+          <Muted>{courier ? KURYE_KONUM_ONAYI : ACIK_RIZA_KONUM}</Muted>
         </Checkbox>
-        <Checkbox checked={marketing} onChange={setMarketing}>
-          <Muted>{TICARI_ILETI}</Muted>
-        </Checkbox>
+        {!courier ? (
+          <Checkbox checked={marketing} onChange={setMarketing}>
+            <Muted>{TICARI_ILETI}</Muted>
+          </Checkbox>
+        ) : null}
       </Card>
       <ErrorBox message={error} />
       <Button title="Onayla ve devam et" onPress={submit} loading={loading} disabled={!read || !location} testID="kvkk-accept" />
