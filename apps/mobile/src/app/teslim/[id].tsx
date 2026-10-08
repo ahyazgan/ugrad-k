@@ -1,9 +1,11 @@
 import * as ImagePicker from "expo-image-picker";
 import { router, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
-import { Image, Text } from "react-native";
+import { Image, Text, View } from "react-native";
 import { SignaturePad } from "@/components/SignaturePad";
-import { Button, Card, ErrorBox, Field, Muted, Screen } from "@/components/ui";
+import { BigTitle } from "@/components/Neo";
+import { Sticker } from "@/components/Sticker";
+import { Button, Card, ErrorBox, Field, Muted, Screen, radii, type } from "@/components/ui";
 import { api, ApiError } from "@/lib/api";
 import { setActiveOrderForLocation } from "@/lib/location";
 
@@ -45,17 +47,24 @@ export default function Teslim() {
 
   return (
     <Screen>
+      <BigTitle size={52}>Teslim et.</BigTitle>
       <Card>
         <Field label="Teslim alan kişi" placeholder="Ad Soyad / unvan" value={receiver} onChangeText={setReceiver} testID="receiver" />
       </Card>
       <Card>
-        <Text style={{ fontWeight: "600" }}>Fotoğraf</Text>
+        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+          <Text style={type.label}>1 · FOTOĞRAF</Text>
+          <Sticker name="kamera" size={56} rotation={8} style={{ marginTop: -18, marginBottom: -8 }} />
+        </View>
         <Muted>Paketin teslim edildiği yerin / kişinin fotoğrafı</Muted>
-        {photoUri ? <Image source={{ uri: photoUri }} style={{ width: "100%", height: 200, borderRadius: 10 }} resizeMode="cover" /> : null}
+        {photoUri ? <Image source={{ uri: photoUri }} style={{ width: "100%", height: 200, borderRadius: radii.tile }} resizeMode="cover" /> : null}
         <Button title={photoUri ? "Yeniden çek" : "Fotoğraf çek"} variant="secondary" onPress={takePhoto} />
       </Card>
       <Card>
-        <Text style={{ fontWeight: "600" }}>İmza</Text>
+        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+          <Text style={type.label}>2 · İMZA</Text>
+          <Sticker name="imza" size={56} rotation={-8} style={{ marginTop: -22, marginBottom: -8 }} />
+        </View>
         <SignaturePad onChange={setSignature} />
       </Card>
       <ErrorBox message={error} />

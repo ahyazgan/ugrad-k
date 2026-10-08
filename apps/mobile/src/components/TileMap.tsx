@@ -10,7 +10,7 @@ import {
 import { useState } from "react";
 import { Image, Platform, Text, View } from "react-native";
 import Svg, { Line } from "react-native-svg";
-import { colors } from "@/components/ui";
+import { colors, font, radii } from "@/components/ui";
 
 const TILE_URL = process.env.EXPO_PUBLIC_MAP_TILE_URL || DEFAULT_TILE_URL;
 const ATTRIBUTION = process.env.EXPO_PUBLIC_MAP_TILE_ATTRIBUTION || DEFAULT_TILE_ATTRIBUTION;
@@ -44,7 +44,7 @@ export function TileMap({ markers, height = 220, route = true }: { markers: MapM
       testID="tile-map"
       accessibilityLabel="Harita"
       onLayout={(e) => setWidth(Math.round(e.nativeEvent.layout.width))}
-      style={{ height, borderRadius: 12, overflow: "hidden", backgroundColor: "#E8ECEF" }}
+      style={{ height, borderRadius: radii.field, overflow: "hidden", backgroundColor: "#E8ECEF" }}
     >
       {view
         ? visibleTiles(view, TILE_URL).map((t) => (
@@ -83,7 +83,7 @@ export function TileMap({ markers, height = 220, route = true }: { markers: MapM
                   justifyContent: "center",
                 }}
               >
-                <Text style={{ color: "#fff", fontWeight: "800", fontSize: m.kind === "courier" ? 16 : 12 }}>{spec.label}</Text>
+                <Text style={{ color: "#fff", ...font("black"), fontSize: m.kind === "courier" ? 16 : 12 }}>{spec.label}</Text>
               </View>
             );
           })

@@ -3,7 +3,10 @@ import { router, useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
 import { FlatList, Pressable, RefreshControl, Text, View } from "react-native";
 import { StatusBadge } from "@/components/StatusBadge";
-import { Card, ErrorBox, Muted, colors } from "@/components/ui";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { BigTitle, InkChip } from "@/components/Neo";
+import { Sticker } from "@/components/Sticker";
+import { Card, ErrorBox, Muted, colors, font, styles } from "@/components/ui";
 import { api, ApiError, type OrderSummary } from "@/lib/api";
 import { formatDateTime } from "@/lib/format";
 
@@ -27,41 +30,54 @@ export default function Siparisler() {
     }, [load]),
   );
 
+  const active = orders?.filter((o) => !["teslim_edildi", "iptal"].includes(o.status)).length ?? 0;
+
   return (
-    <FlatList
-      style={{ backgroundColor: colors.bg }}
-      contentContainerStyle={{ padding: 16, gap: 12 }}
-      data={orders ?? []}
-      keyExtractor={(o) => o.id}
-      refreshControl={
-        <RefreshControl
-          refreshing={refreshing}
-          onRefresh={async () => {
-            setRefreshing(true);
-            await load();
-            setRefreshing(false);
-          }}
-        />
-      }
-      ListHeaderComponent={<ErrorBox message={error} />}
-      ListEmptyComponent={orders ? <Muted style={{ textAlign: "center", marginTop: 32 }}>Henüz siparişiniz yok.</Muted> : null}
-      renderItem={({ item }) => (
-        <Pressable onPress={() => router.push({ pathname: "/siparis/[id]", params: { id: item.id } })}>
-          <Card style={{ gap: 6 }}>
-            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-              <Text style={{ fontWeight: "700" }}>
-                {item.orderNo}
-                {item.urgent ? "  ⚡" : ""}
-              </Text>
-              <StatusBadge status={item.status} />
+    <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={["top", "left", "right"]}>
+      <FlatList
+        style={{ backgroundColor: colors.bg }}
+        contentContainerStyle={{ padding: 14, gap: 10 }}
+        data={orders ?? []}
+        keyExtractor={(o) => o.id}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={async () => {
+              setRefreshing(true);
+              await load();
+              setRefreshing(false);
+            }}
+          />
+        }
+        ListHeaderComponent={
+          <View style={{ gap: 12, marginBottom: 4 }}>
+            <BigTitle size={52}>Siparişlerim.</BigTitle>
+            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", minHeight: 40 }}>
+              {orders && active ? <InkChip>{`AKTİF · ${active}`}</InkChip> : <View />}
+              <Sticker name="kutu" size={76} rotation={-6} style={{ marginVertical: -16, marginRight: 6 }} />
             </View>
-            <Muted>{formatDateTime(item.createdAt)}</Muted>
-            <Text numberOfLines={1}>↑ {item.pickupAddress}</Text>
-            <Text numberOfLines={1}>↓ {item.dropoffAddress}</Text>
-            <Text style={{ fontWeight: "600", textAlign: "right" }}>{formatTL(item.totalKurus)}</Text>
-          </Card>
-        </Pressable>
-      )}
-    />
+            <ErrorBox message={error} />
+          </View>
+        }
+        ListEmptyComponent={orders ? <Muted style={{ textAlign: "center", marginTop: 32 }}>Henüz siparişiniz yok.</Muted> : null}
+        renderItem={({ item }) => (
+          <Pressable onPress={() => router.push({ pathname: "/siparis/[id]", params: { id: item.id } })}>
+            <Card style={{ gap: 6 }}>
+              <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                <Text style={{ ...font("black"), fontSize: 17, color: colors.ink }}>
+                  {item.orderNo}
+                  {item.urgent ? "  ⚡" : ""}
+                </Text>
+                <StatusBadge status={item.status} />
+              </View>
+              <Muted>{formatDateTime(item.createdAt)}</Muted>
+              <Text style={styles.body} numberOfLines={1}>↑ {item.pickupAddress}</Text>
+              <Text style={styles.body} numberOfLines={1}>↓ {item.dropoffAddress}</Text>
+              <Text style={{ ...font("black"), fontSize: 17, letterSpacing: -0.3, color: colors.ink, textAlign: "right" }}>{formatTL(item.totalKurus)}</Text>
+            </Card>
+          </Pressable>
+        )}
+      />
+    </SafeAreaView>
   );
 }

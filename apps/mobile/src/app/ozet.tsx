@@ -2,7 +2,9 @@ import { formatTL } from "@yazgan/shared";
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
 import { Pressable, Text, View } from "react-native";
-import { Button, Card, ErrorBox, Loading, Muted, Row, Screen, Title, colors } from "@/components/ui";
+import { BigTitle, HandTag, InkChip, InkPillBar, RouteCard, RouteStop } from "@/components/Neo";
+import { Sticker } from "@/components/Sticker";
+import { Card, ErrorBox, Loading, Muted, Row, Screen, Title, colors, font, radii } from "@/components/ui";
 import { api, ApiError, type OrderInput, type QuoteResponse } from "@/lib/api";
 import { draftToInput, useOrderDraft } from "@/lib/order-draft";
 import { payOrder } from "@/lib/payment";
@@ -71,28 +73,38 @@ export default function Ozet() {
 
   return (
     <Screen>
-      <Card>
-        <Muted>Nereden</Muted>
-        <Text style={{ fontWeight: "600" }}>{input.pickup.address}</Text>
-        <Muted>Nereye</Muted>
-        <Text style={{ fontWeight: "600" }}>{input.dropoff.address}</Text>
-        {quote ? (
-          <Muted>
-            Sürüş mesafesi {km} km · yaklaşık {min} dk{quote.bridgeCrossings ? " · köprü geçişi" : ""}
-          </Muted>
-        ) : null}
-      </Card>
+      <InkChip>ADIM 2 / 2</InkChip>
+      <View>
+        <BigTitle size={54}>{"Tamam,\nson adım."}</BigTitle>
+        <HandTag rotate={-10} style={{ position: "absolute", right: 4, top: 4 }}>
+          {"sürpriz\nyok!"}
+        </HandTag>
+      </View>
+      <RouteCard
+        from={<RouteStop label="NEREDEN" address={input.pickup.address} details={input.pickup.details} />}
+        to={<RouteStop label="NEREYE" address={input.dropoff.address} details={input.dropoff.details} />}
+        footer={
+          quote ? (
+            <Muted>
+              Sürüş mesafesi {km} km · yaklaşık {min} dk{quote.bridgeCrossings ? " · köprü geçişi" : ""}
+            </Muted>
+          ) : null
+        }
+      />
 
       {error ? <ErrorBox message={error} /> : null}
       {!quote && !error ? <Loading /> : null}
 
       {quote ? (
         <Card>
-          <Title>Fiyat</Title>
+          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+            <Title>Fiyat</Title>
+            <Sticker name="fis" size={48} rotation={8} style={{ marginVertical: -14 }} />
+          </View>
           {quote.quote.lines.map((l) => (
             <Row key={l.code} label={l.label} value={formatTL(l.amountKurus)} />
           ))}
-          <View style={{ height: 1, backgroundColor: colors.border }} />
+          <View style={{ height: 1, backgroundColor: colors.bg }} />
           <Row label="Ara toplam (KDV hariç)" value={formatTL(quote.quote.subtotalKurus)} />
           <Row label="KDV %20" value={formatTL(quote.quote.vatKurus)} />
           <Row label="Toplam" value={formatTL(quote.quote.totalKurus)} bold />
@@ -103,7 +115,10 @@ export default function Ozet() {
       ) : null}
 
       <Card>
-        <Title>Ödeme</Title>
+        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+          <Title>Nasıl ödersin?</Title>
+          <Sticker name="kart" size={60} rotation={-8} style={{ marginVertical: -12 }} />
+        </View>
         {PAYMENT_OPTIONS.filter((o) => !o.corporateOnly || profile?.corporateAccountId).map((o) => {
           const on = draft.paymentMethod === o.value;
           return (
@@ -111,22 +126,48 @@ export default function Ozet() {
               key={o.value}
               disabled={o.disabled}
               onPress={() => update({ paymentMethod: o.value })}
+              accessibilityRole="radio"
+              accessibilityState={{ selected: on, disabled: !!o.disabled }}
               style={{
-                borderWidth: 2,
-                borderColor: on ? colors.primary : colors.border,
-                borderRadius: 10,
-                padding: 12,
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 12,
+                backgroundColor: on ? colors.ink : colors.bg,
+                borderRadius: radii.tile,
+                paddingVertical: 14,
+                paddingHorizontal: 16,
                 opacity: o.disabled ? 0.5 : 1,
               }}
             >
-              <Text style={{ fontWeight: "600" }}>{o.label}</Text>
-              <Muted>{o.hint}</Muted>
+              <View style={{ flex: 1 }}>
+                <Text style={{ ...font("black"), fontSize: 16, letterSpacing: -0.3, color: on ? "#fff" : colors.ink }}>{o.label}</Text>
+                <Text style={{ ...font("semibold"), fontSize: 12, color: on ? colors.onInkMuted : colors.mutedDark }}>{o.hint}</Text>
+              </View>
+              <View
+                style={{
+                  width: 22,
+                  height: 22,
+                  borderRadius: 99,
+                  backgroundColor: on ? colors.lime : "transparent",
+                  borderWidth: on ? 0 : 2,
+                  borderColor: colors.ink,
+                }}
+              />
             </Pressable>
           );
         })}
       </Card>
 
-      <Button title="Siparişi onayla" onPress={confirm} loading={submitting} disabled={!quote} testID="confirm-order" />
+      <InkPillBar
+        caption="TOPLAM · KDV DAHİL"
+        title={quote ? formatTL(quote.quote.totalKurus) : "—"}
+        action="Onayla"
+        accessibilityLabel="Siparişi onayla"
+        onPress={confirm}
+        loading={submitting}
+        disabled={!quote}
+        testID="confirm-order"
+      />
       <Muted style={{ textAlign: "center" }}>
         Bekleme süresi 15 dakikayı aşarsa her 10 dakika için 50 TL + KDV eklenir.
       </Muted>

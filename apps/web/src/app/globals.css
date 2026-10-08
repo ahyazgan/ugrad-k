@@ -1,12 +1,25 @@
 @import "tailwindcss";
 
+/*
+ * "Neo" marka dili (renk kaynağı: packages/shared/brand.ts → BRAND.neo).
+ * Eski sınıf adları korunur, anlamları Neo'ya eşlenir: brand = mürekkep siyahı, brand-light = lila,
+ * accent = limon (yalnız zemin; açık zeminde limon yazı kullanmayın).
+ */
 @theme {
-  --color-brand: #0f3d6e;
-  --color-brand-dark: #0a2c50;
-  --color-brand-light: #e7eef6;
-  --color-accent: #f59e0b;
-  --color-accent-dark: #b45309;
-  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --color-brand: #111114;
+  --color-brand-dark: #000000;
+  --color-brand-light: #ece6fd;
+  --color-accent: #d6fb45;
+  --color-accent-dark: #c4ec2a;
+  --color-neo-bg: #ece6fd;
+  --color-neo-lime: #d6fb45;
+  --color-neo-dot: #9bc20f;
+  --color-neo-ink: #111114;
+  --color-neo-muted: #5a5870;
+  --color-neo-muted-dark: #3b3a4a;
+  --color-neo-inactive: #6e6b8a;
+  --font-sans: "Archivo Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-hand: "Caveat Brush", "Comic Sans MS", cursive;
 }
 
 html {
@@ -15,6 +28,12 @@ html {
 
 body {
   font-family: var(--font-sans);
-  background: #fff;
-  color: #0f172a;
+  background: var(--color-neo-bg);
+  color: var(--color-neo-ink);
+}
+
+/* Dev başlıklar: kalın ve sıkı */
+h1,
+h2 {
+  letter-spacing: -0.03em;
 }

@@ -1,5 +1,6 @@
 import { BRAND } from "@yazgan/shared";
 import Link from "next/link";
+import { Wordmark } from "@/components/Wordmark";
 import { APP_URL } from "@/lib/site";
 
 const NAV = [
@@ -12,29 +13,29 @@ const NAV = [
 
 export function Header() {
   return (
-    <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 backdrop-blur">
+    <header className="sticky top-0 z-30 bg-neo-bg/95 backdrop-blur">
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3">
-        <Link href="/" className="text-xl font-extrabold tracking-tight text-brand">
-          {BRAND.name}
+        <Link href="/" aria-label={`${BRAND.name} ana sayfa`} className="text-brand">
+          <Wordmark small />
         </Link>
-        <nav className="hidden items-center gap-6 text-sm font-medium text-slate-700 md:flex" aria-label="Ana menü">
+        <nav className="hidden items-center gap-1 rounded-full bg-white p-1.5 text-sm font-bold md:flex" aria-label="Ana menü">
           {NAV.map((n) => (
-            <Link key={n.href} href={n.href} className="hover:text-brand">
+            <Link key={n.href} href={n.href} className="flex min-h-11 items-center rounded-full px-4 hover:bg-neo-bg">
               {n.label}
             </Link>
           ))}
         </nav>
         <div className="flex items-center gap-2">
-          <a href={APP_URL} className="rounded-lg bg-accent px-4 py-2 text-sm font-bold text-slate-900 hover:bg-amber-400">
+          <a href={APP_URL} className="flex min-h-12 items-center rounded-full bg-brand px-5 text-sm font-extrabold whitespace-nowrap text-white hover:bg-black">
             Sipariş ver
           </a>
           <details className="relative md:hidden">
-            <summary className="cursor-pointer list-none rounded-lg border border-slate-300 px-3 py-2 text-sm" aria-label="Menü">
+            <summary className="flex h-12 w-12 cursor-pointer list-none items-center justify-center rounded-full bg-white text-lg shadow-sm" aria-label="Menü">
               ☰
             </summary>
-            <nav className="absolute right-0 mt-2 w-56 rounded-xl border border-slate-200 bg-white p-2 shadow-lg" aria-label="Mobil menü">
+            <nav className="absolute right-0 mt-2 w-60 rounded-[28px] bg-white p-2 shadow-lg" aria-label="Mobil menü">
               {NAV.map((n) => (
-                <Link key={n.href} href={n.href} className="block rounded-lg px-3 py-2 text-sm hover:bg-slate-50">
+                <Link key={n.href} href={n.href} className="block rounded-2xl px-4 py-3 text-base font-extrabold hover:bg-neo-bg">
                   {n.label}
                 </Link>
               ))}
