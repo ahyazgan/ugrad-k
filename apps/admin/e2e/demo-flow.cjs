@@ -87,6 +87,17 @@ fs.mkdirSync(out, { recursive: true });
   await page.getByRole("button", { name: "Tarifeyi kaydet" }).click();
   await page.getByText("Kaydedildi").waitFor();
 
+  // Herkese açık takip sayfası: oturum gerekmez
+  const pub = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  pub.on("pageerror", (e) => errors.push(e.message));
+  await pub.goto(base + "/takip/demo0000000000000000000000000000");
+  await pub.getByText("Gönderi takibi · YK-1001").waitFor();
+  await pub.getByText("Kuryemiz Mehmet gönderinizi getiriyor.").waitFor();
+  await pub.screenshot({ path: `${out}/08-takip.png`, fullPage: true });
+  await pub.goto(base + "/takip/gecersiz");
+  await pub.getByText("Gönderi bulunamadı").waitFor();
+  if (pub.url().includes("/giris")) throw new Error("takip sayfası girişe yönlendirdi");
+
   if (errors.length) throw new Error("Tarayıcı hataları: " + JSON.stringify(errors.slice(0, 10)));
   console.log("✓ panel e2e akışı geçti");
   await browser.close();

@@ -246,4 +246,4 @@ do $$ begin
     raise exception 'vardiya kaydı yok'; end if;
 end $$;
 
-\echo '  rls.test.sql: tüm kontroller geçti'
+\echo '  10_rls.test.sql: tüm kontroller geçti'

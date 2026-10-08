@@ -133,6 +133,7 @@ export interface Api {
   getProfile(): Promise<Profile>;
   updateProfile(patch: { fullName?: string; email?: string }): Promise<Profile>;
   getConsents(): Promise<Partial<Record<ConsentType, boolean>>>;
+  savePushToken(token: string): Promise<void>;
   saveConsents(items: { type: ConsentType; granted: boolean }[], version: string): Promise<void>;
   // Adres
   searchPlaces(input: string, sessionToken: string): Promise<PlaceSuggestion[]>;

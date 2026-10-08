@@ -119,6 +119,10 @@ export function createSupabaseApi(url: string, anonKey: string): Api & { client:
       fail(error, "Profil kaydedilemedi");
       return toProfile(data!);
     },
+    async savePushToken(token) {
+      const { error } = await client.from("profiles").update({ push_token: token }).eq("id", await uid());
+      fail(error, "Bildirim kaydı yapılamadı");
+    },
     async getConsents() {
       const { data, error } = await client.from("current_consents").select("consent_type, granted");
       fail(error, "Rıza bilgisi okunamadı");

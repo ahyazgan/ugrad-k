@@ -21,6 +21,8 @@ export function AdminShell({ children }: { children: ReactNode }) {
   const [admin, setAdmin] = useState<{ fullName: string | null } | null | undefined>(undefined);
   const [menuOpen, setMenuOpen] = useState(false);
   const isLogin = pathname === "/giris";
+  // Herkese açık sayfalar (müşteri/alıcı takip linki) yönetici girişi gerektirmez
+  const isPublic = pathname.startsWith("/takip/");
 
   useEffect(() => {
     const check = () => repo.currentAdmin().then(setAdmin);
@@ -29,11 +31,12 @@ export function AdminShell({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
+    if (isPublic) return;
     if (admin === null && !isLogin) router.replace("/giris");
     if (admin && isLogin) router.replace("/");
-  }, [admin, isLogin, router]);
+  }, [admin, isLogin, isPublic, router]);
 
-  if (isLogin) return <>{children}</>;
+  if (isLogin || isPublic) return <>{children}</>;
   if (!admin) {
     return <div className="flex min-h-screen items-center justify-center text-slate-500">Yükleniyor…</div>;
   }

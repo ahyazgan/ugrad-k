@@ -46,7 +46,8 @@ export function fakeDb(tables: Record<string, Row[]>) {
     };
     return q;
   };
-  return { client: { from } as unknown as Ctx["admin"], inserted, updated };
+  const rpc = (name: string) => Promise.resolve({ data: tables[`rpc:${name}`] ?? [], error: null });
+  return { client: { from, rpc } as unknown as Ctx["admin"], inserted, updated };
 }
 
 export function fakeCtx(opts: { userId?: string | null; tables?: Record<string, Row[]> } = {}) {

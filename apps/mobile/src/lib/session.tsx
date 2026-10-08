@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
 import { api, type Profile, type Session } from "./api";
+import { registerForPush } from "./push";
 
 interface SessionState {
   loading: boolean;
@@ -27,6 +28,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     }
     try {
       const [profile, consents] = await Promise.all([api.getProfile(), api.getConsents()]);
+      registerForPush(); // arka planda; başarısız olursa bildirimler SMS ile gider
       setState({
         loading: false,
         session,

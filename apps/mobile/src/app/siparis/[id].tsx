@@ -1,11 +1,14 @@
 import { ORDER_STATUS_LABELS, formatTL, type OrderStatus } from "@yazgan/shared";
 import { useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
-import { Linking, Text, TextInput, View } from "react-native";
+import { Linking, Share, Text, TextInput, View } from "react-native";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Button, Card, ErrorBox, Loading, Muted, Row, Screen, Title, colors, styles } from "@/components/ui";
 import { api, ApiError, type OrderDetail } from "@/lib/api";
 import { formatDateTime, formatTime } from "@/lib/format";
+
+const TRACKING_BASE = process.env.EXPO_PUBLIC_TRACKING_BASE_URL ?? "https://panel.yazgankurye.com/takip";
+const trackingUrl = (token: string) => `${TRACKING_BASE.replace(/\/$/, "")}/${token}`;
 
 const STEPS: OrderStatus[] = ["beklemede", "onaylandi", "kuryeye_atandi", "alindi", "yolda", "teslim_edildi"];
 
@@ -91,6 +94,18 @@ export default function SiparisDetay() {
         <Muted>{formatDateTime(order.createdAt)}</Muted>
         <Timeline order={order} />
       </Card>
+
+      {!["teslim_edildi", "iptal"].includes(order.status) ? (
+        <Button
+          title="Takip linkini paylaş"
+          variant="secondary"
+          onPress={() =>
+            Share.share({
+              message: `${order.orderNo} gönderisini canlı takip edin: ${trackingUrl(order.trackingToken)}`,
+            })
+          }
+        />
+      ) : null}
 
       {order.courierName ? (
         <Card>

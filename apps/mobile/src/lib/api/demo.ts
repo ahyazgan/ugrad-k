@@ -214,6 +214,9 @@ export function createDemoApi(): Api {
       profile = { ...profile!, fullName: patch.fullName ?? profile!.fullName, email: patch.email ?? profile!.email };
       return profile;
     },
+    async savePushToken() {
+      // Demo: push gönderilmez
+    },
     async getConsents() {
       requireSession();
       return { ...consents };

@@ -45,10 +45,21 @@
           "photosPermission": false,
           "microphonePermission": false
         }
+      ],
+      [
+        "expo-notifications",
+        {
+          "color": "#0F3D6E"
+        }
       ]
     ],
     "experiments": {
       "typedRoutes": false
+    },
+    "extra": {
+      "eas": {
+        "projectId": ""
+      }
     }
   }
 }
