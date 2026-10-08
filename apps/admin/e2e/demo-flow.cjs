@@ -166,6 +166,18 @@ fs.mkdirSync(out, { recursive: true });
   await page.getByTestId("balance-kur-1").waitFor({ state: "detached" });
   await page.getByText("Havale").first().waitFor();
 
+  // Vardiya planı: haftalık doluluk, kurye atama
+  await nav("Vardiya planı");
+  await page.getByTestId("plan-summary").getByText(/kurye-dilim eksik|tüm dilimler dolu/).waitFor();
+  await page.getByTestId("next-week").click();
+  const before = await page.getByTestId("plan-summary").innerText();
+  const addBtn = page.locator('[data-testid^="add-"]').first();
+  await addBtn.click();
+  await page.getByTestId("add-courier").selectOption({ label: "Emre Şahin" });
+  await page.waitForFunction((b) => document.querySelector('[data-testid="plan-summary"]')?.textContent !== b, before);
+  console.log("VARDIYA", before, "→", await page.getByTestId("plan-summary").innerText());
+  await shot("04c-vardiya-plani");
+
   await nav("Çalışma saatleri (BTK)");
   await page.getByRole("heading", { name: "Kurye çalışma saatleri" }).waitFor();
   await page.getByLabel("Başlangıç").fill("2026-01-01");

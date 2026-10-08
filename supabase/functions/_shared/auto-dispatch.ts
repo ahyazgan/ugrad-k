@@ -4,6 +4,7 @@ import {
   courierCompliance,
   excludedCouriers,
   planAssignments,
+  slotLabel,
   type AssignableOrder,
   type CandidateCourier,
 } from "../../../packages/shared/index.ts";
@@ -53,6 +54,8 @@ export async function handleAutoDispatch(
     autoBreaks: [] as string[],
     breakAlerts: [] as string[],
     sosResent: [] as string[],
+    shiftReminders: [] as string[],
+    shiftNoShows: [] as string[],
   };
   // Süresi dolan teklifler havuza döner (otomatik atama kapalı olsa da)
   const { data: expired } = await ctx.admin.rpc("expire_offers");
@@ -60,6 +63,7 @@ export async function handleAutoDispatch(
   summary.autoBreaks = await autoBreakUnresponsive(ctx, deps, ops);
   summary.breakAlerts = await alertLongBreaks(ctx, deps, ops, now);
   summary.sosResent = await resendUnacknowledgedSos(ctx, deps, now);
+  Object.assign(summary, await shiftNotices(ctx, deps, now));
   // Saklama süresi dolan yazışmalar (90 gün)
   await ctx.admin.rpc("purge_old_messages");
   if (!ops.auto_assign) {
@@ -230,4 +234,55 @@ async function alertLongBreaks(ctx: Ctx, deps: { env: Env; fetchFn?: typeof fetc
     await ctx.admin.from("courier_breaks").update({ alerted_at: now.toISOString() }).eq("id", b.id);
   }
   return rows.map((b) => b.id);
+}
+
+/** Vardiya planı: 60 dk önce hatırlatma; başlangıçtan 15 dk sonra vardiya açılmadıysa kuryeye ve yöneticiye */
+async function shiftNotices(ctx: Ctx, deps: { env: Env; fetchFn?: typeof fetch }, now: Date) {
+  const [{ data: reminders }, { data: noShows }] = await Promise.all([
+    ctx.admin.rpc("shift_reminders_due"),
+    ctx.admin.rpc("shift_no_shows_due"),
+  ]);
+  const due = [...((reminders ?? []) as Row[]), ...((noShows ?? []) as Row[])];
+  const result = { shiftReminders: [] as string[], shiftNoShows: [] as string[] };
+  if (!due.length) return result;
+  const { data: profiles } = await ctx.admin.from("profiles").select("id, full_name, phone, push_token").in("id", [...new Set(due.map((b) => b.courier_id))]);
+  const who = new Map(((profiles ?? []) as Row[]).map((p) => [p.id, p]));
+  const opts = { env: deps.env, fetchFn: deps.fetchFn };
+  const cfg = notificationConfig(deps.env);
+  for (const b of (reminders ?? []) as Row[]) {
+    const p = who.get(b.courier_id);
+    await deliver(
+      {
+        to: { role: "courier", phone: p?.phone, pushToken: p?.push_token },
+        channels: ["push", "sms"],
+        title: "Vardiya hatırlatma",
+        text: `Vardiyanız ${slotLabel(b.starts_at, b.ends_at)} arası. Başlayınca uygulamadan "Vardiyayı başlat"a basın.`,
+      },
+      opts,
+    );
+    await ctx.admin.from("shift_bookings").update({ reminded_at: now.toISOString() }).eq("id", b.id);
+    result.shiftReminders.push(b.id);
+  }
+  for (const b of (noShows ?? []) as Row[]) {
+    const p = who.get(b.courier_id);
+    const slot = slotLabel(b.starts_at, b.ends_at);
+    await deliver(
+      {
+        to: { role: "courier", phone: p?.phone, pushToken: p?.push_token },
+        channels: ["push", "sms"],
+        title: "Vardiyanız başladı",
+        text: `${slot} vardiyanız başladı ama vardiyayı açmadınız. Gelemiyorsanız yöneticinize haber verin.`,
+      },
+      opts,
+    );
+    const text = `${p?.full_name ?? "Kurye"} ${slot} vardiyasını açmadı (planlıydı).`;
+    await Promise.all(
+      cfg.adminPhones.map((phone) =>
+        deliver({ to: { role: "admin", phone }, channels: ["whatsapp", "sms"], title: "Vardiyaya gelmedi", text, whatsappTemplate: { name: "yonetici_uyari", params: [text] } }, opts),
+      ),
+    );
+    await ctx.admin.from("shift_bookings").update({ no_show_alerted_at: now.toISOString() }).eq("id", b.id);
+    result.shiftNoShows.push(b.id);
+  }
+  return result;
 }

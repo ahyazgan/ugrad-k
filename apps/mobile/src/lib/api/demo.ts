@@ -33,6 +33,7 @@ import {
   type ConsentType,
   type CourierPosition,
   type Incident,
+  type ShiftSlot,
   type OrderDetail,
   type OrderInput,
   type Profile,
@@ -78,6 +79,16 @@ export function createDemoApi(): Api {
   const codeTries = new Map<string, number>();
   const codeVerified = new Set<string>();
   let incident: Incident | null = null;
+  /** Demo vardiya planı: varsayılan dilimler (veritabanı varsayılanlarıyla aynı), alınanlar */
+  const SLOT_TIMES: Record<number, [string, string, number][]> = Object.fromEntries(
+    [1, 2, 3, 4, 5, 6].map((d) => [d, [["08:00", "12:00", 2], ["12:00", "16:00", 2], ["16:00", "20:00", 2], ["20:00", "24:00", 1]]]),
+  );
+  SLOT_TIMES[7] = [["10:00", "14:00", 1], ["14:00", "18:00", 1], ["18:00", "22:00", 1]];
+  const myShiftBookings = new Map<string, { id: string; startsAt: string }>();
+  /** Başkalarının aldığı (demo): her gün ilk dilimde 1 kişi */
+  const othersBooked = (startsAt: string) => (new Date(startsAt).getUTCHours() === 5 || new Date(startsAt).getUTCHours() === 7 ? 1 : 0);
+  const istTs = (day: string, time: string) =>
+    time === "24:00" ? new Date(new Date(`${day}T00:00:00+03:00`).getTime() + 86_400_000).toISOString() : new Date(`${day}T${time}:00+03:00`).toISOString();
   /** Demo yazışmaları: sipariş → mesajlar (rol: yazan taraf) */
   const chats = new Map<string, { id: string; role: "musteri" | "kurye" | "admin"; body: string; createdAt: string; readAt: string | null }[]>();
   const chatListeners = new Map<string, Set<() => void>>();
@@ -597,6 +608,36 @@ export function createDemoApi(): Api {
         { kind: "ruhsat", number: null, expiresAt: null },
         { kind: "trafik_sigortasi", number: null, expiresAt: day(10) },
       ];
+    },
+    async listShiftSlots(fromDay, days) {
+      const out: ShiftSlot[] = [];
+      for (let i = 0; i < days; i++) {
+        const day = new Date(new Date(`${fromDay}T12:00:00+03:00`).getTime() + i * 86_400_000).toISOString().slice(0, 10);
+        const dow = ((new Date(`${day}T12:00:00Z`).getUTCDay() + 6) % 7) + 1;
+        (SLOT_TIMES[dow] ?? []).forEach(([s, e, required], k) => {
+          const startsAt = istTs(day, s);
+          const mine = myShiftBookings.get(startsAt);
+          out.push({ templateId: dow * 10 + k, day, startsAt, endsAt: istTs(day, e), required, booked: othersBooked(startsAt) + (mine ? 1 : 0), mine: !!mine, bookingId: mine?.id ?? null });
+        });
+      }
+      return out;
+    },
+    async bookShift(templateId, day) {
+      const slot = (await this.listShiftSlots(day, 1)).find((x) => x.templateId === templateId);
+      if (!slot) throw new ApiError("Bu gün için böyle bir vardiya yok");
+      if (slot.mine) return;
+      if (new Date(slot.startsAt).getTime() < Date.now()) throw new ApiError("Vardiya ancak önümüzdeki 14 gün için alınabilir");
+      if (slot.booked >= slot.required) throw new ApiError("Bu vardiya dolu");
+      myShiftBookings.set(slot.startsAt, { id: `bk-${slot.startsAt}`, startsAt: slot.startsAt });
+    },
+    async cancelShiftBooking(bookingId) {
+      for (const [k, b] of myShiftBookings) {
+        if (b.id === bookingId) {
+          myShiftBookings.delete(k);
+          return { lateCancel: new Date(b.startsAt).getTime() - Date.now() < 2 * 3_600_000 };
+        }
+      }
+      throw new ApiError("Vardiya bulunamadı");
     },
     async listMessages(orderId) {
       const me = myRole();

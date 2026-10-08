@@ -275,6 +275,48 @@ export function createSupabaseRepo(url: string, anonKey: string): AdminRepo & { 
       // İptalde kartla alınmış ödeme iyzico'dan iptal edilir (başarısızsa "iade_bekliyor" olur)
       if (status === "iptal") await client.functions.invoke("payment-refund", { body: { orderId } });
     },
+    async listShiftPlan(fromDay, days) {
+      const to = new Date(new Date(`${fromDay}T00:00:00+03:00`).getTime() + days * 86_400_000).toISOString();
+      const [t, b] = await Promise.all([
+        client.from("shift_templates").select("*").order("weekday").order("start_time"),
+        client
+          .from("shift_bookings")
+          .select("*, courier:couriers(profile:profiles(full_name))")
+          .gte("starts_at", istDayStartUtc(fromDay))
+          .lt("starts_at", to)
+          .order("starts_at"),
+      ]);
+      const hhmm = (x: string) => (x === "24:00:00" ? "24:00" : x.slice(0, 5));
+      return {
+        templates: (check(t, "Vardiya şablonları okunamadı") as Row[]).map((r) => ({
+          id: r.id,
+          weekday: r.weekday,
+          startTime: hhmm(r.start_time),
+          endTime: hhmm(r.end_time),
+          required: r.required,
+          active: r.active,
+        })),
+        bookings: (check(b, "Vardiyalar okunamadı") as Row[]).map((r) => ({
+          id: r.id,
+          courierId: r.courier_id,
+          courierName: r.courier?.profile?.full_name ?? null,
+          templateId: r.template_id,
+          startsAt: r.starts_at,
+          endsAt: r.ends_at,
+          cancelledAt: r.cancelled_at,
+          lateCancel: !!r.late_cancel,
+        })),
+      };
+    },
+    async saveShiftTemplate(id, patch) {
+      check(await client.from("shift_templates").update({ required: patch.required, active: patch.active }).eq("id", id), "Kaydedilemedi");
+    },
+    async bookShiftFor(templateId, day, courierId) {
+      check(await client.rpc("book_shift", { p_template_id: templateId, p_day: day, p_courier_id: courierId }), "Vardiya atanamadı");
+    },
+    async cancelShiftBooking(bookingId) {
+      check(await client.rpc("cancel_shift_booking", { p_booking_id: bookingId }), "İptal edilemedi");
+    },
     async listOrderMessages(orderId) {
       const rows = check(
         await client.from("order_messages").select("id, sender_role, body, created_at, read_at").eq("order_id", orderId).order("created_at").limit(500),

@@ -40,6 +40,8 @@ import {
   type PromoCodeRow,
   type Incident,
   type OrderMessage,
+  type ShiftBooking,
+  type ShiftTemplate,
   type ReadinessItem,
   type Conversation,
   type Customer,
@@ -68,6 +70,8 @@ interface State {
   orders: AdminOrderDetail[];
   shifts: Shift[];
   incidents: Incident[];
+  shiftTemplates: ShiftTemplate[];
+  shiftBookings: ShiftBooking[];
   messages: Array<OrderMessage & { orderId: string }>;
   invoices: Invoice[];
   conversations: Conversation[];
@@ -459,9 +463,43 @@ async function seed(): Promise<State> {
         { id: "msg-2", orderId: chatOrder.id, senderRole: "musteri", body: "Resepsiyona bırakabilirsiniz", createdAt: chatOrder.arrivedDropoffAt ?? chatOrder.createdAt, readAt: chatOrder.arrivedDropoffAt },
       ]
     : [];
+  // Vardiya planı: veritabanı varsayılanlarıyla aynı şablon; bu hafta ve gelecek hafta örnek seçimler
+  const shiftTemplates: ShiftTemplate[] = [];
+  for (let d = 1; d <= 7; d++) {
+    const blocks: [string, string, number][] =
+      d === 7
+        ? [["10:00", "14:00", 1], ["14:00", "18:00", 1], ["18:00", "22:00", 1]]
+        : [["08:00", "12:00", 2], ["12:00", "16:00", 2], ["16:00", "20:00", 2], ["20:00", "24:00", 1]];
+    for (const [startTime, endTime, required] of blocks) {
+      shiftTemplates.push({ id: shiftTemplates.length + 1, weekday: d, startTime, endTime, required, active: true });
+    }
+  }
+  const istTs = (day: string, t: string) =>
+    t === "24:00" ? new Date(new Date(`${day}T00:00:00+03:00`).getTime() + 86_400_000).toISOString() : new Date(`${day}T${t}:00+03:00`).toISOString();
+  const shiftBookings: ShiftBooking[] = [];
+  for (let off = -6; off <= 7; off++) {
+    const day = new Date(Date.now() + 3 * 3_600_000 + off * 86_400_000).toISOString().slice(0, 10);
+    const dow = ((new Date(`${day}T12:00:00Z`).getUTCDay() + 6) % 7) + 1;
+    for (const t of shiftTemplates.filter((x) => x.weekday === dow)) {
+      const who = t.startTime === "08:00" || t.startTime === "12:00" || t.startTime === "10:00" ? "kur-1" : t.startTime === "16:00" && off % 2 === 0 ? "kur-2" : null;
+      if (!who) continue;
+      shiftBookings.push({
+        id: `bk-${day}-${t.id}`,
+        courierId: who,
+        courierName: who === "kur-1" ? "Mehmet Kaya" : "Emre Şahin",
+        templateId: t.id,
+        startsAt: istTs(day, t.startTime),
+        endsAt: istTs(day, t.endTime),
+        cancelledAt: off === -2 && who === "kur-2" ? hoursAgo(60) : null,
+        lateCancel: off === -2 && who === "kur-2",
+      });
+    }
+  }
   return {
     signedIn: false,
     incidents,
+    shiftTemplates,
+    shiftBookings,
     messages,
     ops: {
       unpaidCardTimeoutMinutes: 30,
@@ -775,6 +813,35 @@ export function createDemoRepo(): AdminRepo {
     subscribeOrders(cb) {
       orderListeners.add(cb);
       return () => orderListeners.delete(cb);
+    },
+    async listShiftPlan(fromDay, days) {
+      const s = await get();
+      const from = istDayStartUtc(fromDay);
+      const to = new Date(new Date(`${fromDay}T00:00:00+03:00`).getTime() + days * 86_400_000).toISOString();
+      return clone({ templates: s.shiftTemplates, bookings: s.shiftBookings.filter((b) => b.startsAt >= from && b.startsAt < to) });
+    },
+    async saveShiftTemplate(id, patch) {
+      const t = (await get()).shiftTemplates.find((x) => x.id === id);
+      if (!t) throw new RepoError("Şablon bulunamadı");
+      if (!(patch.required >= 0 && patch.required <= 50)) throw new RepoError("Gereken kurye 0–50 olmalı");
+      Object.assign(t, patch);
+    },
+    async bookShiftFor(templateId, day, courierId) {
+      const s = await get();
+      const t = s.shiftTemplates.find((x) => x.id === templateId);
+      const c = s.couriers.find((x) => x.id === courierId);
+      if (!t || !c) throw new RepoError("Vardiya veya kurye bulunamadı");
+      const dow = ((new Date(`${day}T12:00:00Z`).getUTCDay() + 6) % 7) + 1;
+      if (t.weekday !== dow) throw new RepoError("Bu gün için böyle bir vardiya yok");
+      const startsAt = new Date(`${day}T${t.startTime}:00+03:00`).toISOString();
+      if (s.shiftBookings.some((b) => b.courierId === courierId && b.startsAt === startsAt && !b.cancelledAt)) return;
+      const endsAt = t.endTime === "24:00" ? new Date(new Date(`${day}T00:00:00+03:00`).getTime() + 86_400_000).toISOString() : new Date(`${day}T${t.endTime}:00+03:00`).toISOString();
+      s.shiftBookings.push({ id: `bk-${Date.now()}`, courierId, courierName: c.fullName, templateId, startsAt, endsAt, cancelledAt: null, lateCancel: false });
+    },
+    async cancelShiftBooking(bookingId) {
+      const b = (await get()).shiftBookings.find((x) => x.id === bookingId && !x.cancelledAt);
+      if (!b) throw new RepoError("Vardiya bulunamadı");
+      b.cancelledAt = new Date().toISOString();
     },
     async listOrderMessages(orderId) {
       return clone(

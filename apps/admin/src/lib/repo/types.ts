@@ -408,6 +408,30 @@ export interface Readiness {
   ready: boolean;
 }
 
+/** Vardiya planı şablonu: haftanın günü × zaman dilimi ve gereken kurye */
+export interface ShiftTemplate {
+  id: number;
+  /** 1 = Pazartesi … 7 = Pazar */
+  weekday: number;
+  /** "08:00" */
+  startTime: string;
+  endTime: string;
+  required: number;
+  active: boolean;
+}
+
+/** Kuryenin seçtiği (veya yöneticinin atadığı) dilim */
+export interface ShiftBooking {
+  id: string;
+  courierId: string;
+  courierName: string | null;
+  templateId: number | null;
+  startsAt: string;
+  endsAt: string;
+  cancelledAt: string | null;
+  lateCancel: boolean;
+}
+
 /** Sipariş yazışması (müşteri ↔ kurye ↔ yönetici) */
 export interface OrderMessage {
   id: string;
@@ -501,6 +525,11 @@ export interface AdminRepo {
   /** Teslim edilemedi → göndericiye iade (yönetici; kanıt şartı yok) ve iade ücretinin eklenmesi */
   reportFailedDelivery(orderId: string, reason: FailedDeliveryReason, note: string): Promise<void>;
   subscribeOrders(onChange: () => void): () => void;
+  // Vardiya planı
+  listShiftPlan(fromDay: string, days: number): Promise<{ templates: ShiftTemplate[]; bookings: ShiftBooking[] }>;
+  saveShiftTemplate(id: number, patch: { required: number; active: boolean }): Promise<void>;
+  bookShiftFor(templateId: number, day: string, courierId: string): Promise<void>;
+  cancelShiftBooking(bookingId: string): Promise<void>;
   // Yazışma
   listOrderMessages(orderId: string): Promise<OrderMessage[]>;
   sendOrderMessage(orderId: string, body: string): Promise<void>;

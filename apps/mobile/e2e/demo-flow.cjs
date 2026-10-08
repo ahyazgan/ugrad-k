@@ -258,6 +258,15 @@ fs.mkdirSync(out, { recursive: true });
   if (!/Elinizdeki nakit tahsilat/.test(earn) || !/YK-\d+/.test(earn)) throw new Error('kazanç ekranı eksik');
   console.log('KAZANC:', earn.match(/Hesaplaşılmamış kazanç[\s\S]{0,160}/)?.[0]?.replace(/\n+/g, ' | '));
   await kshot('12b-kurye-kazanc');
+  // Vardiya planı: boş bir dilim al, sonra bırak
+  await kp.getByRole('tab', { name: /Vardiyam/ }).click();
+  await kt('my-shift-summary').getByText('Henüz vardiya seçmediniz.').waitFor();
+  await kp.locator('[role="button"]:not([aria-disabled="true"])').filter({ hasText: /^Al$/ }).first().click();
+  await kp.getByText(/vardiyası alındı/).waitFor();
+  await kt('my-shift-summary').getByText(/^1 vardiya · \d+ saat \(14 gün\)$/).waitFor();
+  await kshot('12d-kurye-vardiya');
+  await kp.locator('[role="button"]').filter({ hasText: /^Bırak$/ }).first().click();
+  await kp.getByText(/^Vardiya bırakıldı/).waitFor();
   await kp.getByRole('tab', { name: /Hesabım/ }).click();
   await kp.getByText('Belgelerim').waitFor();
   await kp.getByText(/Süresi yaklaşıyor ·/).waitFor();

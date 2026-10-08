@@ -127,6 +127,29 @@ Deno.test("auto-dispatch: yanıtsız kurye molaya alınınca haberdar edilir; uz
   assertEquals(again.breakAlerts, []);
 });
 
+Deno.test("auto-dispatch: vardiya hatırlatma ve gelmedi bildirimi bir kez", async () => {
+  const sent: string[] = [];
+  const fetchFn = ((url: string, init?: RequestInit) => {
+    sent.push(`${url} ${init?.body ?? ""}`);
+    return Promise.resolve(Response.json({ data: [{ status: "ok" }] }));
+  }) as unknown as typeof fetch;
+  const { ctx, updated } = setup({
+    ops_settings: [{ ...ops, auto_assign: false }],
+    "rpc:shift_reminders_due": [{ id: "b1", courier_id: "k1", starts_at: "2026-10-09T10:00:00Z", ends_at: "2026-10-09T14:00:00Z" }],
+    "rpc:shift_no_shows_due": [{ id: "b2", courier_id: "k2", starts_at: "2026-10-09T05:00:00Z", ends_at: "2026-10-09T09:00:00Z" }],
+    profiles: [
+      { id: "k1", full_name: "Mehmet", phone: "+905551110001", push_token: "ExponentPushToken[k1]" },
+      { id: "k2", full_name: "Emre", phone: "+905551110002", push_token: "ExponentPushToken[k2]" },
+    ],
+    shift_bookings: [{ id: "b1" }, { id: "b2" }],
+  });
+  const data = await (await handler((r) => handleAutoDispatch(r, ctx, { env, now: NOW, fetchFn }))(cron())).json();
+  assertEquals(data.shiftReminders, ["b1"]);
+  assertEquals(data.shiftNoShows, ["b2"]);
+  assertEquals(sent.some((x) => x.includes("13:00–17:00")), true); // İstanbul saati
+  assertEquals(updated.shift_bookings!.map((b) => Object.keys(b).sort().join()), ["id,reminded_at", "id,no_show_alerted_at"]);
+});
+
 Deno.test("auto-dispatch: uzun süredir atanamayan için yöneticiye bir kez uyarı", async () => {
   const old = { id: "o1", order_no: "YK-1", status: "onaylandi", pickup_lat: 41.1295, pickup_lng: 29.1135, urgent: false, created_at: "2026-10-09T08:40:00Z", scheduled_pickup_at: null, payment_method: "nakit", payment_status: "odenmedi" };
   const { ctx, updated } = setup({ couriers: [], orders: [old] });

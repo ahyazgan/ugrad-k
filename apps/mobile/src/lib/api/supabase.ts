@@ -491,6 +491,29 @@ export function createSupabaseApi(url: string, anonKey: string): Api & { client:
       fail(error, "Belgeler okunamadı");
       return (data ?? []).map((r: Row) => ({ kind: r.kind, number: r.doc_number, expiresAt: r.expires_at }));
     },
+    async listShiftSlots(fromDay, days) {
+      const { data, error } = await client.rpc("shift_slots", { p_from: fromDay, p_days: days });
+      if (error) throw new ApiError(error.message);
+      return ((data ?? []) as Row[]).map((r) => ({
+        templateId: r.template_id,
+        day: r.day,
+        startsAt: r.starts_at,
+        endsAt: r.ends_at,
+        required: r.required,
+        booked: r.booked,
+        mine: !!r.mine,
+        bookingId: r.booking_id ?? null,
+      }));
+    },
+    async bookShift(templateId, day) {
+      const { error } = await client.rpc("book_shift", { p_template_id: templateId, p_day: day });
+      if (error) throw new ApiError(error.message);
+    },
+    async cancelShiftBooking(bookingId) {
+      const { data, error } = await client.rpc("cancel_shift_booking", { p_booking_id: bookingId });
+      if (error) throw new ApiError(error.message);
+      return { lateCancel: !!(data as Row).late_cancel };
+    },
     async listMessages(orderId) {
       const me = await uid();
       const { data, error } = await client

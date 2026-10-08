@@ -41,6 +41,7 @@ Kodun tamamı yazıldı ve testlerden geçti. Bu rehber, sistemi **gerçek hesap
 34. [Durak sırası](#34-durak-sırası)
 35. [Uygulama içi mesajlaşma](#35-uygulama-içi-mesajlaşma)
 36. [Çevrimdışı çalışma](#36-çevrimdışı-çalışma)
+37. [Vardiya planlama](#37-vardiya-planlama)
 
 ---
 
@@ -510,3 +511,11 @@ Kayıtlı müşteriler `siparis@<alan adı>` adresine yazar; yapay zeka asistan�
 - Sunucunun reddettiği işlem (ör. "Önce işi kabul edin") *Gönderilemedi* olarak İşlerim ekranında kalır; kurye silip yeniden yapabilir. Aynı siparişin sonraki işlemleri o çözülene kadar bekler.
 - Çevrimdışı yapılamayanlar: iş teklifini kabul/ret, teslim kodunu doğrulama (sunucu doğrular), işi bırakma, mesajlaşma.
 - SOS çevrimdışıysa ekranda "İnternet yok, şimdi 112'yi veya yöneticinizi arayın" uyarısı çıkar; alarm bağlantı gelir gelmez basıldığı saat notuyla gider.
+
+## 37. Vardiya planlama
+
+- **Şablon**: panel → Vardiya planı → *Haftalık şablon*. Her gün için zaman dilimleri ve gereken kurye sayısı (varsayılan: Pzt–Cmt 08–12, 12–16, 16–20 için 2, 20–24 için 1; Pazar 10–14, 14–18, 18–22 için 1). 0 = o dilimde kurye gerekmez.
+- **Kurye**: uygulamada *Vardiyam* sekmesinden önümüzdeki 14 günün dilimlerini alır/bırakır. Dolu dilim alınamaz. Başlangıca 2 saatten az kala bırakmak **geç iptal** sayılır (performans puanına yansır).
+- **Panel**: haftalık tablo (yeşil dolu, sarı eksik, kırmızı boş), toplam eksik kurye-dilim; eksik dilime *+ kurye* ile atama (dolu dilime de atanabilir), × ile kaldırma. Geçmiş dilimlerde gerçek vardiya kaydına göre *geldi / gelmedi* (dilimin en az yarısı çalışıldıysa geldi).
+- **Otomatik**: dilimden 1 saat önce kuryeye hatırlatma; dilim başladıktan 15 dakika sonra vardiya açılmadıysa kuryeye uyarı ve yöneticiye WhatsApp/SMS (§6 `otomatik-dagitim`).
+- Vardiya planı öneridir; plan dışı vardiya açmak serbesttir. Çalışma saatleri (BTK) raporu gerçek vardiya kayıtlarından gelir.

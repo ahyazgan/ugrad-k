@@ -181,6 +181,19 @@ export interface FailedDeliveryInput {
   photoUri: string;
 }
 
+/** Vardiya planı dilimi (önümüzdeki günler) */
+export interface ShiftSlot {
+  templateId: number;
+  /** İstanbul günü YYYY-MM-DD */
+  day: string;
+  startsAt: string;
+  endsAt: string;
+  required: number;
+  booked: number;
+  mine: boolean;
+  bookingId: string | null;
+}
+
 /** Sipariş yazışması */
 export interface ChatMessage {
   id: string;
@@ -290,6 +303,11 @@ export interface Api {
   /** Kuryenin kendi belgeleri (yönetici girer) */
   courierDocuments(): Promise<CourierDocument[]>;
   subscribeCourierJobs(onChange: () => void): () => void;
+  // Vardiya planı
+  listShiftSlots(fromDay: string, days: number): Promise<ShiftSlot[]>;
+  bookShift(templateId: number, day: string): Promise<void>;
+  /** Başlangıca 2 saatten az kala iptal "geç iptal" sayılır */
+  cancelShiftBooking(bookingId: string): Promise<{ lateCancel: boolean }>;
   // Mesajlaşma (sipariş üzerinden; telefon numarası paylaşmadan)
   listMessages(orderId: string): Promise<ChatMessage[]>;
   sendMessage(orderId: string, body: string): Promise<void>;
