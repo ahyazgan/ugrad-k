@@ -1,7 +1,9 @@
-import { BRAND } from "@yazgan/shared";
+import { BRAND, DEFAULT_PRICING_SETTINGS } from "@yazgan/shared";
 import Link from "next/link";
+import { FaqAccordion } from "@/components/FaqAccordion";
 import { PriceCalculator } from "@/components/PriceCalculator";
 import { Sticker, type StickerName } from "@/components/Sticker";
+import { Card, HandNote, SampleStamp } from "@/components/ui";
 import { DISTRICTS } from "@/lib/districts";
 import { FAQ } from "@/lib/faq";
 import { corporateRows } from "@/lib/pricing-info";
@@ -14,14 +16,82 @@ const STEPS: { n: string; title: string; text: string; sticker: StickerName }[] 
   { n: "4", sticker: "imza", title: "Teslim kanıtı", text: "Teslimatta fotoğraf ve imza alınır, faturanız otomatik kesilir." },
 ];
 
-const SERVICES = [
-  { title: "Acil evrak", text: "Sözleşme, vekâletname, ihale dosyası: 60 dakika içinde teslim hedefiyle, başka iş yapılmadan doğrudan." },
-  { title: "Adliye ve resmi kurum", text: "Anadolu ve İstanbul adliyelerine, icra dairelerine, noterlere dosya ve dilekçe teslimi." },
-  { title: "Gidiş-dönüş imza", text: "Belgeyi götürür, imzalatır, geri getiririz. Dönüş ayağı yarı fiyatına." },
-  { title: "Planlı gönderi", text: "Yarın sabah için şimdiden sipariş verin; kurye alış saatinden önce yola çıkar." },
-  { title: "Numune ve küçük paket", text: "Yedek parça, numune, ilaç dışı sağlık malzemesi ve küçük paketler." },
-  { title: "Kurumsal hesap", text: "Aylık hacme göre indirim, tek fatura, ekip için ortak hesap ve API entegrasyonu." },
+const SERVICES: { title: string; text: string; sticker: StickerName; tilt: string }[] = [
+  { sticker: "zarf", tilt: "-rotate-6", title: "Acil evrak", text: "Sözleşme, vekâletname, ihale dosyası: 60 dakika içinde teslim hedefiyle, başka iş yapılmadan doğrudan." },
+  { sticker: "bina", tilt: "rotate-3", title: "Adliye ve resmi kurum", text: "Anadolu ve İstanbul adliyelerine, icra dairelerine, noterlere dosya ve dilekçe teslimi." },
+  { sticker: "donus", tilt: "rotate-6", title: "Gidiş-dönüş imza", text: "Belgeyi götürür, imzalatır, geri getiririz. Dönüş ayağı yarı fiyatına." },
+  { sticker: "kronometre", tilt: "-rotate-3", title: "Planlı gönderi", text: "Yarın sabah için şimdiden sipariş verin; kurye alış saatinden önce yola çıkar." },
+  { sticker: "kutu", tilt: "rotate-6", title: "Numune ve küçük paket", text: "Yedek parça, numune, ilaç dışı sağlık malzemesi ve küçük paketler." },
+  { sticker: "kart", tilt: "-rotate-6", title: "Kurumsal hesap", text: "Aylık hacme göre indirim, tek fatura, ekip için ortak hesap ve API entegrasyonu." },
 ];
+
+const S = DEFAULT_PRICING_SETTINGS;
+
+/** Only rules the system actually enforces (pricing.ts, SLA credit, invoice queue). */
+const PROMISES = [
+  { big: "60 dk", title: "Acil teslim taahhüdü", text: "Kaçırırsak acil ek ücreti sonraki siparişinizden otomatik düşülür." },
+  { big: "0 TL", title: "Gizli ücret", text: "Her kalem sipariş öncesinde ayrı satırda görünür; sonradan sürpriz yok." },
+  ...(S.maxWeightKg != null
+    ? [{ big: `${S.maxWeightKg} kg`, title: "Motosiklet sınırı", text: "Daha ağır gönderiler sipariş aşamasında reddedilir; yolda sürpriz olmaz." }]
+    : []),
+  { big: "e-arşiv", title: "Otomatik fatura", text: "Teslimattan sonra faturanız kendiliğinden kesilir; kurumsala ay sonu tek fatura." },
+];
+
+const SECTION = "mx-auto max-w-6xl px-4 py-16 lg:py-20";
+
+/** Sample proof-of-delivery receipt (clearly stamped "Örnek"; no real customer data). */
+function ProofMock() {
+  return (
+    <div className="relative mx-auto w-full max-w-md">
+      <Sticker name="kamera" className="absolute top-20 -left-3 z-10 w-20 -rotate-6 sm:top-24 sm:-left-10 sm:w-24" />
+      <Card className="relative p-5 sm:p-6">
+        <div className="flex items-center justify-between gap-3">
+          <span className="text-xs font-extrabold tracking-[0.14em] text-neo-muted uppercase">Teslim fişi</span>
+          <SampleStamp className="rotate-6" />
+        </div>
+        {/* Photo placeholder: no stock photo, just a framed area */}
+        <div
+          aria-hidden="true"
+          className="mt-4 flex aspect-[4/3] items-center justify-center rounded-2xl bg-[repeating-linear-gradient(135deg,#ece6fd_0_14px,#f5f2fe_14px_28px)] text-sm font-bold text-neo-inactive"
+        >
+          teslim fotoğrafı
+        </div>
+        <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
+          <div>
+            <dt className="text-xs font-semibold text-neo-muted">Teslim alan</dt>
+            <dd className="font-bold text-brand">Resepsiyon · Ad Soyad</dd>
+          </div>
+          <div>
+            <dt className="text-xs font-semibold text-neo-muted">Teslim saati</dt>
+            <dd className="font-bold text-brand">14:32</dd>
+          </div>
+          <div>
+            <dt className="text-xs font-semibold text-neo-muted">Sipariş</dt>
+            <dd className="font-bold text-brand">YK-0000</dd>
+          </div>
+          <div>
+            <dt className="text-xs font-semibold text-neo-muted">Teslim kodu</dt>
+            <dd className="font-bold text-brand">doğrulandı</dd>
+          </div>
+        </dl>
+        <div className="mt-4 border-t-2 border-dashed border-slate-200 pt-3">
+          <div className="text-xs font-semibold text-neo-muted">İmza</div>
+          <svg viewBox="0 0 240 60" className="mt-1 h-12 w-48 text-brand" aria-hidden="true">
+            <path
+              d="M6 42c14-22 24-30 30-26 7 5-9 30-2 31 8 1 16-30 25-29 8 1 0 24 8 24 9 0 14-20 22-19 6 1 2 14 9 14 10 0 20-16 32-17 9 0 6 12 15 11 12-1 22-12 38-14"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="3"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        </div>
+      </Card>
+      <Sticker name="imza" className="absolute -right-1 -bottom-8 w-20 rotate-6 sm:-right-8 sm:w-24" />
+    </div>
+  );
+}
 
 export default function Home() {
   const wa = whatsappLink("Merhaba, kurye istiyorum.");
@@ -81,48 +151,94 @@ export default function Home() {
               <h2 className="text-2xl font-black">Fiyatı hemen hesaplayın</h2>
               <Sticker name="motor" priority className="-mt-4 -mb-2 w-28 shrink-0 -rotate-3 sm:w-40 lg:-mt-10 lg:w-48" />
             </div>
-            <PriceCalculator />
+            {/* Hero already carries four stickers on desktop: keep the receipt sticker for smaller screens only */}
+            <PriceCalculator receiptStickerClassName="lg:hidden" />
           </div>
         </div>
       </section>
 
-      <section className="mx-auto max-w-6xl px-4 py-16">
+      <section className={SECTION}>
         <h2 className="text-3xl font-black">Nasıl çalışır?</h2>
         <ol className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {STEPS.map((s) => (
-            <li key={s.n} className="rounded-[26px] bg-white p-5">
+            <Card as="li" key={s.n} className="p-5">
               <div className="relative h-10">
                 <div className="flex h-10 w-10 items-center justify-center rounded-full bg-accent font-black text-brand">{s.n}</div>
                 <Sticker name={s.sticker} className="absolute -top-3 right-0 w-14 rotate-6" />
               </div>
               <div className="mt-3 text-lg font-black tracking-tight">{s.title}</div>
               <p className="mt-1 text-sm text-slate-600">{s.text}</p>
-            </li>
+            </Card>
           ))}
         </ol>
       </section>
 
-      <section>
-        <div className="mx-auto max-w-6xl px-4 py-16">
-          <h2 className="text-3xl font-black">Ne taşıyoruz?</h2>
-          <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {SERVICES.map((s) => (
-              <div key={s.title} className="rounded-[26px] bg-white p-5">
-                <div className="text-lg font-black tracking-tight">{s.title}</div>
+      <section className={SECTION}>
+        <h2 className="text-3xl font-black">Ne taşıyoruz?</h2>
+        <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {SERVICES.map((s) => (
+            <Card key={s.title} className="flex items-start gap-4 p-5">
+              <Sticker name={s.sticker} className={`w-12 shrink-0 ${s.tilt}`} />
+              <div>
+                <h3 className="text-lg font-black tracking-tight">{s.title}</h3>
                 <p className="mt-1 text-sm text-slate-600">{s.text}</p>
               </div>
-            ))}
-          </div>
+            </Card>
+          ))}
         </div>
       </section>
 
-      <section className="mx-auto max-w-6xl px-4 py-16">
-        <div className="grid items-center gap-8 rounded-[32px] bg-brand p-8 text-white lg:grid-cols-[1fr_auto] lg:p-12">
+      <section className={SECTION} aria-labelledby="teslim-kaniti">
+        <div className="grid items-center gap-14 lg:grid-cols-2 lg:gap-16">
+          <div>
+            <h2 id="teslim-kaniti" className="text-3xl font-black sm:text-4xl">
+              Teslim kanıtı, her siparişte.
+            </h2>
+            <p className="mt-3 max-w-xl text-lg font-medium text-neo-muted-dark">
+              Süreli işlerde &quot;teslim edildi mi?&quot; sorusu kalmasın. Kurye teslimatta kanıtı toplar, sipariş kaydında saklanır.
+            </p>
+            <ul className="mt-6 grid grid-cols-2 gap-3">
+              {[
+                ["Fotoğraf", "Kurye teslim anında fotoğraf çeker."],
+                ["Ad ve imza", "Teslim alan kişinin adı ve imzası."],
+                ["Saat", "Teslim saati sipariş kaydına işlenir."],
+                ["Teslim kodu", "İsterseniz alıcıya SMS ile kod gider; kod olmadan teslim edilmez."],
+              ].map(([t, d]) => (
+                <li key={t} className="rounded-2xl bg-white/70 p-4">
+                  <div className="font-black text-brand">{t}</div>
+                  <div className="mt-0.5 text-sm text-slate-600">{d}</div>
+                </li>
+              ))}
+            </ul>
+          </div>
+          <ProofMock />
+        </div>
+      </section>
+
+      <section className="mx-auto max-w-6xl px-4" aria-labelledby="taahhutler">
+        <div className="rounded-[32px] bg-brand p-6 text-white sm:p-10">
+          <h2 id="taahhutler" className="text-2xl font-black sm:text-3xl">
+            Taahhütlerimiz
+          </h2>
+          <ul className="mt-6 grid grid-cols-2 gap-x-4 gap-y-6 lg:grid-cols-4 lg:gap-8">
+            {PROMISES.map((p) => (
+              <li key={p.title} className="border-t border-white/15 pt-4">
+                <div className="text-3xl font-black tracking-[-0.04em] text-accent sm:text-4xl">{p.big}</div>
+                <div className="mt-2 font-extrabold">{p.title}</div>
+                <p className="mt-1 text-sm text-white/70">{p.text}</p>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </section>
+
+      <section className={SECTION}>
+        <div className="grid items-center gap-8 rounded-[32px] bg-white p-8 lg:grid-cols-[1fr_auto] lg:p-12">
           <div className="flex items-start gap-5">
             <Sticker name="bina" className="hidden w-24 shrink-0 -rotate-6 sm:block" />
             <div>
               <h2 className="text-2xl font-extrabold">Ayda 20&apos;den fazla gönderiniz mi var?</h2>
-              <p className="mt-2 max-w-2xl text-white/80">
+              <p className="mt-2 max-w-2xl text-neo-muted-dark">
                 Kurumsal hesapla {corporateRows()
                   .map((r) => `${r.label.toLocaleLowerCase("tr-TR")} ${r.value}`)
                   .join(", ")}
@@ -130,13 +246,13 @@ export default function Home() {
               </p>
             </div>
           </div>
-          <Link href="/kurumsal" className="flex min-h-14 items-center justify-center rounded-full bg-accent px-7 text-center text-lg font-extrabold text-brand hover:bg-accent-dark">
+          <Link href="/kurumsal" className="flex min-h-14 items-center justify-center rounded-full bg-brand px-7 text-center text-lg font-extrabold text-white hover:bg-black">
             Kurumsal teklif al
           </Link>
         </div>
       </section>
 
-      <section className="mx-auto max-w-6xl px-4 pb-16">
+      <section className="mx-auto max-w-6xl px-4 pb-16 lg:pb-20">
         <h2 className="text-3xl font-black">Hizmet bölgeleri</h2>
         <p className="mt-2 text-slate-600">Anadolu yakasının tamamına ve Avrupa yakasına (köprü geçiş ücretiyle) hizmet veriyoruz.</p>
         <div className="mt-5 flex flex-wrap gap-2">
@@ -148,19 +264,23 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="mx-auto max-w-3xl px-4 pb-8">
-        <h2 className="text-3xl font-black">Sık sorulanlar</h2>
-        <div className="mt-4 divide-y divide-neo-bg rounded-[26px] bg-white">
-          {FAQ.slice(0, 5).map((f) => (
-            <details key={f.q} className="group p-4">
-              <summary className="cursor-pointer list-none font-semibold text-slate-900">{f.q}</summary>
-              <p className="mt-2 text-sm text-slate-600">{f.a}</p>
-            </details>
-          ))}
+      <section className="mx-auto max-w-6xl px-4" aria-labelledby="sss-baslik">
+        <div className="grid gap-8 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-12">
+          <div className="lg:sticky lg:top-24 lg:self-start">
+            <div className="flex items-start justify-between gap-4">
+              <h2 id="sss-baslik" className="text-3xl font-black sm:text-4xl">
+                Sık sorulanlar
+              </h2>
+              <Sticker name="telefon" className="w-14 shrink-0 rotate-6 lg:-mt-2 lg:w-20" />
+            </div>
+            <HandNote className="mt-3 -rotate-3">kısa cevaplar</HandNote>
+            <p className="mt-4 max-w-sm text-neo-muted-dark">Fiyat, teslimat, ödeme ve fatura hakkında en çok sorulanlar. Fazlası SSS sayfasında.</p>
+            <Link href="/sss" className="mt-5 inline-flex min-h-12 items-center rounded-full bg-white px-6 font-extrabold text-brand hover:bg-brand hover:text-white">
+              Tüm sorular →
+            </Link>
+          </div>
+          <FaqAccordion items={FAQ.slice(0, 5)} />
         </div>
-        <Link href="/sss" className="mt-3 inline-block text-sm font-semibold text-brand hover:underline">
-          Tüm sorular →
-        </Link>
       </section>
     </>
   );

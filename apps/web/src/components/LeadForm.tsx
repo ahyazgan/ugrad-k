@@ -3,6 +3,7 @@
 import { useState, type FormEvent } from "react";
 import Link from "next/link";
 import { submitLead, SiteApiError, type LeadInput } from "@/lib/api";
+import { CARD } from "@/components/ui";
 
 const VOLUMES = ["1-10", "10-20", "20-50", "50+"];
 
@@ -39,7 +40,7 @@ export function LeadForm({ kind, sourcePage }: { kind: LeadInput["kind"]; source
   const input = "w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 outline-none focus:border-brand focus:ring-2 focus:ring-brand/20";
   const bad = (field: string) => (error?.field === field ? "border-red-500" : "");
   return (
-    <form onSubmit={submit} className="grid gap-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm" noValidate>
+    <form onSubmit={submit} className={`grid gap-4 p-5 sm:p-6 ${CARD}`} noValidate>
       {kind === "kurumsal" ? (
         <label className="grid gap-1 text-sm font-semibold text-slate-700">
           Firma adı

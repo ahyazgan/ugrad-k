@@ -2,7 +2,10 @@
 
 import { formatTL, type PlaceDetails, type PlaceSuggestion, type ServiceLevel } from "@yazgan/shared";
 import { useEffect, useId, useRef, useState } from "react";
+import { Sticker } from "@/components/Sticker";
+import { HandNote } from "@/components/ui";
 import { placeDetails, quote, searchPlaces, SiteApiError, type SiteQuote } from "@/lib/api";
+import { baseRows } from "@/lib/pricing-info";
 import { APP_URL, whatsappLink } from "@/lib/site";
 
 const newToken = () => (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : String(Math.random()).slice(2));
@@ -166,8 +169,49 @@ function LevelPicker({ value, onChange }: { value: ServiceLevel; onChange: (v: S
   );
 }
 
+/**
+ * Empty state before both addresses are picked: a dashed "receipt preview" listing the opening fee and
+ * km tiers from pricing.ts defaults, with the total left blank ("— TL").
+ */
+function ReceiptPreview({ stickerClassName = "" }: { stickerClassName?: string }) {
+  const rows = baseRows();
+  return (
+    <div className="relative rounded-2xl border-2 border-dashed border-slate-300 bg-neo-bg/40 px-4 pt-4 pb-3" data-testid="receipt-preview">
+      <Sticker name="fis" className={`absolute -top-6 -right-3 w-16 rotate-6 ${stickerClassName}`} />
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 pr-12">
+        <span className="text-xs font-extrabold tracking-[0.14em] text-neo-muted uppercase">Fiş önizlemesi</span>
+        <HandNote variant="ink" className="-rotate-2 text-xl">
+          adresi yaz, kalemleri gör
+        </HandNote>
+      </div>
+      <ul className="mt-3 space-y-1.5 text-sm">
+        {rows.map((r) => (
+          <li key={r.label} className="flex items-baseline gap-2">
+            <span className="text-slate-700">{r.label}</span>
+            <span aria-hidden="true" className="min-w-4 flex-1 -translate-y-[3px] border-b border-dotted border-slate-400" />
+            <span className="font-semibold whitespace-nowrap text-brand">{r.value}</span>
+          </li>
+        ))}
+        <li className="flex items-baseline gap-2 text-slate-500">
+          <span>Hizmet ve zaman ekleri</span>
+          <span aria-hidden="true" className="min-w-4 flex-1 -translate-y-[3px] border-b border-dotted border-slate-300" />
+          <span className="whitespace-nowrap">adrese göre</span>
+        </li>
+      </ul>
+      <div className="mt-3 flex items-baseline justify-between border-t-2 border-dashed border-slate-300 pt-3">
+        <span className="font-black text-brand">Toplam</span>
+        <span className="text-2xl font-black text-slate-400">
+          <span aria-hidden="true">— TL</span>
+          <span className="sr-only">henüz hesaplanmadı</span>
+        </span>
+      </div>
+      <p className="mt-1 text-xs text-slate-500">Tutarlar KDV hariçtir. İki adresi seçin, fiyat anında hesaplansın.</p>
+    </div>
+  );
+}
+
 /** Adres → anında fiyat. Sunucuda uygulama ile aynı fiyat fonksiyonu (pricing.ts) çalışır. */
-export function PriceCalculator({ compact = false }: { compact?: boolean }) {
+export function PriceCalculator({ compact = false, receiptStickerClassName }: { compact?: boolean; receiptStickerClassName?: string }) {
   const [pickup, setPickup] = useState<PlaceDetails | null>(null);
   const [dropoff, setDropoff] = useState<PlaceDetails | null>(null);
   const [serviceLevel, setServiceLevel] = useState<ServiceLevel>("standart");
@@ -207,7 +251,7 @@ export function PriceCalculator({ compact = false }: { compact?: boolean }) {
     : null;
 
   return (
-    <div className="rounded-[26px] bg-white p-5 shadow-xl shadow-brand/5 sm:p-6" id="fiyat-hesapla">
+    <div className="scroll-mt-24 rounded-[26px] bg-white p-5 shadow-xl shadow-brand/5 sm:p-6" id="fiyat-hesapla">
       <div className="grid gap-4">
         <AddressField id="pickup" label="Nereden?" placeholder="Alış adresi, ör. Kavacık" value={pickup} onChange={setPickup} />
         <AddressField id="dropoff" label="Nereye?" placeholder="Teslim adresi, ör. Levent" value={dropoff} onChange={setDropoff} />
@@ -220,7 +264,7 @@ export function PriceCalculator({ compact = false }: { compact?: boolean }) {
 
       <div className="mt-5 border-t border-slate-100 pt-5" aria-live="polite">
         {!pickup || !dropoff ? (
-          <p className="text-sm text-slate-500">İki adresi seçin, fiyat anında hesaplansın.</p>
+          <ReceiptPreview stickerClassName={receiptStickerClassName} />
         ) : error ? (
           <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
         ) : !shown ? (

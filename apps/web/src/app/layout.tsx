@@ -1,6 +1,7 @@
 import { BRAND, COMPANY } from "@yazgan/shared";
 import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
+import { CtaBand } from "@/components/CtaBand";
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
 import { JsonLd } from "@/components/JsonLd";
@@ -53,10 +54,11 @@ const localBusiness = {
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="tr">
-      <body className="min-h-screen antialiased">
+      <body className="flex min-h-screen flex-col antialiased">
         <JsonLd data={localBusiness} />
         <Header />
-        <main>{children}</main>
+        <main className="flex-1">{children}</main>
+        <CtaBand />
         <Footer />
       </body>
     </html>
