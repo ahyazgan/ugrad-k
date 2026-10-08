@@ -19,6 +19,9 @@ export interface HealthSnapshot {
   orders_problem: number;
   couriers_on_shift: number;
   couriers_stale: number;
+  /** Aktif kuryelerde süresi dolmuş / document_warn_days içinde dolacak belge sayısı */
+  courier_docs_expired?: number;
+  courier_docs_expiring?: number;
   heartbeats: Record<string, string>;
 }
 
@@ -57,6 +60,8 @@ export function evaluateHealth(s: HealthSnapshot, now: Date, jobs: Record<string
   if (s.invoices_stuck > 0) add("invoices_stuck", "warning", `${s.invoices_stuck} fatura 1 saatten uzun süredir kuyrukta`);
   if (s.webhooks_failed_24h > 0) add("webhooks_failed", "warning", `Son 24 saatte ${s.webhooks_failed_24h} kurumsal webhook iletilemedi`);
   if (s.webhooks_stuck > 0) add("webhooks_stuck", "warning", `${s.webhooks_stuck} kurumsal webhook kuyrukta bekliyor`);
+  if ((s.courier_docs_expired ?? 0) > 0) add("courier_docs_expired", "warning", `${s.courier_docs_expired} kurye belgesinin süresi dolmuş (panel → Kuryeler → Belgeler)`);
+  if ((s.courier_docs_expiring ?? 0) > 0) add("courier_docs_expiring", "warning", `${s.courier_docs_expiring} kurye belgesinin süresi yakında doluyor (panel → Kuryeler → Belgeler)`);
   if (s.couriers_stale > 0) add("couriers_stale", "warning", `Vardiyadaki ${s.couriers_stale} kuryenin konumu 15 dakikadır gelmiyor`);
   return out;
 }

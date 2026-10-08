@@ -394,6 +394,11 @@ export function createSupabaseApi(url: string, anonKey: string): Api & { client:
         rates: c.data ? { perJobKurus: c.data.courier_per_job_kurus, perKmKurus: c.data.courier_per_km_kurus } : null,
       };
     },
+    async courierDocuments() {
+      const { data, error } = await client.from("courier_documents").select("kind, doc_number, expires_at").eq("courier_id", await uid());
+      fail(error, "Belgeler okunamadı");
+      return (data ?? []).map((r: Row) => ({ kind: r.kind, number: r.doc_number, expiresAt: r.expires_at }));
+    },
     subscribeCourierJobs(onChange) {
       let channel: ReturnType<typeof client.channel> | null = null;
       let closed = false;

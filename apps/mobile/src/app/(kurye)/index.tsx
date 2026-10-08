@@ -1,7 +1,8 @@
-import { ORDER_STATUS_LABELS } from "@yazgan/shared";
+import { ORDER_STATUS_LABELS, type Compliance } from "@yazgan/shared";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import { Pressable, Text, View } from "react-native";
+import { complianceFor, DocumentWarning } from "@/components/CourierDocs";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Button, Card, ErrorBox, Muted, Screen, Title, colors } from "@/components/ui";
 import { api, ApiError, type OrderSummary, type Shift } from "@/lib/api";
@@ -16,6 +17,7 @@ export default function KuryeIsler() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [trackingMsg, setTrackingMsg] = useState<string | null>(null);
+  const [compliance, setCompliance] = useState<Compliance | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -27,6 +29,7 @@ export default function KuryeIsler() {
       const live =
         j.find((x) => x.status === "yolda") ?? j.find((x) => x.status === "alindi") ?? j.find((x) => x.status === "kuryeye_atandi");
       setActiveOrderForLocation(live?.id ?? null);
+      api.courierDocuments().then((d) => setCompliance(complianceFor(d)), () => undefined);
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "Yüklenemedi");
     }
@@ -91,6 +94,7 @@ export default function KuryeIsler() {
         />
       </Card>
       <ErrorBox message={error} />
+      <DocumentWarning c={compliance} />
 
       <Title>Aktif işler ({active.length})</Title>
       {active.length === 0 ? <Muted>{shift ? "Şu an atanmış iş yok. Yeni iş atandığında burada görünür." : "—"}</Muted> : null}

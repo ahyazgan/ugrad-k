@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { ORDER_STATUSES, ORDER_TRANSITIONS } from "../orders.ts";
 import { DEFAULT_PRICING_SETTINGS } from "../pricing.ts";
+import { COURIER_DOCUMENT_TYPES } from "../compliance.ts";
 import { DEFAULT_COST_MODEL } from "../cost.ts";
 import { COST_COLUMN_MAP, costModelFromRow, costModelToRow, PRICING_COLUMN_MAP, pricingSettingsFromRow, pricingSettingsToRow } from "../db.ts";
 
@@ -48,6 +49,17 @@ describe("şema senkronu", () => {
       expect(Number(m![1]), col).toBe(DEFAULT_COST_MODEL[key as keyof typeof DEFAULT_COST_MODEL]);
     }
     expect(costModelFromRow({ ...costModelToRow(DEFAULT_COST_MODEL), card_fee_pct: "2.50" })).toEqual(DEFAULT_COST_MODEL);
+  });
+
+  it("courier_document_types satırları COURIER_DOCUMENT_TYPES ile aynı", () => {
+    const block = sql.split("insert into public.courier_document_types")[1]?.split(";")[0] ?? "";
+    const rows = [...block.matchAll(/\('([a-z_]+)', '([^']+)', (true|false), (true|false), \d+\)/g)].map((m) => ({
+      kind: m[1],
+      label: m[2],
+      required: m[3] === "true",
+      expires: m[4] === "true",
+    }));
+    expect(rows).toEqual(COURIER_DOCUMENT_TYPES);
   });
 
   it("satır ↔ ayar dönüşümü kayıpsız, numeric metinleri sayıya çevirir", () => {

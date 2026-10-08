@@ -1,6 +1,7 @@
 // Otomatik onay + kurye atama + atanamayan sipariş uyarısı.
 // Her dakika pg_cron ile (x-notify-secret) veya panelden yönetici tarafından tetiklenir.
 import {
+  courierCompliance,
   planAssignments,
   type AssignableOrder,
   type CandidateCourier,
@@ -56,7 +57,20 @@ export async function handleAutoDispatch(
 
   const load = new Map<string, number>();
   for (const r of (activeRes.data ?? []) as Row[]) if (r.courier_id) load.set(r.courier_id, (load.get(r.courier_id) ?? 0) + 1);
-  const couriers: CandidateCourier[] = ((couriersRes.data ?? []) as Row[]).map((c) => ({
+  let onShift = (couriersRes.data ?? []) as Row[];
+  // Vardiya sırasında süresi dolan zorunlu belge: yeni iş verilmez
+  if (ops.enforce_courier_documents && onShift.length) {
+    const { data: docs } = await ctx.admin
+      .from("courier_documents")
+      .select("courier_id, kind, expires_at")
+      .in("courier_id", onShift.map((c) => c.id));
+    const byCourier = new Map<string, Row[]>();
+    for (const d of (docs ?? []) as Row[]) byCourier.set(d.courier_id, [...(byCourier.get(d.courier_id) ?? []), d]);
+    onShift = onShift.filter((c) =>
+      courierCompliance((byCourier.get(c.id) ?? []).map((d) => ({ kind: d.kind, expiresAt: d.expires_at })), now).ok,
+    );
+  }
+  const couriers: CandidateCourier[] = onShift.map((c) => ({
     id: c.id,
     name: c.profile?.full_name ?? null,
     lat: c.last_lat,

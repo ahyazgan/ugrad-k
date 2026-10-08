@@ -87,3 +87,20 @@ Deno.test("auto-dispatch: otomatik atama kapalıyken yalnız onay", async () => 
   assertEquals(data.approved, 2);
   assertEquals(assigned.length, 0);
 });
+
+Deno.test("auto-dispatch: zorunlu belgesi süresi dolan kuryeye iş verilmez", async () => {
+  const docs = (courier: string, sigorta: string) => [
+    { courier_id: courier, kind: "ehliyet", expires_at: "2035-01-01" },
+    { courier_id: courier, kind: "kurye_faaliyet_belgesi", expires_at: "2030-01-01" },
+    { courier_id: courier, kind: "ruhsat", expires_at: null },
+    { courier_id: courier, kind: "trafik_sigortasi", expires_at: sigorta },
+  ];
+  const expired = setup({ ops_settings: [{ ...ops, enforce_courier_documents: true }], courier_documents: docs("k1", "2026-10-08") });
+  const d1 = await (await handler((r) => handleAutoDispatch(r, expired.ctx, { env, now: NOW }))(cron())).json();
+  assertEquals(d1.assigned.length, 0);
+  assertEquals(expired.assigned.length, 0);
+
+  const valid = setup({ ops_settings: [{ ...ops, enforce_courier_documents: true }], courier_documents: docs("k1", "2026-10-09") });
+  await handler((r) => handleAutoDispatch(r, valid.ctx, { env, now: NOW }))(cron());
+  assertEquals(valid.assigned[0].p_courier_id, "k1");
+});

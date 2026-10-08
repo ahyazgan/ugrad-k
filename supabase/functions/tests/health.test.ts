@@ -34,6 +34,12 @@ Deno.test("sağlık: sorunsuz özet sorun üretmez; geciken görev ve bekleyen s
   assert(issues.find((i) => i.key === "job:auto-dispatch")!.message.includes("hiç çalışmadı"));
 });
 
+Deno.test("sağlık: kurye belgesi süresi uyarısı", () => {
+  const issues = evaluateHealth({ ...healthy, courier_docs_expired: 1, courier_docs_expiring: 3 }, NOW);
+  assertEquals(issues.map((i) => [i.key, i.severity]), [["courier_docs_expired", "warning"], ["courier_docs_expiring", "warning"]]);
+  assert(issues[1]!.message.startsWith("3 kurye belgesinin"));
+});
+
 Deno.test("sağlık: kesinti izleyicisi ayrıntı görmez", async () => {
   const ok = fakeCtx({ userId: null, tables: { "rpc:system_health": healthy } });
   const r = await handler((q) => handleHealth(q, ok.ctx, { env, now: () => NOW }))(new Request("http://x"));

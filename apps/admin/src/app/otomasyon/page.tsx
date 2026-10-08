@@ -13,6 +13,7 @@ const NUMBERS: Array<{ key: keyof OpsSettings; label: string; hint: string }> = 
   { key: "locationMaxAgeMinutes", label: "Konum en fazla kaç dakikalık olsun", hint: "Daha eski konumdaki kuryeye atanmaz" },
   { key: "unassignedAlertMinutes", label: "Atanamayan sipariş uyarısı (dk)", hint: "Bu süre sonunda size WhatsApp/SMS gelir" },
   { key: "unpaidCardTimeoutMinutes", label: "Kartla ödeme süresi (dk)", hint: "Ödenmeyen kart siparişi bu süre sonunda iptal edilir" },
+  { key: "documentWarnDays", label: "Belge süresi uyarısı (gün)", hint: "Kurye belgesinin bitmesine bu kadar gün kala uyarı" },
 ];
 
 export default function OtomasyonPage() {
@@ -75,6 +76,7 @@ const JOB_LABELS: Record<string, string> = {
   "auto-dispatch": "Otomatik dağıtım",
   "webhook-dispatch": "Kurumsal webhook",
   "invoice-dispatch": "Fatura kesimi",
+  "courier-earnings": "Kurye hakedişi",
   health: "Sistem denetimi",
 };
 
@@ -172,6 +174,21 @@ function OpsForm({ initial, onSaved }: { initial: OpsSettings; onSaved: () => vo
               <span className="block text-slate-500">
                 Vardiyadaki, konumu güncel kuryelerden alışa en yakın ve en az yüklü olana; acil siparişler önce. İşi bırakan kuryeye aynı iş
                 tekrar verilmez. Planlı siparişler alıştan 30 dk önce atanır.
+              </span>
+            </span>
+          </label>
+          <label className="flex items-start gap-3">
+            <input
+              type="checkbox"
+              checked={form.enforceCourierDocuments}
+              onChange={(e) => setForm({ ...form, enforceCourierDocuments: e.target.checked })}
+              data-testid="enforce-docs"
+            />
+            <span>
+              <b>Belgesi eksik kuryeyi çalıştırma</b>
+              <span className="block text-slate-500">
+                Ehliyet, kurye faaliyet belgesi, ruhsat veya trafik sigortası eksik ya da süresi dolmuş kurye vardiya başlatamaz ve otomatik iş
+                almaz (Kuryeler → Belgeler).
               </span>
             </span>
           </label>

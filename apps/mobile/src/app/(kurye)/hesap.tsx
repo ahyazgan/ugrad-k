@@ -1,4 +1,7 @@
-import { router } from "expo-router";
+import type { Compliance } from "@yazgan/shared";
+import { router, useFocusEffect } from "expo-router";
+import { useCallback, useState } from "react";
+import { complianceFor, DocumentList } from "@/components/CourierDocs";
 import { DeleteAccount } from "@/components/DeleteAccount";
 import { Button, Card, Muted, Screen, Title } from "@/components/ui";
 import { api } from "@/lib/api";
@@ -8,6 +11,12 @@ import { useSession } from "@/lib/session";
 
 export default function KuryeHesap() {
   const { profile } = useSession();
+  const [compliance, setCompliance] = useState<Compliance | null>(null);
+  useFocusEffect(
+    useCallback(() => {
+      api.courierDocuments().then((d) => setCompliance(complianceFor(d)), () => undefined);
+    }, []),
+  );
   return (
     <Screen>
       <Card>
@@ -15,6 +24,7 @@ export default function KuryeHesap() {
         <Muted>{profile?.phone}</Muted>
         <Muted>Bilgilerinizde değişiklik için yöneticinize başvurun.</Muted>
       </Card>
+      {compliance ? <DocumentList c={compliance} /> : null}
       <Button
         title="Çıkış yap"
         variant="secondary"

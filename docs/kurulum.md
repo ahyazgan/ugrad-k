@@ -374,3 +374,10 @@ Kayıtlı müşteriler `siparis@<alan adı>` adresine yazar; yapay zeka asistan�
 - **Nakit**: kuryeye ödemeli siparişte kurye teslimde "Nakit aldım / IBAN'a gönderdi / Alınamadı" seçer. Nakit kuryede kalır ve hakedişten düşülür; IBAN ve alınamayanlar *Tahsil edilecekler* listesine düşer, para hesaba geçince "Ödeme alındı" işaretlenir. IBAN ile ödeyecek müşterilere şirket IBAN'ını SMS/WhatsApp şablonlarında veya faturada verin.
 - **Hesaplaşma**: *Hesaplaş* o ana kadarki teslimatları kapatır. Net artıysa kuryeye o kadar ödeme yapın; eksiyse kurye elindeki nakitten o kadarını şirkete teslim eder. Yanlış hesaplaşma iptal edilebilir; teslimatlar yeniden ödenmemiş listesine döner. Her hesaplaşmanın dökümü CSV olarak indirilebilir (muhasebeciniz için).
 - **Vergi/SGK**: Esnaf (vergi muafiyetli veya şahıs şirketi) kuryelere yapılan ödemelerin belgelendirmesi (gider pusulası, fatura, stopaj) mali müşavirinizle netleştirilmelidir (docs/fiyat-arastirmasi.md §8.6).
+
+## 24. Kurye belgeleri ve uyum
+
+- **Belgeler**: panel → Kuryeler → *Belgeler*. Zorunlu: sürücü belgesi, kurye faaliyet belgesi, motosiklet ruhsatı, zorunlu trafik sigortası. İsteğe bağlı: SRC, muayene, kasko/ferdi kaza, adli sicil, vergi levhası. Bitiş tarihi ve isteğe bağlı dosya (fotoğraf/PDF, özel `courier-docs` deposu) girilir. Başvurudan gelen belgeler Başvurular sayfasındadır; onaydan sonra buraya tarihleriyle girin.
+- **Zorunluluk**: panel → Otomasyon → *Belgesi eksik kuryeyi çalıştırma* (varsayılan açık). Açıkken zorunlu belgesi eksik veya süresi dolmuş kurye vardiya başlatamaz, vardiyadayken belgesi dolarsa otomatik iş almaz. Belge bitiş günü dahil geçerlidir (İstanbul saati).
+- **Uyarılar**: Süresi dolan ve *Belge süresi uyarısı (gün)* içinde dolacak belgeler sistem denetiminde (§22) yöneticiye bildirilir; kurye de uygulamada uyarı görür (İşlerim, Hesabım → Belgelerim).
+- **Bildirim listesi**: Kuryeler → *Kurye listesi (CSV)* belge numaraları ve bitiş tarihleriyle; Ulaştırma Bakanlığı kurye bildirimi ve sigorta için kullanılabilir. Şirketin **P1 yetki belgesi** şirket düzeyindedir, burada tutulmaz.

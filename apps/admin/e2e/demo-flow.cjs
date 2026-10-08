@@ -93,6 +93,18 @@ fs.mkdirSync(out, { recursive: true });
   await page.getByLabel("Plaka").fill("34 TST 99");
   await page.getByRole("button", { name: "Kurye ekle" }).click();
   await page.getByText("Can Test").waitFor();
+  // Belgeler: Mehmet'in sigortası yaklaşıyor, Emre'nin kurye faaliyet belgesi eksik
+  await page.getByTestId("docs-kur-1").getByText("1 belge yaklaşıyor").waitFor();
+  await page.getByTestId("docs-kur-2").getByText("1 belge eksik").waitFor();
+  await page.getByTestId("docs-kur-2").click();
+  await page.getByText("Emre Şahin: belgeler").waitFor();
+  await page.getByText(/Vardiyaya giremez ve otomatik iş almaz: Kurye faaliyet belgesi/).waitFor();
+  const kfb = page.getByTestId("doc-kurye_faaliyet_belgesi");
+  await kfb.getByLabel("Belge no").fill("KFB-2026-555");
+  await kfb.getByTestId("expires-kurye_faaliyet_belgesi").fill("2028-05-15");
+  await kfb.getByTestId("save-kurye_faaliyet_belgesi").click();
+  await page.getByTestId("docs-kur-2").getByText("Tamam").waitFor();
+  await page.getByText("Zorunlu belgeler tamam.").waitFor();
   await shot("04-kuryeler");
 
   // ───── Başvurular: web sitesinden gelen müşteri ve kurye başvuruları

@@ -10,3 +10,4 @@ export * from "./assignment.ts";
 export * from "./tiles.ts";
 export * from "./brand.ts";
 export * from "./cost.ts";
+export * from "./compliance.ts";

@@ -7,6 +7,7 @@ import type {
   PlaceSuggestion,
   PriceQuote,
   CostModel,
+  CourierDocumentKind,
   PricingSettings,
   ServiceLevel,
 } from "@yazgan/shared";
@@ -243,6 +244,21 @@ export interface OpsSettings {
   maxPickupDistanceKm: number;
   locationMaxAgeMinutes: number;
   unassignedAlertMinutes: number;
+  /** Zorunlu belgesi eksik/süresi dolmuş kurye vardiyaya giremez, iş almaz */
+  enforceCourierDocuments: boolean;
+  /** Belge süresi bu kadar gün kala uyarı */
+  documentWarnDays: number;
+}
+
+export interface CourierDocumentRecord {
+  courierId: string;
+  kind: CourierDocumentKind;
+  docNumber: string | null;
+  /** YYYY-MM-DD */
+  expiresAt: string | null;
+  filePath: string | null;
+  note: string | null;
+  updatedAt: string;
 }
 
 export interface DispatchResult {
@@ -371,6 +387,14 @@ export interface AdminRepo {
   createCourier(input: { fullName: string; phone: string; plate: string; vehicleModel?: string }): Promise<{ id: string }>;
   updateCourier(id: string, patch: { active?: boolean; plate?: string; vehicleModel?: string }): Promise<void>;
   listShifts(filter: { from: string; to: string; courierId?: string }): Promise<Shift[]>;
+  // Kurye belgeleri
+  listCourierDocuments(courierId?: string): Promise<CourierDocumentRecord[]>;
+  saveCourierDocument(
+    doc: { courierId: string; kind: CourierDocumentKind; docNumber: string | null; expiresAt: string | null; note: string | null },
+    file?: File | null,
+  ): Promise<void>;
+  deleteCourierDocument(courierId: string, kind: CourierDocumentKind): Promise<void>;
+  courierDocumentUrl(path: string): Promise<string | null>;
   // Müşteriler
   listCustomers(search?: string): Promise<Customer[]>;
   setCustomerCorporate(profileId: string, corporateAccountId: string | null): Promise<void>;

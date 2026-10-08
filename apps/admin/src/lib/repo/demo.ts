@@ -9,8 +9,10 @@ import {
   ORDER_TRANSITIONS,
   buildQuote,
   calculateMonthlyInvoice,
+  courierCompliance,
   courierEarning,
   DEFAULT_COST_MODEL,
+  istanbulDay,
   monthlyInvoiceItem,
   mockMapsProvider,
   MOCK_PLACES,
@@ -31,6 +33,7 @@ import {
   type AdminRepo,
   type CorporateAccount,
   type Courier,
+  type CourierDocumentRecord,
   type CourierPayout,
   type EarningRow,
   type Conversation,
@@ -69,8 +72,33 @@ interface State {
   apiKeys: Array<ApiKeyInfo & { accountId: string }>;
   webhooks: Map<string, WebhookConfig>;
   costModel: CostModel;
+  documents: CourierDocumentRecord[];
   earnings: EarningRow[];
   payouts: CourierPayout[];
+}
+
+const dayOffset = (days: number) => istanbulDay(new Date(Date.now() + days * 86_400_000));
+/** Mehmet'in belgeleri tam (sigortası 12 gün içinde bitiyor); Emre'nin kurye faaliyet belgesi eksik */
+function demoDocuments(): CourierDocumentRecord[] {
+  const doc = (courierId: string, kind: CourierDocumentRecord["kind"], expiresAt: string | null, docNumber: string | null = null): CourierDocumentRecord => ({
+    courierId,
+    kind,
+    docNumber,
+    expiresAt,
+    filePath: null,
+    note: null,
+    updatedAt: hoursAgo(200),
+  });
+  return [
+    doc("kur-1", "ehliyet", dayOffset(1400), "A2-348812"),
+    doc("kur-1", "kurye_faaliyet_belgesi", dayOffset(500), "KFB-2026-11873"),
+    doc("kur-1", "ruhsat", null),
+    doc("kur-1", "trafik_sigortasi", dayOffset(12)),
+    doc("kur-1", "src", dayOffset(900)),
+    doc("kur-2", "ehliyet", dayOffset(2000)),
+    doc("kur-2", "ruhsat", null),
+    doc("kur-2", "trafik_sigortasi", dayOffset(200)),
+  ];
 }
 
 /** Teslim edilmiş siparişin hakediş satırı (Edge Function courier-earnings ile aynı hesap) */
@@ -312,6 +340,8 @@ async function seed(): Promise<State> {
       maxPickupDistanceKm: 15,
       locationMaxAgeMinutes: 10,
       unassignedAlertMinutes: 10,
+      enforceCourierDocuments: true,
+      documentWarnDays: 30,
     },
     consented: new Set(["cus-1", "cus-2", "cus-3"]),
     apiKeys: [],
@@ -393,6 +423,7 @@ async function seed(): Promise<State> {
     ],
     settings: { ...DEFAULT_PRICING_SETTINGS },
     costModel: { ...DEFAULT_COST_MODEL },
+    documents: demoDocuments(),
     earnings,
     payouts,
     holidays: (holidaysJson as Array<{ date: string; name: string; half_day: boolean }>).map((h) => ({
@@ -745,6 +776,7 @@ export function createDemoRepo(): AdminRepo {
         })),
         s.couriers
           .filter((c) => c.active && c.isOnShift)
+          .filter((c) => !s.ops.enforceCourierDocuments || courierCompliance(s.documents.filter((d) => d.courierId === c.id)).ok)
           .map((c) => ({ id: c.id, name: c.fullName, lat: c.lastLat, lng: c.lastLng, locationAt: c.lastLocationAt, activeOrders: c.activeOrderCount })),
         {
           maxActiveOrdersPerCourier: s.ops.maxActiveOrdersPerCourier,
@@ -977,6 +1009,26 @@ export function createDemoRepo(): AdminRepo {
       a.courierId = courierId;
       a.plate = input.plate;
       return { courierId };
+    },
+    async listCourierDocuments(courierId) {
+      return clone((await get()).documents.filter((d) => !courierId || d.courierId === courierId));
+    },
+    async saveCourierDocument(doc, file) {
+      const s = await get();
+      const prev = s.documents.find((d) => d.courierId === doc.courierId && d.kind === doc.kind);
+      const next: CourierDocumentRecord = {
+        ...doc,
+        filePath: file ? `${doc.courierId}/${doc.kind}-${Date.now()}-${file.name}` : (prev?.filePath ?? null),
+        updatedAt: new Date().toISOString(),
+      };
+      s.documents = [...s.documents.filter((d) => d !== prev), next];
+    },
+    async deleteCourierDocument(courierId, kind) {
+      const s = await get();
+      s.documents = s.documents.filter((d) => !(d.courierId === courierId && d.kind === kind));
+    },
+    async courierDocumentUrl(path) {
+      return this.applicationDocumentUrl(path);
     },
     async applicationDocumentUrl(path) {
       // Demo: gerçek dosya yok, yer tutucu görsel

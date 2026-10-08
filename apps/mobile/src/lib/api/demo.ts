@@ -11,6 +11,7 @@ import {
   courierEarning,
   DEFAULT_COST_MODEL,
   DEFAULT_PRICING_SETTINGS,
+  istanbulDay,
   ORDER_TRANSITIONS,
   buildQuote,
   mockMapsProvider,
@@ -421,6 +422,16 @@ export function createDemoApi(): Api {
         payouts: [],
         rates: { perJobKurus: DEFAULT_COST_MODEL.courierPerJobKurus, perKmKurus: DEFAULT_COST_MODEL.courierPerKmKurus },
       };
+    },
+    async courierDocuments() {
+      requireSession();
+      const day = (n: number) => istanbulDay(new Date(Date.now() + n * 86_400_000));
+      return [
+        { kind: "ehliyet", number: "A2-348812", expiresAt: day(1400) },
+        { kind: "kurye_faaliyet_belgesi", number: "KFB-2026-11873", expiresAt: day(500) },
+        { kind: "ruhsat", number: null, expiresAt: null },
+        { kind: "trafik_sigortasi", number: null, expiresAt: day(10) },
+      ];
     },
     subscribeCourierJobs(onChange) {
       jobListeners.add(onChange);

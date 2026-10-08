@@ -99,6 +99,9 @@ fs.mkdirSync(out, { recursive: true });
   await kp.getByRole('checkbox').nth(1).click();
   await kt('kvkk-accept').click();
   await kp.getByText('Vardiya kapalı').waitFor();
+  // Sigorta 10 gün içinde bitiyor: uyarı görünür ama vardiya engellenmez
+  await kt('doc-warning').waitFor();
+  await kp.getByText(/Zorunlu trafik sigortası: 10 gün kaldı/).waitFor();
   await kt('shift-toggle').click();
   await kp.getByText('Vardiyadasınız').waitFor();
   await kp.getByText(/Aktif işler \(2\)/).waitFor();
@@ -134,6 +137,9 @@ fs.mkdirSync(out, { recursive: true });
   if (!/Elinizdeki nakit tahsilat/.test(earn) || !/YK-\d+/.test(earn)) throw new Error('kazanç ekranı eksik');
   console.log('KAZANC:', earn.match(/Hesaplaşılmamış kazanç[\s\S]{0,160}/)?.[0]?.replace(/\n+/g, ' | '));
   await kshot('12b-kurye-kazanc');
+  await kp.getByRole('tab', { name: /Hesabım/ }).click();
+  await kp.getByText('Belgelerim').waitFor();
+  await kp.getByText(/Süresi yaklaşıyor ·/).waitFor();
   await kp.getByRole('tab', { name: /İşlerim/ }).click();
   // Elde paket yokken vardiya kapatılabilir
   await kt('shift-toggle').click();

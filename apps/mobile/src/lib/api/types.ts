@@ -1,4 +1,5 @@
 import type {
+  CourierDocument,
   OrderStatus,
   PlaceDetails,
   PlaceSuggestion,
@@ -198,5 +199,7 @@ export interface Api {
   ): Promise<void>;
   pushLocation(loc: CourierLocation, orderId: string | null): Promise<void>;
   courierEarnings(): Promise<CourierEarnings>;
+  /** Kuryenin kendi belgeleri (yönetici girer) */
+  courierDocuments(): Promise<CourierDocument[]>;
   subscribeCourierJobs(onChange: () => void): () => void;
 }

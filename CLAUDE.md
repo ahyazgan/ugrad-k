@@ -73,6 +73,7 @@ Ek: `iptal`, `sorunlu`
 - Herkese açık Edge Functions: `site-api` (fiyat/adres/başvuru/kurye başvurusu/değerlendirme; IP hız sınırı `hit_rate_limit`), `api` (kurumsal REST, `yk_live_` anahtar SHA-256), `email-inbound` (Postmark → asistan, SPF/DKIM + kayıtlı müşteri), `health` (GET ayrıntısız; cron uyarı), `webhook-dispatch` (HMAC imzalı kurumsal webhook kuyruğu)
 - Edge Functions: auto-dispatch (otomatik onay + kurye atama, `packages/shared/assignment.ts`), admin-order (telefon siparişi), quote, create-order, places, send-sms, reprice-order, notify-dispatch, payment-init/callback/refund, invoice-dispatch/monthly, whatsapp-webhook, assistant-voice, account-delete
 - Kurye hakedişi: `cost_settings` (ödeme modeli = maliyet modeli, `packages/shared/cost.ts` `courierEarning`), `courier_earnings` (Edge Function `courier-earnings`, 5 dk cron), `courier_payouts` (RPC `create_courier_payout`/`cancel_courier_payout`). Kuryeye ödemeli siparişte teslimde `cash_collection` (nakit/iban/alinmadi) zorunlu; nakit hakedişten düşülür. Panel `/hakedis`, kurye uygulaması Kazancım sekmesi. docs/kurulum.md §23
+- Kurye belgeleri: `courier_document_types` (= `packages/shared/compliance.ts` `COURIER_DOCUMENT_TYPES`, schema-sync testi), `courier_documents`, bucket `courier-docs`. `ops_settings.enforce_courier_documents` açıkken zorunlu belgesi eksik/süresi dolmuş kurye `start_shift` ile vardiyaya giremez, auto-dispatch iş vermez; süresi dolan/yaklaşan belgeler `system_health` uyarısı. docs/kurulum.md §24
 - Operasyon ayarları `ops_settings` (panel → Otomasyon): otomatik onay/atama, kapasite, mesafe, ödeme süresi
 - Kuyruklar (outbox): `notifications` ve `invoices` tabloları; dakikalık cron ile işlenir (docs/kurulum.md §6)
 - Yapay zeka asistanı: `supabase/functions/_shared/assistant.ts` (Claude, araçlar aynı sipariş API'sini kullanır; geçmiş yalnızca sona eklenir)
@@ -93,5 +94,6 @@ Ek: `iptal`, `sorunlu`
 - [x] Dış kanallar (2026-10-10): marka tek dosyada, web sitesi + SEO, tarayıcıdan sipariş (Expo web, ödeme dönüşü), kurumsal başvuru ve kurye başvurusu (panel → Başvurular), e-postayla sipariş, kurumsal API + webhook, teslim sonrası puan + Google yorum, sistem izleme (panel → Otomasyon → Sistem durumu). Kurulum: docs/kurulum.md §16–22
 - [x] Fiyat algoritması v2 (2026-10-08): hizmet seviyeleri (ekonomi/standart/acil), Pazar eki, uzak alış, 20 kg sınırı, kurumsal indirim kapsamı, endeks aracı, maliyet/marj simülasyonu (`docs/fiyat-arastirmasi.md` §8)
 - [x] Kurye hakedişi ve nakit mutabakatı (2026-10-08)
-- [ ] Kurye belge ve uyum takibi · [ ] ETA ve 60 dk acil taahhüdü takibi
+- [x] Kurye belge ve uyum takibi (2026-10-08)
+- [ ] ETA ve 60 dk acil taahhüdü takibi
 - [x] Ek geliştirmeler (2026-10-09): panelden telefon siparişi, otomatik onay + kurye atama, ödenmemiş kart siparişi iptali, kademeli km + %75 ek ücret tavanı (panelden tek tıkla eski tarifeye dönüş), raporlar + CSV, canlı haritalar (panel, takip sayfası, müşteri ve kurye uygulaması)

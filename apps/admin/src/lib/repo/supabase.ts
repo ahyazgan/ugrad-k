@@ -25,6 +25,7 @@ import {
   type Conversation,
   type Courier,
   type CourierApplication,
+  type CourierDocumentRecord,
   type CourierPayout,
   type EarningRow,
   type Invoice,
@@ -299,6 +300,54 @@ export function createSupabaseRepo(url: string, anonKey: string): AdminRepo & { 
         "Kurye güncellenemedi",
       );
     },
+    async listCourierDocuments(courierId) {
+      let q = client.from("courier_documents").select("*");
+      if (courierId) q = q.eq("courier_id", courierId);
+      return (check(await q, "Belgeler okunamadı") ?? []).map(
+        (r: Row): CourierDocumentRecord => ({
+          courierId: r.courier_id,
+          kind: r.kind,
+          docNumber: r.doc_number,
+          expiresAt: r.expires_at,
+          filePath: r.file_path,
+          note: r.note,
+          updatedAt: r.updated_at,
+        }),
+      );
+    },
+    async saveCourierDocument(doc, file) {
+      let filePath: string | undefined;
+      if (file) {
+        const ext = (file.name.split(".").pop() ?? "bin").toLowerCase().replace(/[^a-z0-9]/g, "");
+        filePath = `${doc.courierId}/${doc.kind}-${Date.now()}.${ext}`;
+        const up = await client.storage.from("courier-docs").upload(filePath, file, { contentType: file.type || undefined });
+        if (up.error) throw new RepoError(`Dosya yüklenemedi: ${up.error.message}`);
+      }
+      const { data } = await client.auth.getSession();
+      check(
+        await client.from("courier_documents").upsert(
+          {
+            courier_id: doc.courierId,
+            kind: doc.kind,
+            doc_number: doc.docNumber,
+            expires_at: doc.expiresAt,
+            note: doc.note,
+            updated_by: data.session?.user.id,
+            ...(filePath ? { file_path: filePath } : {}),
+          },
+          { onConflict: "courier_id,kind" },
+        ),
+        "Belge kaydedilemedi",
+      );
+    },
+    async deleteCourierDocument(courierId, kind) {
+      check(await client.from("courier_documents").delete().eq("courier_id", courierId).eq("kind", kind), "Belge silinemedi");
+    },
+    async courierDocumentUrl(path) {
+      const { data } = await client.storage.from("courier-docs").createSignedUrl(path, 300);
+      return data?.signedUrl ?? null;
+    },
+
     async listShifts({ from, to, courierId }) {
       let q = client
         .from("courier_shifts")
@@ -442,6 +491,8 @@ export function createSupabaseRepo(url: string, anonKey: string): AdminRepo & { 
         maxPickupDistanceKm: Number(r.max_pickup_distance_km),
         locationMaxAgeMinutes: r.location_max_age_minutes,
         unassignedAlertMinutes: r.unassigned_alert_minutes,
+        enforceCourierDocuments: r.enforce_courier_documents ?? true,
+        documentWarnDays: r.document_warn_days ?? 30,
       };
     },
     async saveOpsSettings(s) {
@@ -456,6 +507,8 @@ export function createSupabaseRepo(url: string, anonKey: string): AdminRepo & { 
             max_pickup_distance_km: s.maxPickupDistanceKm,
             location_max_age_minutes: s.locationMaxAgeMinutes,
             unassigned_alert_minutes: s.unassignedAlertMinutes,
+            enforce_courier_documents: s.enforceCourierDocuments,
+            document_warn_days: s.documentWarnDays,
           })
           .eq("id", 1),
         "Ayarlar kaydedilemedi",
