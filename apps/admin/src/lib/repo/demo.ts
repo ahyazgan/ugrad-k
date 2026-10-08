@@ -814,6 +814,13 @@ export function createDemoRepo(): AdminRepo {
       orderListeners.add(cb);
       return () => orderListeners.delete(cb);
     },
+    async courierPerformanceStats() {
+      // Demo: Mehmet istikrarlı, Emre geç iptal ve yanıtsız tekliflerle orta seviye
+      return {
+        "kur-1": { offersAccepted: 46, offersDeclined: 2, offersTimedOut: 1, delivered: 52, urgentDelivered: 14, urgentOnTime: 13, ratingCount: 21, ratingAvg: 4.81, released: 0, failedDeliveries: 1, shiftsBooked: 18, shiftsAttended: 18, lateCancels: 0 },
+        "kur-2": { offersAccepted: 19, offersDeclined: 4, offersTimedOut: 5, delivered: 22, urgentDelivered: 6, urgentOnTime: 4, ratingCount: 9, ratingAvg: 4.2, released: 2, failedDeliveries: 1, shiftsBooked: 9, shiftsAttended: 6, lateCancels: 1 },
+      };
+    },
     async listShiftPlan(fromDay, days) {
       const s = await get();
       const from = istDayStartUtc(fromDay);

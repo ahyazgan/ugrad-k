@@ -1,6 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { createClient, FunctionsHttpError, type SupabaseClient } from "@supabase/supabase-js";
-import { courierBalance, type OrderStatus } from "@yazgan/shared";
+import { courierBalance, performanceStatsFromRow, type OrderStatus } from "@yazgan/shared";
 import { Platform } from "react-native";
 import {
   ApiError,
@@ -445,6 +445,12 @@ export function createSupabaseApi(url: string, anonKey: string): Api & { client:
       });
       if (error) throw new ApiError(error.message);
       return { arrivedAt: (data as { arrived_at: string }).arrived_at };
+    },
+    async myPerformance() {
+      const { data, error } = await client.rpc("courier_performance_stats", { p_days: 30, p_courier_id: await uid() });
+      if (error) throw new ApiError(error.message);
+      const r = ((data ?? []) as Row[])[0];
+      return r ? performanceStatsFromRow(r) : null;
     },
     async courierEarnings() {
       const id = await uid();

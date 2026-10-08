@@ -560,6 +560,9 @@ export function createDemoApi(): Api {
       failIfOffline();
       // Demo: konum sunucuya gönderilmez
     },
+    async myPerformance() {
+      return { offersAccepted: 23, offersDeclined: 1, offersTimedOut: 2, delivered: 31, urgentDelivered: 8, urgentOnTime: 7, ratingCount: 11, ratingAvg: 4.7, released: 1, failedDeliveries: 0, shiftsBooked: 10, shiftsAttended: 9, lateCancels: 0 };
+    },
     async courierEarnings() {
       requireSession();
       const items = [...orders.values()]

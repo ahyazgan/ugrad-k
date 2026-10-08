@@ -1,6 +1,7 @@
 import type {
   CourierDocument,
   FailedDeliveryReason,
+  PerformanceStats,
   IncidentKind,
   OrderStatus,
   PlaceDetails,
@@ -292,6 +293,8 @@ export interface Api {
   /** Kurye adrese vardığını bildirir (adrese 300 m içinde olmalı) */
   markArrived(orderId: string, stop: "alis" | "teslim", at: CourierLocation | null, occurredAt?: string): Promise<{ arrivedAt: string }>;
   courierEarnings(): Promise<CourierEarnings>;
+  /** Kuryenin son 30 günlük performans sayıları (puan: courierPerformance) */
+  myPerformance(): Promise<PerformanceStats | null>;
   /** Acil durum: yöneticiye konumla alarm (molaya alınır) */
   raiseSos(input: { kind: IncidentKind; note?: string; at: (CourierLocation & { accuracy?: number | null }) | null }): Promise<{ id: string }>;
   /** Kapatılmamış son acil durum kaydı */

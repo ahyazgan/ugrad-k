@@ -1,4 +1,4 @@
-import { formatTL } from "@yazgan/shared";
+import { courierPerformance, formatTL, PERFORMANCE_TIERS, type PerformanceStats } from "@yazgan/shared";
 import { useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
 import { Text, View } from "react-native";
@@ -11,17 +11,32 @@ const fmtDate = (iso: string) =>
 export default function Kazancim() {
   const [data, setData] = useState<CourierEarnings | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [perf, setPerf] = useState<PerformanceStats | null>(null);
 
   useFocusEffect(
     useCallback(() => {
       api.courierEarnings().then(setData, (e) => setError(e instanceof ApiError ? e.message : "Yüklenemedi"));
+      api.myPerformance().then(setPerf, () => undefined);
     }, []),
   );
 
   if (!data) return error ? <Screen><ErrorBox message={error} /></Screen> : <Loading />;
   const net = data.unpaid.netKurus;
+  const p = perf ? courierPerformance(perf) : null;
   return (
     <Screen>
+      {p ? (
+        <Card style={{ gap: 4 }}>
+          <Muted>Performansım (son 30 gün)</Muted>
+          <Text testID="my-performance" style={{ fontSize: 22, fontWeight: "800", color: colors.primary }}>
+            {p.score ?? "—"} · {PERFORMANCE_TIERS[p.tier]}
+          </Text>
+          {p.parts.map((x) => (
+            <Row key={x.key} label={x.label} value={x.value == null ? "az veri" : `%${Math.round(x.value * 100)}`} />
+          ))}
+          <Muted>Yüksek puan, otomatik iş atamada öncelik demektir. Teklifleri yanıtlamak, aldığınız vardiyaya gelmek ve acil işleri zamanında teslim etmek puanı yükseltir.</Muted>
+        </Card>
+      ) : null}
       <Card>
         <Muted>Hesaplaşılmamış kazanç</Muted>
         <Title>{formatTL(data.unpaid.earningsKurus)}</Title>

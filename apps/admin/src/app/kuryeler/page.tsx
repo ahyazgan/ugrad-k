@@ -1,6 +1,6 @@
 "use client";
 
-import { COURIER_DOCUMENT_TYPES, INCIDENT_KINDS } from "@yazgan/shared";
+import { COURIER_DOCUMENT_TYPES, courierPerformance, INCIDENT_KINDS, PERFORMANCE_TIERS, type PerformanceTier } from "@yazgan/shared";
 import { useState, type FormEvent } from "react";
 import { ComplianceBadge, complianceOf, CourierDocumentsCard } from "@/components/CourierDocuments";
 import { Button, Card, ErrorText, Input, PageHeader, Table, Td } from "@/components/ui";
@@ -14,6 +14,7 @@ export default function KuryelerPage() {
   const docsLoad = useLoad(() => repo.listCourierDocuments());
   const ops = useLoad(() => repo.getOpsSettings());
   const incidents = useLoad(() => repo.listIncidents({ limit: 20 }));
+  const perf = useLoad(() => repo.courierPerformanceStats());
   const warnDays = ops.data?.documentWarnDays ?? 30;
   const [selected, setSelected] = useState<string | null>(null);
   const docsOf = (id: string) => (docsLoad.data ?? []).filter((d) => d.courierId === id);
@@ -75,7 +76,7 @@ export default function KuryelerPage() {
       <ErrorText>{error}</ErrorText>
       <div className="grid gap-6 xl:grid-cols-3">
         <div className="xl:col-span-2">
-          <Table head={["Kurye", "Plaka / araç", "Durum", "Belgeler", "Aktif iş", "Son konum", ""]}>
+          <Table head={["Kurye", "Plaka / araç", "Durum", "Belgeler", "Performans (30 gün)", "Aktif iş", "Son konum", ""]}>
             {(data ?? []).map((c) => (
               <tr key={c.id} className={c.active ? "" : "opacity-50"}>
                 <Td>
@@ -102,6 +103,9 @@ export default function KuryelerPage() {
                     <ComplianceBadge c={complianceOf(docsOf(c.id), warnDays)} />
                     <span className="mt-0.5 block text-xs text-brand underline">Belgeler</span>
                   </button>
+                </Td>
+                <Td>
+                  <PerformanceCell stats={perf.data?.[c.id]} courierId={c.id} />
                 </Td>
                 <Td>{c.activeOrderCount}</Td>
                 <Td className="whitespace-nowrap text-xs">
@@ -178,5 +182,33 @@ export default function KuryelerPage() {
         </Table>
       </Card>
     </>
+  );
+}
+const TIER_TONE: Record<PerformanceTier, string> = {
+  altin: "bg-amber-100 text-amber-800",
+  gumus: "bg-slate-200 text-slate-700",
+  gelismeli: "bg-orange-100 text-orange-800",
+  riskli: "bg-red-100 text-red-800",
+  yeni: "bg-sky-50 text-sky-700",
+};
+
+/** Puan + kademe; tıklanınca bileşenler */
+function PerformanceCell({ stats, courierId }: { stats: Parameters<typeof courierPerformance>[0] | undefined; courierId: string }) {
+  if (!stats) return <span className="text-xs text-slate-400">—</span>;
+  const p = courierPerformance(stats);
+  return (
+    <details data-testid={`perf-${courierId}`}>
+      <summary className="cursor-pointer list-none">
+        <span className="font-semibold">{p.score ?? "—"}</span>{" "}
+        <span className={`rounded px-1.5 py-0.5 text-xs font-semibold ${TIER_TONE[p.tier]}`}>{PERFORMANCE_TIERS[p.tier]}</span>
+      </summary>
+      <ul className="mt-1 space-y-0.5 text-xs text-slate-600">
+        {p.parts.map((x) => (
+          <li key={x.key}>
+            {x.label}: {x.value == null ? "az veri" : `%${Math.round(x.value * 100)}`} · {x.detail}
+          </li>
+        ))}
+      </ul>
+    </details>
   );
 }

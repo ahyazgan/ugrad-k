@@ -150,6 +150,22 @@ Deno.test("auto-dispatch: vardiya hatırlatma ve gelmedi bildirimi bir kez", asy
   assertEquals(updated.shift_bookings!.map((b) => Object.keys(b).sort().join()), ["id,reminded_at", "id,no_show_alerted_at"]);
 });
 
+Deno.test("auto-dispatch: performansı yüksek kurye biraz uzakta da olsa önce", async () => {
+  const stats = (id: string, accepted: number, offered: number, rating: number) => ({
+    courier_id: id, offers_accepted: accepted, offers_declined: offered - accepted, offers_timed_out: 0, delivered: 30, urgent_delivered: 0,
+    urgent_on_time: 0, rating_count: 10, rating_avg: rating, released: 0, failed_deliveries: 0, shifts_booked: 0, shifts_attended: 0, late_cancels: 0,
+  });
+  const { ctx, assigned } = setup({
+    couriers: [
+      { id: "zayif", active: true, is_on_shift: true, last_lat: 41.12, last_lng: 29.1, last_location_at: fresh, profile: { full_name: "Yakın" } },
+      { id: "iyi", active: true, is_on_shift: true, last_lat: 41.14, last_lng: 29.13, last_location_at: fresh, profile: { full_name: "İyi" } },
+    ],
+    "rpc:courier_performance_stats": [stats("zayif", 4, 10, 2.5), stats("iyi", 20, 20, 4.9)],
+  });
+  await handler((r) => handleAutoDispatch(r, ctx, { env, now: NOW }))(cron());
+  assertEquals(assigned[0].p_courier_id, "iyi");
+});
+
 Deno.test("auto-dispatch: uzun süredir atanamayan için yöneticiye bir kez uyarı", async () => {
   const old = { id: "o1", order_no: "YK-1", status: "onaylandi", pickup_lat: 41.1295, pickup_lng: 29.1135, urgent: false, created_at: "2026-10-09T08:40:00Z", scheduled_pickup_at: null, payment_method: "nakit", payment_status: "odenmedi" };
   const { ctx, updated } = setup({ couriers: [], orders: [old] });

@@ -4,9 +4,10 @@
  *
  * Uygunluk: vardiyada ve molada değil, konumu taze, aktif iş sayısı sınırın altında, alışa
  * mesafesi sınır içinde ve bu işi daha önce bırakmamış kurye.
- * Puan (düşük = iyi): tahmini yol km'si + aktif iş başına ceza km'si.
+ * Puan (düşük = iyi): tahmini yol km'si + aktif iş başına ceza km'si − performans avantajı (en fazla ±3 km).
  */
 import { haversineMeters, type LatLng } from "./geo.ts";
+import { performanceBonusKm } from "./performance.ts";
 
 export interface CandidateCourier {
   id: string;
@@ -17,6 +18,8 @@ export interface CandidateCourier {
   activeOrders: number;
   /** Moladaki kurye otomatik iş almaz */
   onBreak?: boolean;
+  /** Performans puanı (0–100, yoksa null): yüksek puan birkaç km avantaj */
+  performance?: number | null;
 }
 
 export interface AssignableOrder {
@@ -81,7 +84,7 @@ export function rankCouriers(order: AssignableOrder, couriers: CandidateCourier[
     else if (cfg.now.getTime() - new Date(c.locationAt).getTime() > cfg.locationMaxAgeMinutes * 60_000) reason = "stale_location";
     else if (c.activeOrders >= cfg.maxActiveOrdersPerCourier) reason = "at_capacity";
     else if (distanceKm > cfg.maxPickupDistanceKm) reason = "too_far";
-    const score = (distanceKm ?? 999) + c.activeOrders * LOAD_PENALTY_KM;
+    const score = (distanceKm ?? 999) + c.activeOrders * LOAD_PENALTY_KM - performanceBonusKm(c.performance);
     return { courier: c, distanceKm, score: Math.round(score * 10) / 10, eligible: reason === null, reason };
   });
   return ranked.sort((a, b) => Number(b.eligible) - Number(a.eligible) || a.score - b.score);

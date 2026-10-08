@@ -2,7 +2,9 @@
 // Her dakika pg_cron ile (x-notify-secret) veya panelden yönetici tarafından tetiklenir.
 import {
   courierCompliance,
+  courierPerformance,
   excludedCouriers,
+  performanceStatsFromRow,
   planAssignments,
   slotLabel,
   type AssignableOrder,
@@ -99,6 +101,13 @@ export async function handleAutoDispatch(
       courierCompliance((byCourier.get(c.id) ?? []).map((d) => ({ kind: d.kind, expiresAt: d.expires_at })), now).ok,
     );
   }
+  // Performans puanı (son 30 gün): yalnız atanacak iş varken hesaplanır
+  const performance = new Map<string, number | null>();
+  const hasWork = ((ordersRes.data ?? []) as Row[]).length > 0;
+  if (hasWork && onShift.length) {
+    const { data: stats } = await ctx.admin.rpc("courier_performance_stats", { p_days: 30 });
+    for (const r of (stats ?? []) as Row[]) performance.set(r.courier_id, courierPerformance(performanceStatsFromRow(r)).score);
+  }
   const couriers: CandidateCourier[] = onShift.map((c) => ({
     id: c.id,
     name: c.profile?.full_name ?? null,
@@ -107,6 +116,7 @@ export async function handleAutoDispatch(
     locationAt: c.last_location_at,
     activeOrders: load.get(c.id) ?? 0,
     onBreak: !!c.on_break,
+    performance: performance.get(c.id) ?? null,
   }));
 
   // Kartla ödenmemişler atanmaz

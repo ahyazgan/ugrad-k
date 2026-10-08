@@ -113,6 +113,10 @@ fs.mkdirSync(out, { recursive: true });
   await page.getByText("Deniz Yeni").first().waitFor();
 
   await nav("Kuryeler");
+  // Performans: puan ve kademe, bileşenler
+  await page.getByTestId("perf-kur-1").getByText("Altın").waitFor();
+  await page.getByTestId("perf-kur-1").locator("summary").click();
+  await page.getByTestId("perf-kur-1").getByText(/Teklif kabul: %\d+/).waitFor();
   // Acil durum kayıtları: kapatılan alarm ve çözüm notu
   await page.getByTestId("incident-inc-open").getByText(/lastik değişti/).waitFor();
   await page.getByLabel("Ad Soyad").fill("Can Test");

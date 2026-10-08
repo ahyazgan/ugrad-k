@@ -42,6 +42,7 @@ Kodun tamamı yazıldı ve testlerden geçti. Bu rehber, sistemi **gerçek hesap
 35. [Uygulama içi mesajlaşma](#35-uygulama-içi-mesajlaşma)
 36. [Çevrimdışı çalışma](#36-çevrimdışı-çalışma)
 37. [Vardiya planlama](#37-vardiya-planlama)
+38. [Kurye performans puanı](#38-kurye-performans-puanı)
 
 ---
 
@@ -519,3 +520,11 @@ Kayıtlı müşteriler `siparis@<alan adı>` adresine yazar; yapay zeka asistan�
 - **Panel**: haftalık tablo (yeşil dolu, sarı eksik, kırmızı boş), toplam eksik kurye-dilim; eksik dilime *+ kurye* ile atama (dolu dilime de atanabilir), × ile kaldırma. Geçmiş dilimlerde gerçek vardiya kaydına göre *geldi / gelmedi* (dilimin en az yarısı çalışıldıysa geldi).
 - **Otomatik**: dilimden 1 saat önce kuryeye hatırlatma; dilim başladıktan 15 dakika sonra vardiya açılmadıysa kuryeye uyarı ve yöneticiye WhatsApp/SMS (§6 `otomatik-dagitim`).
 - Vardiya planı öneridir; plan dışı vardiya açmak serbesttir. Çalışma saatleri (BTK) raporu gerçek vardiya kayıtlarından gelir.
+
+## 38. Kurye performans puanı
+
+- Son 30 günden 0–100 puan (packages/shared/performance.ts): teklif kabul %25, acil taahhüdü tutturma %20, müşteri puanı %20, aldığı işi bırakmadan tamamlama %15, vardiya planına uyum (gelmeme ve geç iptal düşürür) %20. Az verili bileşen hesaba girmez; yeni kurye "Yeni" görünür.
+- Kademeler: 85+ Altın, 70–84 Gümüş, 50–69 Gelişmeli, 50 altı Riskli.
+- **Otomatik atama**: 70 nötr; her 10 puan 1 km avantaj/dezavantaj (en fazla ±3 km). Yani yakın ama düşük puanlı kurye yerine biraz uzaktaki yüksek puanlı kurye seçilebilir.
+- **Panel**: Kuryeler → *Performans (30 gün)* sütunu; tıklayınca bileşenler. **Kurye**: Kazancım sekmesinde kendi puanı ve bileşenleri.
+- Puan prim veya ceza için tek başına kullanılmamalı; kuryeyle konuşurken bileşenlere bakın (ör. düşük kabul oranı uzak bölgeden kaynaklanabilir).

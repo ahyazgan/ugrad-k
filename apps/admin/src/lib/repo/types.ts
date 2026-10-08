@@ -11,6 +11,7 @@ import type {
   CostModel,
   CourierDocumentKind,
   IncidentKind,
+  PerformanceStats,
   PricingSettings,
   Promo,
   ServiceLevel,
@@ -525,6 +526,8 @@ export interface AdminRepo {
   /** Teslim edilemedi → göndericiye iade (yönetici; kanıt şartı yok) ve iade ücretinin eklenmesi */
   reportFailedDelivery(orderId: string, reason: FailedDeliveryReason, note: string): Promise<void>;
   subscribeOrders(onChange: () => void): () => void;
+  /** Kurye performans sayıları (son 30 gün); puan packages/shared courierPerformance */
+  courierPerformanceStats(): Promise<Record<string, PerformanceStats>>;
   // Vardiya planı
   listShiftPlan(fromDay: string, days: number): Promise<{ templates: ShiftTemplate[]; bookings: ShiftBooking[] }>;
   saveShiftTemplate(id: number, patch: { required: number; active: boolean }): Promise<void>;

@@ -254,6 +254,7 @@ fs.mkdirSync(out, { recursive: true });
   // Kazancım: teslimat ve elde tutulan nakit
   await kp.getByRole('tab', { name: /Kazancım/ }).click();
   await kt('earnings-net').waitFor();
+  await kt('my-performance').getByText(/^\d+ · (Altın|Gümüş|Gelişmeli|Riskli)$/).waitFor();
   const earn = await kp.locator('body').innerText();
   if (!/Elinizdeki nakit tahsilat/.test(earn) || !/YK-\d+/.test(earn)) throw new Error('kazanç ekranı eksik');
   console.log('KAZANC:', earn.match(/Hesaplaşılmamış kazanç[\s\S]{0,160}/)?.[0]?.replace(/\n+/g, ' | '));

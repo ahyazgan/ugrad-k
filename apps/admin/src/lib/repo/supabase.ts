@@ -12,6 +12,7 @@ import {
   type OrderStatus,
   type PlaceDetails,
   type PlaceSuggestion,
+  performanceStatsFromRow,
 } from "@yazgan/shared";
 import { istDayEndUtc, istDayStartUtc, istMonthRangeUtc } from "../dates";
 import {
@@ -274,6 +275,10 @@ export function createSupabaseRepo(url: string, anonKey: string): AdminRepo & { 
       );
       // İptalde kartla alınmış ödeme iyzico'dan iptal edilir (başarısızsa "iade_bekliyor" olur)
       if (status === "iptal") await client.functions.invoke("payment-refund", { body: { orderId } });
+    },
+    async courierPerformanceStats() {
+      const rows = (check(await client.rpc("courier_performance_stats", { p_days: 30 }), "Performans okunamadı") ?? []) as Row[];
+      return Object.fromEntries(rows.map((r) => [r.courier_id, performanceStatsFromRow(r)]));
     },
     async listShiftPlan(fromDay, days) {
       const to = new Date(new Date(`${fromDay}T00:00:00+03:00`).getTime() + days * 86_400_000).toISOString();
