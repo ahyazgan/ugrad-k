@@ -17,8 +17,8 @@ export default function MusteriLayout() {
           tabBarIcon: tabIcon("home", "home-outline"),
         }}
       />
-      <Tabs.Screen name="siparisler" options={{ title: "Siparişlerim", tabBarIcon: tabIcon("cube", "cube-outline") }} />
-      <Tabs.Screen name="hesap" options={{ title: "Hesabım", tabBarIcon: tabIcon("person", "person-outline") }} />
+      <Tabs.Screen name="siparisler" options={{ title: "Siparişlerim", headerShown: false, tabBarIcon: tabIcon("cube", "cube-outline") }} />
+      <Tabs.Screen name="hesap" options={{ title: "Hesabım", headerShown: false, tabBarIcon: tabIcon("person", "person-outline") }} />
     </Tabs>
   );
 }

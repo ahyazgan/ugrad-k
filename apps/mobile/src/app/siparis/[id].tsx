@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Linking, Pressable, Share, Text, TextInput, View } from "react-native";
 import { StatusBadge } from "@/components/StatusBadge";
 import { TileMap, type MapMarker } from "@/components/TileMap";
-import { Button, Card, ErrorBox, Loading, Muted, Row, Screen, Title, colors, styles } from "@/components/ui";
+import { Button, Card, ErrorBox, Loading, Muted, Row, Screen, Title, colors, styles, font } from "@/components/ui";
 import { api, ApiError, type CourierPosition, type OrderDetail } from "@/lib/api";
 import { formatDateTime, formatTime } from "@/lib/format";
 import { payOrder } from "@/lib/payment";
@@ -40,7 +40,7 @@ function Timeline({ order }: { order: OrderDetail }) {
                 backgroundColor: at ? (current ? colors.accent : colors.primary) : colors.border,
               }}
             />
-            <Text style={{ flex: 1, fontWeight: current ? "700" : "400", color: at ? colors.text : colors.muted }}>
+            <Text style={{ flex: 1, ...font(current ? "extrabold" : "semibold"), color: at ? colors.text : colors.muted }}>
               {ORDER_STATUS_LABELS[s]}
             </Text>
             {at ? <Muted>{formatTime(at)}</Muted> : null}
@@ -90,8 +90,8 @@ function RateCard({ order, onRated }: { order: OrderDetail; onRated: () => void 
   if (done) {
     return (
       <Card>
-        <Text style={{ fontWeight: "700" }} testID="rating-thanks">
-          Değerlendirmeniz için teşekkürler <Text style={{ color: colors.accent }}>{"★".repeat(order.rating ?? score)}</Text>
+        <Text style={{ ...font("extrabold") }} testID="rating-thanks">
+          Değerlendirmeniz için teşekkürler <Text style={{ color: colors.star }}>{"★".repeat(order.rating ?? score)}</Text>
         </Text>
         {google ? <Button title="Google'da yorum yazın" variant="secondary" onPress={() => Linking.openURL(google)} /> : null}
       </Card>
@@ -99,11 +99,11 @@ function RateCard({ order, onRated }: { order: OrderDetail; onRated: () => void 
   }
   return (
     <Card>
-      <Text style={{ fontWeight: "700" }}>Teslimatı nasıl buldunuz?</Text>
+      <Text style={{ ...font("extrabold") }}>Teslimatı nasıl buldunuz?</Text>
       <View style={{ flexDirection: "row", gap: 6 }} accessibilityRole="radiogroup">
         {[1, 2, 3, 4, 5].map((n) => (
           <Pressable key={n} onPress={() => setScore(n)} testID={`star-${n}`} accessibilityRole="radio" accessibilityLabel={`${n} yıldız`} hitSlop={6}>
-            <Text style={{ fontSize: 34, color: n <= score ? colors.accent : colors.border }}>★</Text>
+            <Text style={{ fontSize: 34, color: n <= score ? colors.star : colors.border }}>★</Text>
           </Pressable>
         ))}
       </View>
@@ -182,8 +182,8 @@ export default function SiparisDetay() {
   return (
     <Screen>
       {yeni ? (
-        <Card style={{ backgroundColor: colors.successLight, borderColor: colors.success }}>
-          <Text style={{ fontWeight: "700", color: colors.success }}>Siparişiniz alındı 🎉</Text>
+        <Card style={{ backgroundColor: colors.lime }}>
+          <Text style={{ ...font("black"), fontSize: 18, color: colors.ink }}>Siparişiniz alındı 🎉</Text>
           <Muted>Durum değiştikçe bu ekran kendiliğinden güncellenir.</Muted>
         </Card>
       ) : null}
@@ -212,7 +212,7 @@ export default function SiparisDetay() {
 
       {order.courierName ? (
         <Card>
-          <Text style={{ fontWeight: "700" }}>Kuryeniz: {order.courierName}</Text>
+          <Text style={{ ...font("extrabold") }}>Kuryeniz: {order.courierName}</Text>
           {order.courierPhone ? (
             <Button title="Kuryeyi ara" variant="secondary" onPress={() => Linking.openURL(`tel:${order.courierPhone}`)} />
           ) : null}
@@ -221,10 +221,10 @@ export default function SiparisDetay() {
 
       <Card>
         <Muted>Nereden</Muted>
-        <Text style={{ fontWeight: "600" }}>{order.pickupAddress}</Text>
+        <Text style={{ ...font("bold") }}>{order.pickupAddress}</Text>
         {order.pickupDetails ? <Muted>{order.pickupDetails}</Muted> : null}
         <Muted>Nereye</Muted>
-        <Text style={{ fontWeight: "600" }}>{order.dropoffAddress}</Text>
+        <Text style={{ ...font("bold") }}>{order.dropoffAddress}</Text>
         {order.dropoffDetails ? <Muted>{order.dropoffDetails}</Muted> : null}
         {order.packageDescription ? <Muted>Paket: {order.packageDescription}</Muted> : null}
       </Card>
@@ -279,7 +279,7 @@ export default function SiparisDetay() {
       {cancellable && !cancelOpen ? <Button title="Siparişi iptal et" variant="secondary" onPress={() => setCancelOpen(true)} /> : null}
       {cancelOpen ? (
         <Card>
-          <Text style={{ fontWeight: "600" }}>İptal nedeni</Text>
+          <Text style={{ ...font("bold") }}>İptal nedeni</Text>
           <TextInput style={styles.input} value={reason} onChangeText={setReason} placeholder="Kısaca yazın" />
           <Button title="İptal et" variant="danger" onPress={cancel} loading={busy} disabled={reason.trim().length < 3} />
           <Button title="Vazgeç" variant="secondary" onPress={() => setCancelOpen(false)} />

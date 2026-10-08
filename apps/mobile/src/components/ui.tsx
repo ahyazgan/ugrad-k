@@ -217,6 +217,7 @@ export const styles = StyleSheet.create({
   padded: { padding: 14 },
   title: { ...type.h2 },
   muted: { ...font("semibold"), color: colors.muted, fontSize: 14, lineHeight: 20 },
+  body: { ...font("semibold"), color: colors.text, fontSize: 14, lineHeight: 20 },
   card: {
     backgroundColor: colors.card,
     borderRadius: radii.card,

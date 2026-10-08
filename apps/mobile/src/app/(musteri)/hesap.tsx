@@ -1,7 +1,8 @@
 import { router } from "expo-router";
 import { useState } from "react";
 import { DeleteAccount } from "@/components/DeleteAccount";
-import { Button, Card, ErrorBox, Field, Muted, Screen, Title } from "@/components/ui";
+import { BigTitle } from "@/components/Neo";
+import { Button, Card, ErrorBox, Field, Muted, Screen, Title, colors } from "@/components/ui";
 import { api, ApiError } from "@/lib/api";
 import { COMPANY } from "@/lib/kvkk";
 import { useSession } from "@/lib/session";
@@ -36,7 +37,8 @@ function HesapForm() {
   }
 
   return (
-    <Screen>
+    <Screen safeTop>
+      <BigTitle size={52}>Hesabım.</BigTitle>
       <Card>
         <Title>Bilgilerim</Title>
         <Muted>{profile?.phone}</Muted>
@@ -47,7 +49,7 @@ function HesapForm() {
         <Button title="Kaydet" onPress={save} loading={saving} />
       </Card>
       {profile?.corporateAccountId ? (
-        <Card>
+        <Card style={{ backgroundColor: colors.lime }}>
           <Title>Kurumsal hesap</Title>
           <Muted>Ayda 20+ teslimatta %15, 50+ teslimatta %25 indirim ay sonu faturanıza yansır.</Muted>
         </Card>

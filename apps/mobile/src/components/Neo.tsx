@@ -2,7 +2,7 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { BRAND } from "@yazgan/shared";
 import type { ReactNode } from "react";
-import { Pressable, Text, View, type StyleProp, type ViewStyle } from "react-native";
+import { ActivityIndicator, Pressable, Text, View, type StyleProp, type ViewStyle } from "react-native";
 import Svg, { Path } from "react-native-svg";
 import { colors, font, radii, shadow, type } from "./theme";
 
@@ -100,6 +100,7 @@ export function InkPillBar({
   action,
   onPress,
   disabled,
+  loading,
   testID,
   accessibilityLabel,
 }: {
@@ -112,17 +113,19 @@ export function InkPillBar({
   action: string;
   onPress: () => void;
   disabled?: boolean;
+  loading?: boolean;
   testID?: string;
   accessibilityLabel?: string;
 }) {
+  const off = disabled || loading;
   return (
     <Pressable
       testID={testID}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel ?? action}
-      accessibilityState={{ disabled: !!disabled }}
+      accessibilityState={{ disabled: !!off, busy: !!loading }}
       onPress={onPress}
-      disabled={disabled}
+      disabled={off}
       style={({ pressed }) => ({
         minHeight: title ? 70 : 58,
         backgroundColor: colors.ink,
@@ -133,7 +136,7 @@ export function InkPillBar({
         paddingLeft: placeholder ? 20 : 24,
         paddingRight: 6,
         paddingVertical: 5,
-        opacity: disabled ? 0.55 : pressed ? 0.9 : 1,
+        opacity: off ? 0.55 : pressed ? 0.9 : 1,
       })}
     >
       {placeholder ? <Ionicons name="search" size={22} color="#fff" /> : null}
@@ -159,8 +162,40 @@ export function InkPillBar({
         }}
       >
         <Text style={{ ...font("extrabold"), fontSize: 17, color: colors.ink }}>{action}</Text>
-        <Ionicons name="arrow-forward" size={18} color={colors.ink} />
+        {loading ? <ActivityIndicator color={colors.ink} /> : <Ionicons name="arrow-forward" size={18} color={colors.ink} />}
       </View>
     </Pressable>
+  );
+}
+
+/** Rota kartı: siyah daire (alış) → kesikli çizgi → limon kare (teslim) */
+export function RouteCard({ from, to, footer }: { from: ReactNode; to: ReactNode; footer?: ReactNode }) {
+  return (
+    <View style={{ backgroundColor: colors.surface, borderRadius: radii.card, padding: 18, paddingVertical: 12, gap: 8 }}>
+      <View style={{ flexDirection: "row", gap: 12 }}>
+        <View style={{ alignItems: "center", paddingVertical: 18 }}>
+          <View style={{ width: 12, height: 12, borderRadius: 99, backgroundColor: colors.ink }} />
+          <View style={{ flex: 1, width: 0, borderLeftWidth: 2, borderStyle: "dashed", borderColor: colors.ink, marginVertical: 4 }} />
+          <View style={{ width: 12, height: 12, borderRadius: 3, backgroundColor: colors.limeDot }} />
+        </View>
+        <View style={{ flex: 1 }}>
+          {from}
+          <View style={{ height: 1, backgroundColor: colors.bg }} />
+          {to}
+        </View>
+      </View>
+      {footer}
+    </View>
+  );
+}
+
+/** Rota kartındaki tek satır (etiket + adres) */
+export function RouteStop({ label, address, details }: { label: string; address: string; details?: string | null }) {
+  return (
+    <View style={{ paddingVertical: 8, gap: 2 }}>
+      <Text style={type.label}>{label}</Text>
+      <Text style={{ ...font("bold"), fontSize: 15, color: colors.ink }}>{address}</Text>
+      {details ? <Text style={{ ...font("semibold"), fontSize: 13, color: colors.muted }}>{details}</Text> : null}
+    </View>
   );
 }

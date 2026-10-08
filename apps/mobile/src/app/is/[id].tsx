@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Text, TextInput, View } from "react-native";
 import { StatusBadge } from "@/components/StatusBadge";
 import { TileMap, type MapMarker } from "@/components/TileMap";
-import { Button, Card, ErrorBox, Loading, Muted, Screen, Title, colors, styles } from "@/components/ui";
+import { Button, Card, ErrorBox, Loading, Muted, Screen, Title, colors, styles, font } from "@/components/ui";
 import { api, ApiError, type OrderDetail } from "@/lib/api";
 import { lastKnownPosition, setActiveOrderForLocation } from "@/lib/location";
 import { callPhone, openDirections } from "@/lib/navigation";
@@ -28,8 +28,8 @@ function Stop({
   return (
     <Card>
       <Muted>{title}</Muted>
-      <Text style={{ fontWeight: "700", fontSize: 16 }}>{address}</Text>
-      {details ? <Text>{details}</Text> : null}
+      <Text style={{ ...font("extrabold"), fontSize: 16 }}>{address}</Text>
+      {details ? <Text style={styles.body}>{details}</Text> : null}
       {contactName || contactPhone ? <Muted>{[contactName, contactPhone].filter(Boolean).join(" · ")}</Muted> : null}
       <View style={{ flexDirection: "row", gap: 8 }}>
         <View style={{ flex: 1 }}>
@@ -130,11 +130,11 @@ export default function IsDetay() {
           </Title>
           <StatusBadge status={s} />
         </View>
-        {order.packageDescription ? <Text>📦 {order.packageDescription}{order.weightKg ? ` · ${order.weightKg} kg` : ""}</Text> : null}
-        {order.customerNote ? <Text style={{ color: colors.primary }}>Not: {order.customerNote}</Text> : null}
-        {order.roundTrip ? <Text style={{ fontWeight: "700" }}>↩ Gidiş-dönüş: teslimden sonra alış adresine geri dönülecek</Text> : null}
+        {order.packageDescription ? <Text style={styles.body}>📦 {order.packageDescription}{order.weightKg ? ` · ${order.weightKg} kg` : ""}</Text> : null}
+        {order.customerNote ? <Text style={{ ...font("extrabold"), color: colors.ink }}>Not: {order.customerNote}</Text> : null}
+        {order.roundTrip ? <Text style={{ ...font("extrabold") }}>↩ Gidiş-dönüş: teslimden sonra alış adresine geri dönülecek</Text> : null}
         {order.paymentMethod === "nakit" ? (
-          <Text style={{ fontWeight: "700", color: colors.danger }}>
+          <Text style={{ ...font("extrabold"), color: colors.danger }}>
             Tahsilat: {(order.totalKurus / 100).toLocaleString("tr-TR", { minimumFractionDigits: 2 })} TL (nakit / IBAN)
           </Text>
         ) : null}
@@ -165,7 +165,7 @@ export default function IsDetay() {
 
       {s === "kuryeye_atandi" ? (
         <Card>
-          <Text style={{ fontWeight: "600" }}>Alışta bekleme süresi (dakika)</Text>
+          <Text style={{ ...font("bold") }}>Alışta bekleme süresi (dakika)</Text>
           <Muted>İlk 15 dakika ücretsiz; sonrası müşteriye yansıtılır.</Muted>
           <TextInput style={styles.input} keyboardType="number-pad" value={waiting} onChangeText={setWaiting} testID="waiting" />
           <Button title="Paketi aldım" onPress={() => act({ type: "pickup", waitingMinutes: waitingNum })} loading={busy} testID="pickup" />
@@ -195,7 +195,7 @@ export default function IsDetay() {
       ) : null}
       {noteFor ? (
         <Card>
-          <Text style={{ fontWeight: "600" }}>{noteFor === "problem" ? "Sorunu açıklayın" : "Neden bırakıyorsunuz?"}</Text>
+          <Text style={{ ...font("bold") }}>{noteFor === "problem" ? "Sorunu açıklayın" : "Neden bırakıyorsunuz?"}</Text>
           <TextInput style={styles.input} value={note} onChangeText={setNote} placeholder="Örn. alıcıya ulaşılamıyor" multiline />
           <Button
             title="Gönder"

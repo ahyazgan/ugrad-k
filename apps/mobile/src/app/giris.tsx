@@ -1,9 +1,11 @@
 import { router } from "expo-router";
 import { useState } from "react";
-import { Text, View } from "react-native";
-import { Button, Card, ErrorBox, Field, Muted, Screen, Title, colors } from "@/components/ui";
+import Ionicons from "@expo/vector-icons/Ionicons";
+import { Text, TextInput, View } from "react-native";
+import { BigTitle, HandTag, InkChip, Wordmark } from "@/components/Neo";
+import { Sticker } from "@/components/Sticker";
+import { Button, Card, ErrorBox, Muted, Screen, colors, font, radii } from "@/components/ui";
 import { api, ApiError } from "@/lib/api";
-import { BRAND } from "@yazgan/shared";
 
 export default function Giris() {
   const [phone, setPhone] = useState("");
@@ -24,33 +26,74 @@ export default function Giris() {
   }
 
   return (
-    <Screen>
-      <View style={{ gap: 6, marginTop: 16 }}>
-        <Text style={{ fontSize: 28, fontWeight: "800", color: colors.primary }}>{BRAND.name}</Text>
-        <Muted>Acil evrak ve paketleriniz, moto kurye ile kapıdan kapıya.</Muted>
+    <Screen safeTop>
+      <View style={{ marginTop: 10 }}>
+        <Wordmark size={40} />
       </View>
+      <View style={{ marginTop: 18, marginBottom: 6 }}>
+        <BigTitle size={68}>{"Selam.\nHadi\nbaşla."}</BigTitle>
+        <HandTag rotate={-10} style={{ position: "absolute", right: 8, bottom: 14 }}>
+          {"30 sn'de\ngiriş!"}
+        </HandTag>
+        <Sticker name="box" size={130} style={{ position: "absolute", right: 0, top: -10 }} />
+      </View>
+      <Muted>Acil evrak ve paketlerin, moto kurye ile kapıdan kapıya.</Muted>
       {api.mode === "demo" ? (
-        <Card style={{ backgroundColor: "#FFFBEB", borderColor: colors.accent }}>
-          <Text style={{ fontWeight: "700" }}>Demo modu</Text>
+        <Card style={{ gap: 6 }}>
+          <InkChip>DEMO MODU</InkChip>
           <Muted>Sunucu bağlantısı henüz yapılmadı. Herhangi bir numara ve 123456 koduyla giriş yapabilirsiniz.</Muted>
         </Card>
       ) : null}
-      <Card>
-        <Title>Giriş yap</Title>
-        <Field
-          label="Cep telefonu"
+      <View
+        style={{
+          backgroundColor: colors.surface,
+          borderRadius: radii.pill,
+          minHeight: 64,
+          flexDirection: "row",
+          alignItems: "center",
+          paddingHorizontal: 8,
+          gap: 10,
+        }}
+      >
+        <View style={{ height: 48, width: 48, borderRadius: radii.pill, backgroundColor: colors.bg, alignItems: "center", justifyContent: "center" }}>
+          <Ionicons name="call" size={20} color={colors.ink} />
+        </View>
+        <TextInput
+          accessibilityLabel="Cep telefonu"
           placeholder="05xx xxx xx xx"
+          placeholderTextColor={colors.muted}
           keyboardType="phone-pad"
           autoComplete="tel"
           value={phone}
           onChangeText={setPhone}
           onSubmitEditing={submit}
           testID="phone"
+          style={{ ...font("extrabold"), flex: 1, fontSize: 20, letterSpacing: 0.5, color: colors.ink, paddingVertical: 12 }}
         />
-        <ErrorBox message={error} />
-        <Button title="Doğrulama kodu gönder" onPress={submit} loading={loading} disabled={phone.length < 10} testID="send-otp" />
-        <Muted>Numaranıza SMS ile 6 haneli bir kod göndereceğiz.</Muted>
-      </Card>
+      </View>
+      <ErrorBox message={error} />
+      <Button title="Kod gönder" onPress={submit} loading={loading} disabled={phone.length < 10} testID="send-otp" />
+      <Muted style={{ textAlign: "center" }}>Telefonuna SMS ile 6 haneli bir kod göndereceğiz.</Muted>
+      <View
+        style={{
+          marginTop: 12,
+          minHeight: 58,
+          borderRadius: radii.pill,
+          backgroundColor: colors.ink,
+          flexDirection: "row",
+          alignItems: "center",
+          paddingLeft: 22,
+          paddingRight: 8,
+          gap: 10,
+        }}
+      >
+        <Text style={{ ...font("bold"), flex: 1, color: "#fff", fontSize: 14 }}>
+          Kurye misin? <Text style={{ ...font("black"), color: colors.lime }}>Buradan gir</Text>
+        </Text>
+        <View style={{ width: 44, height: 44, borderRadius: radii.pill, backgroundColor: colors.lime, alignItems: "center", justifyContent: "center" }}>
+          <Ionicons name="bicycle" size={20} color={colors.ink} />
+        </View>
+      </View>
     </Screen>
   );
 }

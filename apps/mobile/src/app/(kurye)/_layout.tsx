@@ -9,8 +9,8 @@ export default function KuryeLayout() {
   if (!loading && (!session || !consented || profile?.role !== "kurye")) return <Redirect href="/" />;
   return (
     <Tabs screenOptions={tabOptions}>
-      <Tabs.Screen name="index" options={{ title: "İşlerim", tabBarIcon: tabIcon("bicycle", "bicycle-outline") }} />
-      <Tabs.Screen name="hesap" options={{ title: "Hesabım", tabBarIcon: tabIcon("person", "person-outline") }} />
+      <Tabs.Screen name="index" options={{ title: "İşlerim", headerShown: false, tabBarIcon: tabIcon("bicycle", "bicycle-outline") }} />
+      <Tabs.Screen name="hesap" options={{ title: "Hesabım", headerShown: false, tabBarIcon: tabIcon("person", "person-outline") }} />
     </Tabs>
   );
 }

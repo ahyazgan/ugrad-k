@@ -3,7 +3,7 @@ import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Pressable, Text, View } from "react-native";
 import type { PlaceDetails, PlaceSuggestion } from "@yazgan/shared";
-import { Button, Card, ErrorBox, Field, Muted, Screen, colors } from "@/components/ui";
+import { Button, Card, ErrorBox, Field, Muted, Screen, colors, font } from "@/components/ui";
 import { api, ApiError } from "@/lib/api";
 import { useOrderDraft } from "@/lib/order-draft";
 
@@ -86,7 +86,7 @@ export default function AdresSec() {
               testID={`suggestion-${i}`}
               style={{ padding: 14, borderTopWidth: i ? 1 : 0, borderColor: colors.border }}
             >
-              <Text style={{ fontWeight: "600" }}>{s.title}</Text>
+              <Text style={{ ...font("bold") }}>{s.title}</Text>
               <Muted>{s.subtitle}</Muted>
             </Pressable>
           ))}
@@ -94,7 +94,7 @@ export default function AdresSec() {
       ) : null}
       {selected ? (
         <Card>
-          <Text style={{ fontWeight: "700" }}>{selected.address}</Text>
+          <Text style={{ ...font("extrabold") }}>{selected.address}</Text>
           <Muted>
             {selected.district ? `${selected.district} · ` : ""}
             {selected.side === "avrupa" ? "Avrupa yakası" : "Anadolu yakası"}

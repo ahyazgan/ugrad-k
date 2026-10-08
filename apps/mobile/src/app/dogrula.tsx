@@ -1,6 +1,9 @@
 import { router, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
-import { Button, Card, ErrorBox, Field, Muted, Screen, Title } from "@/components/ui";
+import { Pressable, Text, TextInput, View } from "react-native";
+import { BigTitle, HandTag } from "@/components/Neo";
+import { Sticker } from "@/components/Sticker";
+import { Button, ErrorBox, Muted, Screen, colors, font } from "@/components/ui";
 import { api, ApiError } from "@/lib/api";
 import { useSession } from "@/lib/session";
 
@@ -40,26 +43,42 @@ export default function Dogrula() {
 
   return (
     <Screen>
-      <Card>
-        <Title>Kodu girin</Title>
-        <Muted>{phone} numarasına gönderilen 6 haneli kodu girin.</Muted>
-        <Field
-          label="Doğrulama kodu"
-          placeholder="______"
-          keyboardType="number-pad"
-          autoComplete="sms-otp"
-          textContentType="oneTimeCode"
-          maxLength={6}
-          value={code}
-          onChangeText={setCode}
-          onSubmitEditing={submit}
-          testID="otp"
-        />
-        <ErrorBox message={error} />
-        {info ? <Muted>{info}</Muted> : null}
-        <Button title="Doğrula" onPress={submit} loading={loading} disabled={code.length !== 6} testID="verify" />
-        <Button title="Kodu tekrar gönder" variant="secondary" onPress={resend} />
-      </Card>
+      <View style={{ marginTop: 4 }}>
+        <BigTitle size={64}>{"Kodu\ngir."}</BigTitle>
+        <Sticker name="clock" size={84} style={{ position: "absolute", right: 24, top: -8 }} />
+      </View>
+      <Muted>{phone} numarasına SMS ile gönderdiğimiz 6 haneli kodu gir.</Muted>
+      <TextInput
+        accessibilityLabel="Doğrulama kodu"
+        placeholder="••••••"
+        placeholderTextColor={colors.border}
+        keyboardType="number-pad"
+        autoComplete="sms-otp"
+        textContentType="oneTimeCode"
+        maxLength={6}
+        value={code}
+        onChangeText={setCode}
+        onSubmitEditing={submit}
+        testID="otp"
+        style={{
+          ...font("black"),
+          backgroundColor: colors.surface,
+          borderRadius: 20,
+          borderWidth: 2,
+          borderColor: code.length === 6 ? colors.ink : "transparent",
+          height: 70,
+          fontSize: 32,
+          letterSpacing: 14,
+          textAlign: "center",
+          color: colors.ink,
+        }}
+      />
+      <ErrorBox message={error} />
+      {info ? <HandTag rotate={-4}>{info}</HandTag> : null}
+      <Pressable accessibilityRole="button" onPress={resend} style={{ minHeight: 44, justifyContent: "center", alignSelf: "flex-start" }}>
+        <Text style={{ ...font("extrabold"), fontSize: 14, color: colors.ink, textDecorationLine: "underline" }}>Kodu tekrar gönder</Text>
+      </Pressable>
+      <Button title="Doğrula ve başla" onPress={submit} loading={loading} disabled={code.length !== 6} testID="verify" />
     </Screen>
   );
 }

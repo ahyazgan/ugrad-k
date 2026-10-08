@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { PanResponder, Pressable, Text, View } from "react-native";
 import Svg, { Path } from "react-native-svg";
-import { colors } from "./ui";
+import { colors, font, radii } from "./ui";
 
 const stroke = { stroke: "#111", strokeWidth: 2.5, fill: "none", strokeLinecap: "round", strokeLinejoin: "round" } as const;
 
@@ -59,7 +59,7 @@ export function SignaturePad({ onChange, height = 180 }: { onChange: (svg: strin
       <View
         testID="signature-pad"
         onLayout={(e) => setWidth(e.nativeEvent.layout.width)}
-        style={{ height, borderWidth: 1, borderColor: colors.border, borderRadius: 10, backgroundColor: "#fff", overflow: "hidden" }}
+        style={{ height, borderWidth: 2, borderColor: colors.border, borderRadius: radii.field, backgroundColor: "#fff", overflow: "hidden" }}
         {...responder.panHandlers}
       >
         <Svg width="100%" height="100%">
@@ -74,7 +74,7 @@ export function SignaturePad({ onChange, height = 180 }: { onChange: (svg: strin
         ) : null}
       </View>
       <Pressable onPress={() => setStrokes([])}>
-        <Text style={{ color: colors.primary, textAlign: "right" }}>Temizle</Text>
+        <Text style={{ ...font("extrabold"), color: colors.ink, textAlign: "right", textDecorationLine: "underline" }}>Temizle</Text>
       </Pressable>
     </View>
   );

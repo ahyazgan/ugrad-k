@@ -1,7 +1,7 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { router } from "expo-router";
 import { Pressable, Text, View, useWindowDimensions } from "react-native";
-import { HandTag, InkPillBar, Wordmark } from "@/components/Neo";
+import { HandTag, InkPillBar, RouteCard, Wordmark } from "@/components/Neo";
 import { Sticker } from "@/components/Sticker";
 import { Button, Card, Field, Muted, Screen, Segmented, ToggleRow, colors, font, radii, shadow, type } from "@/components/ui";
 import type { DraftPoint } from "@/lib/api";
@@ -182,18 +182,10 @@ export default function YeniGonderi() {
 
       {/* Gönderi formu */}
       <Text style={{ ...type.h2, marginTop: 10 }}>Ne, nereye?</Text>
-      <Card style={{ flexDirection: "row", gap: 12, paddingVertical: 10 }}>
-        <View style={{ alignItems: "center", paddingVertical: 18 }}>
-          <View style={{ width: 12, height: 12, borderRadius: 99, backgroundColor: colors.ink }} />
-          <View style={{ flex: 1, width: 0, borderLeftWidth: 2, borderStyle: "dashed", borderColor: colors.ink, marginVertical: 4 }} />
-          <View style={{ width: 12, height: 12, borderRadius: 3, backgroundColor: colors.limeDot }} />
-        </View>
-        <View style={{ flex: 1 }}>
-          <AddressButton label="NEREDEN (ALIŞ)" point={draft.pickup} target="pickup" />
-          <View style={{ height: 1, backgroundColor: colors.bg }} />
-          <AddressButton label="NEREYE (TESLİM)" point={draft.dropoff} target="dropoff" />
-        </View>
-      </Card>
+      <RouteCard
+        from={<AddressButton label="NEREDEN (ALIŞ)" point={draft.pickup} target="pickup" />}
+        to={<AddressButton label="NEREYE (TESLİM)" point={draft.dropoff} target="dropoff" />}
+      />
 
       <Card>
         <Text style={type.h3}>Alış</Text>

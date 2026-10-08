@@ -71,7 +71,7 @@ export default function RootLayout() {
               <Stack.Screen name="odeme" options={{ title: "Ödeme" }} />
               <Stack.Screen name="(kurye)" options={{ headerShown: false }} />
               <Stack.Screen name="is/[id]" options={{ title: "İş detayı" }} />
-              <Stack.Screen name="teslim/[id]" options={{ title: "Teslim et" }} />
+              <Stack.Screen name="teslim/[id]" options={{ title: "Teslim et", headerTitle: "" }} />
             </Stack>
           </OrderDraftProvider>
         </SessionProvider>
