@@ -348,7 +348,7 @@ export default function KuryeIsler() {
           sticker="kask"
           rotation={-8}
           title="Yol açık, iş yok."
-          body="Yeni iş gelince telefonun titrer."
+          body="Yeni iş gelince telefonunuz titrer."
           action={
             busyArea.h > 0
               ? { label: "Yoğun bölgeleri gör", variant: "dark", testID: "busy-areas-jump", onPress: () => scrollRef.current?.scrollTo({ y: Math.max(0, busyArea.y - 8), animated: true }) }

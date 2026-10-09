@@ -277,7 +277,7 @@ export default function SiparisDetay() {
           <Muted>
             {order.status === "geri_teslim"
               ? "Paket size geri teslim edildi."
-              : "Paket size geri getiriliyor. Dönüş ayağı ücreti (gidişin %50'si) fiyata eklendi."}
+              : "Paket size geri getiriliyor. İndirimli dönüş ayağı ücreti fiyata eklendi."}
           </Muted>
         </Card>
       ) : null}

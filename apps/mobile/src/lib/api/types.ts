@@ -9,6 +9,7 @@ import type {
   PlaceDetails,
   PlaceSuggestion,
   PriceQuote,
+  PricingSettings,
   IstanbulSide,
   ServiceLevel,
 } from "@yazgan/shared";
@@ -259,6 +260,8 @@ export interface Api {
   // Adres
   searchPlaces(input: string, sessionToken: string): Promise<PlaceSuggestion[]>;
   placeDetails(placeId: string, sessionToken: string): Promise<PlaceDetails>;
+  // Fiyat ayarları (yalnız gösterim ipuçları; gerçek fiyat her zaman sunucuda hesaplanır)
+  getPricingSettings(): Promise<PricingSettings>;
   // Sipariş
   quote(input: OrderInput): Promise<QuoteResponse>;
   createOrder(input: OrderInput): Promise<{ id: string; orderNo: string; totalKurus: number }>;

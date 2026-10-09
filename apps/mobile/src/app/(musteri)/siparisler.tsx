@@ -67,7 +67,7 @@ export default function Siparisler() {
               sticker="kutu"
               rotation={-6}
               title="Henüz sipariş yok."
-              body="İlk gönderini 1 dakikada oluştur."
+              body="İlk gönderinizi oluşturun."
               action={{ label: "Yeni sipariş", onPress: () => router.navigate("/(musteri)"), testID: "orders-empty-new" }}
             />
           ) : null

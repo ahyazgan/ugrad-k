@@ -34,7 +34,7 @@ export function StopPlan({ jobs, me }: { jobs: OrderSummary[]; me: { lat: number
           key={`${s.jobId}-${s.kind}`}
           onPress={() => router.push({ pathname: "/is/[id]", params: { id: s.jobId } })}
           testID={`stop-${i}`}
-          style={{ flexDirection: "row", gap: 10, paddingVertical: 4, alignItems: "center" }}
+          style={{ flexDirection: "row", gap: 10, minHeight: 44, paddingVertical: 4, alignItems: "center" }}
         >
           {/* Sıradaki durak: siyah daire + limon numara (limon yazı yalnız siyah zeminde) */}
           <View

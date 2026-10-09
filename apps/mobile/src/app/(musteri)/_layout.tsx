@@ -1,12 +1,13 @@
 import { Redirect } from "expo-router";
 import { Tabs } from "expo-router/js-tabs";
 import { tabIcon, useNeoTabOptions } from "@/components/NeoTabs";
-import { useSession } from "@/lib/session";
+import { entryRoute, useSession } from "@/lib/session";
 
 export default function MusteriLayout() {
-  const { loading, session, consented, profile } = useSession();
+  const state = useSession();
   const tabOptions = useNeoTabOptions();
-  if (!loading && (!session || !consented || profile?.role === "kurye")) return <Redirect href="/" />;
+  const target = entryRoute(state);
+  if (!state.loading && target !== "/(musteri)") return <Redirect href={target} />;
   return (
     <Tabs screenOptions={tabOptions}>
       <Tabs.Screen

@@ -1,4 +1,3 @@
-import { router } from "expo-router";
 import { useEffect, useState } from "react";
 import { Share, View } from "react-native";
 import { DeleteAccount } from "@/components/DeleteAccount";
@@ -7,6 +6,7 @@ import { Sticker } from "@/components/Sticker";
 import { Button, Card, ErrorBox, Field, Muted, Screen, Title, colors } from "@/components/ui";
 import { api, ApiError } from "@/lib/api";
 import { COMPANY } from "@/lib/kvkk";
+import { corporateTiersText, usePricingSettings } from "@/lib/pricing-settings";
 import { useSession } from "@/lib/session";
 
 export default function Hesap() {
@@ -17,6 +17,7 @@ export default function Hesap() {
 
 function HesapForm() {
   const { profile, refresh } = useSession();
+  const corporateTiers = corporateTiersText(usePricingSettings());
   const [fullName, setFullName] = useState(profile?.fullName ?? "");
   const [email, setEmail] = useState(profile?.email ?? "");
   const [saving, setSaving] = useState(false);
@@ -73,7 +74,7 @@ function HesapForm() {
         <Card style={{ backgroundColor: colors.lime, flexDirection: "row", alignItems: "center" }}>
           <View style={{ flex: 1, gap: 6 }}>
             <Title>Kurumsal hesap</Title>
-            <Muted>Ayda 20+ teslimatta %15, 50+ teslimatta %25 indirim ay sonu faturanıza yansır.</Muted>
+            <Muted>{corporateTiers ? `${corporateTiers} indirim ay sonu faturanıza yansır.` : "Tüm teslimatlarınız ay sonunda tek faturada toplanır."}</Muted>
           </View>
           <Sticker name="hediye" size={72} rotation={8} />
         </Card>
@@ -90,8 +91,7 @@ function HesapForm() {
         title="Çıkış yap"
         variant="secondary"
         onPress={async () => {
-          await api.signOut();
-          router.replace("/giris");
+          await api.signOut(); // sekme düzeni oturum düşünce giriş ekranına yönlendirir
         }}
       />
       <DeleteAccount />

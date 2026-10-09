@@ -390,6 +390,8 @@ export function createDemoApi(): Api {
     searchPlaces: (input, token) => maps.autocomplete(input, token),
     placeDetails: (id, token) => maps.placeDetails(id, token),
 
+    getPricingSettings: async () => DEFAULT_PRICING_SETTINGS,
+
     async quote(input) {
       requireSession();
       const { q } = await quoteFor(input);

@@ -1,5 +1,5 @@
 import type { Compliance } from "@yazgan/shared";
-import { router, useFocusEffect } from "expo-router";
+import { useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
 import { complianceFor, DocumentList } from "@/components/CourierDocs";
 import { DeleteAccount } from "@/components/DeleteAccount";
@@ -37,8 +37,7 @@ export default function KuryeHesap() {
         variant="secondary"
         onPress={async () => {
           await stopTracking();
-          await api.signOut();
-          router.replace("/giris");
+          await api.signOut(); // sekme düzeni oturum düşünce giriş ekranına yönlendirir
         }}
       />
       <DeleteAccount />

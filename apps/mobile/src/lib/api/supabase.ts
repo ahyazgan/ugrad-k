@@ -1,6 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { createClient, FunctionsHttpError, type SupabaseClient } from "@supabase/supabase-js";
-import { courierBalance, performanceStatsFromRow, type OrderStatus } from "@yazgan/shared";
+import { courierBalance, performanceStatsFromRow, pricingSettingsFromRow, type OrderStatus, type PricingSettingsRow } from "@yazgan/shared";
 import { Platform } from "react-native";
 import {
   ApiError,
@@ -170,6 +170,12 @@ export function createSupabaseApi(url: string, anonKey: string): Api & { client:
       return (await invoke<{ place: any }>("places", { placeId, sessionToken })).place;
     },
 
+    async getPricingSettings() {
+      // pricing_settings is world-readable (RLS: select using true); single row id = 1
+      const { data, error } = await client.from("pricing_settings").select("*").eq("id", 1).single();
+      fail(error, "Fiyat ayarları okunamadı");
+      return pricingSettingsFromRow(data as PricingSettingsRow);
+    },
     quote: (input) => invoke<QuoteResponse>("quote", input),
     async createOrder(input) {
       const r = await invoke<{ order: Row }>("create-order", input);

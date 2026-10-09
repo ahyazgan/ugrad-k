@@ -1,5 +1,4 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { DEFAULT_PRICING_SETTINGS } from "@yazgan/shared";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
 import { Pressable, ScrollView, Text, View, useWindowDimensions } from "react-native";
@@ -8,11 +7,11 @@ import { Sticker } from "@/components/Sticker";
 import { Button, Card, Field, Muted, Screen, Segmented, ToggleRow, Txt, colors, font, radii, shadow, type } from "@/components/ui";
 import { api, type DraftPoint } from "@/lib/api";
 import { useOrderDraft } from "@/lib/order-draft";
+import { usePricingSettings } from "@/lib/pricing-settings";
 import { recentPlaces, type RecentPlace } from "@/lib/recent";
 
 /** Kuruş → "1.000 TL" (fiyat ayarından gelen tutarlar; kodda sabit yazılmaz) */
 const tl = (kurus: number) => `${(kurus / 100).toLocaleString("tr-TR", { maximumFractionDigits: 2 })} TL`;
-const P = DEFAULT_PRICING_SETTINGS;
 
 /** Arama çubuğunun altındaki son 3 adres: dokununca teslim adresi olur */
 function RecentChips({ places, onPick }: { places: RecentPlace[]; onPick: (p: RecentPlace) => void }) {
@@ -33,9 +32,9 @@ function RecentChips({ places, onPick }: { places: RecentPlace[]; onPick: (p: Re
             maxWidth: 240,
             backgroundColor: pressed ? colors.primaryLight : colors.surface,
             borderRadius: radii.pill,
-            paddingLeft: 10,
-            paddingRight: 14,
-            paddingVertical: 8,
+            minHeight: 44,
+            paddingLeft: 12,
+            paddingRight: 16,
           })}
         >
           <Ionicons name="time-outline" size={15} color={colors.ink} />
@@ -55,7 +54,13 @@ function openAddress(target: "pickup" | "dropoff") {
 /** NEREDEN / NEREYE satırı (rota kartının içinde) */
 function AddressButton({ label, point, target }: { label: string; point: DraftPoint | null; target: "pickup" | "dropoff" }) {
   return (
-    <Pressable testID={`address-${target}`} onPress={() => openAddress(target)} style={{ paddingVertical: 8, gap: 2 }}>
+    <Pressable
+      testID={`address-${target}`}
+      accessibilityRole="button"
+      accessibilityLabel={`${label}: ${point ? point.address : "adres seçin"}`}
+      onPress={() => openAddress(target)}
+      style={{ minHeight: 48, justifyContent: "center", paddingVertical: 8, gap: 2 }}
+    >
       <Text style={type.label}>{label}</Text>
       <Text style={{ ...font("bold"), fontSize: 15, color: point ? colors.text : colors.muted }} numberOfLines={2}>
         {point ? point.address : "Adres seçin"}
@@ -129,14 +134,17 @@ function QuickCard({
 
 export default function YeniGonderi() {
   const { draft, update } = useOrderDraft();
+  const P = usePricingSettings();
   const ready = !!draft.pickup && !!draft.dropoff;
+  // Return-leg discount as copy: 50 → "yarı fiyat", otherwise "%40 indirimli"
+  const returnDeal = P.returnLegDiscountPct === 50 ? "yarı fiyat" : `%${P.returnLegDiscountPct.toLocaleString("tr-TR")} indirimli`;
   const { width } = useWindowDimensions();
   const heroSize = Math.min(80, Math.max(56, Math.round(width * 0.2)));
-  // Çıkartmalar başlık satırlarının sonu ile sağdaki el yazısı etiketler arasındaki boşluğa sığdırılır;
+  // Çıkartmalar başlık satırlarının sonundaki boşluğa sığdırılır (zarfın sağında şimşek taşar: 24 px);
   // dar ekranlarda yer yoksa gösterilmez (yazının üstüne binmesin).
   const contentWidth = width - 32;
-  const zarfSize = Math.round(Math.min(heroSize * 0.72, contentWidth - 76 - heroSize * 2.5 - 28));
-  const kutuSize = Math.round(Math.min(heroSize * 0.82, contentWidth - 102 - heroSize * 2.08 - 8));
+  const zarfSize = Math.round(Math.min(heroSize * 0.72, contentWidth - heroSize * 2.5 - 28 - 24));
+  const kutuSize = Math.round(Math.min(heroSize * 0.82, contentWidth - heroSize * 2.08 - 8));
   // Son 3 adres (geçmiş siparişlerden); okunamazsa çipler gösterilmez
   const [recent, setRecent] = useState<RecentPlace[]>([]);
   useFocusEffect(
@@ -162,16 +170,15 @@ export default function YeniGonderi() {
           style={{ width: 50, height: 50, borderRadius: 99, backgroundColor: colors.surface, alignItems: "center", justifyContent: "center", ...shadow }}
         >
           <Ionicons name="person" size={22} color={colors.ink} />
-          <View style={{ position: "absolute", right: 2, top: 2, width: 11, height: 11, borderRadius: 99, backgroundColor: colors.lime }} />
         </Pressable>
       </View>
 
-      {/* Dev başlık + el yazısı etiketler (alttaki etiket "Kapında."nın altına iner, kelimeyi kesmez) */}
+      {/* Dev başlık + el yazısı etiket ("Kapında."nın altına iner, kelimeyi kesmez) */}
       <View style={{ minHeight: heroSize * 2.9, justifyContent: "center", marginTop: 4, marginBottom: 16 }}>
         <Text accessibilityRole="header" style={{ ...type.hero, fontSize: heroSize, lineHeight: heroSize * 0.94, letterSpacing: -heroSize * 0.056 }}>
           {"Hızlı.\nNet.\nKapında."}
         </Text>
-        {/* 3B çıkartmalar: satır sonlarındaki boşluklarda, el yazısı etiketlerin altında kalır */}
+        {/* 3B çıkartmalar: satır sonlarındaki boşluklarda */}
         {zarfSize >= 40 ? (
           <>
             <Sticker name="zarf" size={zarfSize} rotation={-10} style={{ position: "absolute", left: heroSize * 2.5, top: heroSize * 0.02 }} />
@@ -181,12 +188,7 @@ export default function YeniGonderi() {
         {kutuSize >= 40 ? (
           <Sticker name="kutu" size={kutuSize} rotation={6} style={{ position: "absolute", left: heroSize * 2.08 + 2, top: heroSize * 1.0 }} />
         ) : null}
-        <HandTag tone="none" rotate={-12} style={{ position: "absolute", right: 0, top: 0 }}>
-          {"Daha\nfazlasını\ntaşır :)"}
-        </HandTag>
-        <HandTag rotate={-14} style={{ position: "absolute", right: 24, top: heroSize * 1.1 }}>
-          {"MESAFE\nYOK"}
-        </HandTag>
+        {/* Tek el yazısı etiket: bilgi taşıyan "aynı gün" vaadi (süs etiketleri kaldırıldı) */}
         <HandTag tone="white" rotate={-6} style={{ position: "absolute", right: 0, bottom: -22 }}>
           BUGÜN ORADA ✓
         </HandTag>
@@ -216,14 +218,14 @@ export default function YeniGonderi() {
         <QuickCard
           tone="white"
           testID="quick-roundtrip"
-          label="Gidiş-dönüş, dönüşü yarı fiyat"
+          label={`Gidiş-dönüş, dönüşü ${returnDeal}`}
           selected={draft.roundTrip}
           onPress={() => update({ roundTrip: !draft.roundTrip })}
           hint="Daha akıllı gönderim."
         >
           <Sticker name="donus" size={36} rotation={-8} style={{ position: "absolute", right: 14, bottom: 8 }} />
           <Text style={{ ...font("black"), fontSize: 16, lineHeight: 17, letterSpacing: -0.4, color: colors.ink }}>
-            Gidiş-dönüş, dönüşü <Text style={{ backgroundColor: colors.lime }}>yarı fiyat</Text>
+            Gidiş-dönüş, dönüşü <Text style={{ backgroundColor: colors.lime }}>{returnDeal}</Text>
           </Text>
         </QuickCard>
       </View>
@@ -303,8 +305,8 @@ export default function YeniGonderi() {
             { value: "acil", label: "Acil", hint: "60 dk, ek ücretli" },
           ]}
         />
-        {draft.serviceLevel === "ekonomi" ? <Muted>Ekonomi: Pazartesi–Cumartesi öğleden önce verilen siparişler aynı gün teslim edilir.</Muted> : null}
-        <ToggleRow label="Gidiş-dönüş" hint={`Dönüş ayağı %${P.returnLegDiscountPct} indirimli`} value={draft.roundTrip} onChange={(v) => update({ roundTrip: v })} />
+        {draft.serviceLevel === "ekonomi" ? <Muted>{`Ekonomi: Pazartesi–Cumartesi, alışı saat ${P.economyCutoffHour}.00 öncesine planlanan siparişler aynı gün teslim edilir.`}</Muted> : null}
+        <ToggleRow label="Gidiş-dönüş" hint={`Dönüş ayağı %${P.returnLegDiscountPct.toLocaleString("tr-TR")} indirimli`} value={draft.roundTrip} onChange={(v) => update({ roundTrip: v })} />
         <Field
           label="Gönderinin değeri (TL, isteğe bağlı)"
           placeholder="Örn. 25.000"

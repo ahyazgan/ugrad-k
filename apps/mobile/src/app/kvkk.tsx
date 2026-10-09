@@ -93,7 +93,8 @@ export default function Kvkk() {
             gap: 8,
             borderTopWidth: 1,
             borderTopColor: colors.bg,
-            paddingTop: 12,
+            minHeight: 48,
+            paddingTop: 4,
             opacity: pressed ? 0.7 : 1,
           })}
         >

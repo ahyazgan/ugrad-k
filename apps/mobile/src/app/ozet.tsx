@@ -8,6 +8,7 @@ import { Button, Card, ErrorBox, Field, Loading, Muted, Row, Screen, Title, colo
 import { api, ApiError, type OrderInput, type QuoteResponse } from "@/lib/api";
 import { draftToInput, useOrderDraft } from "@/lib/order-draft";
 import { payOrder } from "@/lib/payment";
+import { usePricingSettings } from "@/lib/pricing-settings";
 import { useSession } from "@/lib/session";
 
 const PAYMENT_OPTIONS: { value: OrderInput["paymentMethod"]; label: string; hint: string; corporateOnly?: boolean; disabled?: boolean }[] = [
@@ -18,6 +19,7 @@ const PAYMENT_OPTIONS: { value: OrderInput["paymentMethod"]; label: string; hint
 
 export default function Ozet() {
   const { draft, update, reset } = useOrderDraft();
+  const P = usePricingSettings();
   const { profile } = useSession();
   const input = draftToInput(draft);
   // Teklif, hesaplandığı girdinin anahtarıyla saklanır; girdi değişince eski teklif gösterilmez
@@ -135,7 +137,7 @@ export default function Ozet() {
           ))}
           <View style={{ height: 1, backgroundColor: colors.bg }} />
           <Row label="Ara toplam (KDV hariç)" value={formatTL(quote.quote.subtotalKurus)} />
-          <Row label="KDV %20" value={formatTL(quote.quote.vatKurus)} />
+          <Row label={`KDV %${P.vatPct.toLocaleString("tr-TR")}`} value={formatTL(quote.quote.vatKurus)} />
           <Row label="Toplam" value={formatTL(quote.quote.totalKurus)} bold />
           {draft.paymentMethod === "cari" ? (
             <Muted>Kurumsal indiriminiz ay sonu faturanızda uygulanır.</Muted>
@@ -198,7 +200,7 @@ export default function Ozet() {
         testID="confirm-order"
       />
       <Muted style={{ textAlign: "center" }}>
-        Bekleme süresi 15 dakikayı aşarsa her 10 dakika için 50 TL + KDV eklenir.
+        {`Bekleme süresi ${P.waitingFreeMinutes} dakikayı aşarsa her ${P.waitingBlockMinutes} dakika için ${formatTL(P.waitingBlockFeeKurus)} + KDV eklenir.`}
       </Muted>
     </Screen>
   );

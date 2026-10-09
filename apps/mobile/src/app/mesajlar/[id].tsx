@@ -101,6 +101,8 @@ export default function Mesajlar() {
   const [messages, setMessages] = useState<ChatMessage[] | null>(null);
   const [order, setOrder] = useState<OrderDetail | null>(null);
   const [text, setText] = useState("");
+  // Web: the input's own outline is removed, so the pill shows a visible focus ring instead
+  const [focused, setFocused] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const scroll = useRef<ScrollView>(null);
@@ -172,7 +174,7 @@ export default function Mesajlar() {
               stickerSize={96}
               rotation={-8}
               title="Henüz mesaj yok."
-              body={me === "kurye" ? "Müşteriye hazır cevaplardan birini gönder ya da yaz." : "Kuryene hazır cevaplardan birini gönder ya da yaz."}
+              body={me === "kurye" ? "Müşteriye hazır cevaplardan birini gönderin ya da yazın." : "Kuryenize hazır cevaplardan birini gönderin ya da yazın."}
             >
               {/* Boşken hazır cevaplar ortada, büyük çipler */}
               <View style={{ alignSelf: "stretch", gap: 8, marginTop: 10 }}>
@@ -248,8 +250,9 @@ export default function Mesajlar() {
                   style={({ pressed }) => ({
                     backgroundColor: pressed ? colors.primaryLight : colors.surface,
                     borderRadius: radii.pill,
-                    paddingHorizontal: 14,
-                    paddingVertical: 8,
+                    minHeight: 44,
+                    justifyContent: "center",
+                    paddingHorizontal: 16,
                   })}
                 >
                   <Txt weight="bold" size={13}>
@@ -266,12 +269,15 @@ export default function Mesajlar() {
               minHeight: 60,
               backgroundColor: colors.ink,
               borderRadius: radii.pill,
+              // Focus ring (lime on ink); transparent border keeps the size stable
+              borderWidth: 2,
+              borderColor: focused ? colors.lime : "transparent",
               flexDirection: "row",
               alignItems: "center",
               gap: 8,
-              paddingLeft: 20,
-              paddingRight: 6,
-              paddingVertical: 5,
+              paddingLeft: 18,
+              paddingRight: 4,
+              paddingVertical: 3,
             }}
           >
             <TextInput
@@ -284,6 +290,8 @@ export default function Mesajlar() {
               testID="chat-input"
               accessibilityLabel="Mesaj"
               onSubmitEditing={() => send(text)}
+              onFocus={() => setFocused(true)}
+              onBlur={() => setFocused(false)}
             />
             <Pressable
               testID="chat-send"

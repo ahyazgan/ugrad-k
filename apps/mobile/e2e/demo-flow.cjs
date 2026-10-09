@@ -329,7 +329,32 @@ fs.mkdirSync(out, { recursive: true });
   await kt('today-strip').getByText(/^2 iş · [\d.,]+ TL · (Altın|Gümüş|Gelişmeli|Riskli)$/).waitFor();
   if (await kp.getByText(/Aktif işler \(/).count()) throw new Error('vardiya kapalıyken "Aktif işler" görünmemeli');
   await kshot('13-kurye-bitti');
+  // Çıkış: sekme düzeni doğrudan giriş ekranına yönlendirir (eskiden "/" yönlendirmesi sonsuz döngüye giriyordu)
+  await kp.getByRole('tab', { name: /Hesabım/ }).click();
+  await kp.getByRole('button', { name: 'Çıkış yap' }).click();
+  await kt('phone').waitFor({ timeout: 10000 });
   if (errors.length) throw new Error('Tarayıcı hataları: ' + JSON.stringify(errors.slice(0, 10)));
   console.log('✓ kurye akışı geçti');
+
+  // ───────── Hesap silme (devam eden siparişi olmayan müşteri): onaydan sonra giriş ekranına dönülür
+  const dp = await (await browser.newContext({ viewport: { width: 390, height: 844 } })).newPage();
+  dp.on('pageerror', e => errors.push(e.message));
+  dp.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
+  const dt = id => dp.getByTestId(id);
+  await dp.goto(`http://localhost:${process.env.PORT || 8099}/`);
+  await dt('phone').fill('05329876543');
+  await dt('send-otp').click();
+  await dt('otp').fill('123456');
+  await dt('verify').click();
+  await dp.getByRole('checkbox').nth(0).click();
+  await dp.getByRole('checkbox').nth(1).click();
+  await dt('kvkk-accept').click();
+  await dt('address-pickup').waitFor();
+  await dp.getByRole('tab', { name: /Hesabım/ }).click();
+  await dt('delete-account').click();
+  await dt('delete-account-confirm').click();
+  await dt('phone').waitFor({ timeout: 10000 });
+  if (errors.length) throw new Error('Tarayıcı hataları: ' + JSON.stringify(errors.slice(0, 10)));
+  console.log('✓ çıkış ve hesap silme geçti');
   await browser.close();
 })().catch(e => { console.error('FAIL', e.message); process.exit(1); });

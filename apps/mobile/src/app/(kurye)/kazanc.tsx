@@ -182,7 +182,7 @@ export default function Kazancim() {
             stickerSize={88}
             rotation={-6}
             title="Henüz teslimat yok."
-            body="Teslim ettiğin işler birkaç dakika içinde burada."
+            body="Teslim ettiğiniz işler birkaç dakika içinde burada görünür."
             action={{ label: "İşlerime git", variant: "secondary", onPress: () => router.navigate("/(kurye)") }}
           />
         ) : null}

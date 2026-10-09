@@ -5,7 +5,6 @@ import { useEffect, useMemo, useRef, useState, type ComponentProps } from "react
 import { ActivityIndicator, Pressable, TextInput, View } from "react-native";
 import {
   countBridgeCrossings,
-  DEFAULT_PRICING_SETTINGS,
   formatTL,
   resolveSide,
   sideFromDistrict,
@@ -20,6 +19,7 @@ import { Button, Card, ErrorBox, Field, Muted, Screen, Txt, colors, font, radii,
 import { api, ApiError } from "@/lib/api";
 import { myPlace } from "@/lib/location";
 import { useOrderDraft } from "@/lib/order-draft";
+import { usePricingSettings } from "@/lib/pricing-settings";
 import { recentPlaces, type RecentPlace } from "@/lib/recent";
 
 const SIDE_LABEL: Record<IstanbulSide, string> = { anadolu: "Anadolu yakası", avrupa: "Avrupa yakası" };
@@ -88,6 +88,7 @@ function PlaceRow({
 export default function AdresSec() {
   const { target } = useLocalSearchParams<{ target: "pickup" | "dropoff" }>();
   const { draft, update } = useOrderDraft();
+  const pricing = usePricingSettings();
   const current = target === "pickup" ? draft.pickup : draft.dropoff;
   const other = target === "pickup" ? draft.dropoff : draft.pickup;
   // Google Places oturum belirteci: arama + detay tek oturum olarak faturalanır
@@ -176,7 +177,7 @@ export default function AdresSec() {
   // Köprü ipucu: alış veya teslimden biri Avrupa yakasındaysa 1 ücretli geçiş (geo.ts); tutar fiyat ayarından
   const otherSide = other ? resolveSide(other, other.district) : null;
   const crossings = selected ? countBridgeCrossings(selected.side, otherSide ?? "anadolu") : 0;
-  const bridgeFee = `+${formatTL(crossings * DEFAULT_PRICING_SETTINGS.bridgeFeeKurus)}`;
+  const bridgeFee = `+${formatTL(crossings * pricing.bridgeFeeKurus)}`;
   const sideHint = !selected
     ? null
     : selected.side === "avrupa"
@@ -230,7 +231,7 @@ export default function AdresSec() {
           style={{ ...font("bold"), flex: 1, fontSize: 17, color: colors.ink, paddingVertical: 12, outlineWidth: 0 }}
         />
         {query ? (
-          <Pressable accessibilityRole="button" accessibilityLabel="Aramayı temizle" hitSlop={8} onPress={() => {
+          <Pressable accessibilityRole="button" accessibilityLabel="Aramayı temizle" hitSlop={12} onPress={() => {
               setQuery("");
               setSelected(null);
               setItems([]);

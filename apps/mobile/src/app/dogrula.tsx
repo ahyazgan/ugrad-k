@@ -78,7 +78,7 @@ export default function Dogrula() {
           </HandTag>
         ) : null}
       </View>
-      <Muted>{phone} numarasına SMS ile gönderdiğimiz 6 haneli kodu gir.</Muted>
+      <Muted>{phone} numarasına SMS ile gönderdiğimiz 6 haneli kodu girin.</Muted>
       <TextInput
         accessibilityLabel="Doğrulama kodu"
         placeholder="••••••"
