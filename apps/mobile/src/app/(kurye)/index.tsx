@@ -11,7 +11,7 @@ import {
 } from "@yazgan/shared";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Pressable, View, useWindowDimensions, type ScrollView } from "react-native";
+import { Pressable, View, type ScrollView } from "react-native";
 import { BusyAreas } from "@/components/BusyAreas";
 import { complianceFor, DocumentWarning } from "@/components/CourierDocs";
 import { BigTitle, EmptyState, InkChip, Wordmark } from "@/components/Neo";
@@ -23,6 +23,7 @@ import { Sticker } from "@/components/Sticker";
 import { Button, Card, ErrorBox, Muted, Screen, Title, Txt, colors, radii, type } from "@/components/ui";
 import { api, ApiError, type OrderSummary, type Shift, type ShiftSlot } from "@/lib/api";
 import { formatTime } from "@/lib/format";
+import { useAppWidth } from "@/lib/layout";
 import { currentPosition, lastKnownPosition, setActiveOrderForLocation, startTracking, stopTracking } from "@/lib/location";
 
 const ACTIVE = ["kuryeye_atandi", "alindi", "yolda", "sorunlu", "geri_donuyor"];
@@ -149,7 +150,7 @@ export default function KuryeIsler() {
     const t = setInterval(() => setNow(Date.now()), 30_000);
     return () => clearInterval(t);
   }, []);
-  const { width } = useWindowDimensions();
+  const width = useAppWidth();
   // "gelsin!" satırının sağındaki boşluğa sığacak motor genişliği
   const motorSize = Math.max(56, Math.min(120, width - 32 - 210));
 

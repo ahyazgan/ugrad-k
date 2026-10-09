@@ -1,11 +1,12 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
-import { Pressable, ScrollView, Text, View, useWindowDimensions } from "react-native";
+import { Pressable, ScrollView, Text, View } from "react-native";
 import { HandTag, InkPillBar, RouteCard, Wordmark } from "@/components/Neo";
 import { Sticker } from "@/components/Sticker";
 import { Button, Card, Field, Muted, Screen, Segmented, ToggleRow, Txt, colors, font, radii, shadow, type } from "@/components/ui";
 import { api, type DraftPoint } from "@/lib/api";
+import { useAppWidth } from "@/lib/layout";
 import { useOrderDraft } from "@/lib/order-draft";
 import { usePricingSettings } from "@/lib/pricing-settings";
 import { recentPlaces, type RecentPlace } from "@/lib/recent";
@@ -138,7 +139,7 @@ export default function YeniGonderi() {
   const ready = !!draft.pickup && !!draft.dropoff;
   // Return-leg discount as copy: 50 → "yarı fiyat", otherwise "%40 indirimli"
   const returnDeal = P.returnLegDiscountPct === 50 ? "yarı fiyat" : `%${P.returnLegDiscountPct.toLocaleString("tr-TR")} indirimli`;
-  const { width } = useWindowDimensions();
+  const width = useAppWidth();
   const heroSize = Math.min(80, Math.max(56, Math.round(width * 0.2)));
   // Çıkartmalar başlık satırlarının sonundaki boşluğa sığdırılır (zarfın sağında şimşek taşar: 24 px);
   // dar ekranlarda yer yoksa gösterilmez (yazının üstüne binmesin).

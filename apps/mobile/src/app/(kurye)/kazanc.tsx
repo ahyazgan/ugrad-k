@@ -1,11 +1,12 @@
 import { courierPerformance, formatTL, incentiveProgress, incentiveScope, PERFORMANCE_TIERS, type PerformanceStats } from "@yazgan/shared";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
-import { View, useWindowDimensions } from "react-native";
+import { View } from "react-native";
 import { BigTitle, EmptyState, HandTag } from "@/components/Neo";
 import { Sticker } from "@/components/Sticker";
 import { Card, ErrorBox, Loading, Muted, Row, Screen, Txt, colors, radii, type } from "@/components/ui";
 import { api, ApiError, type CourierEarnings, type IncentiveStatus } from "@/lib/api";
+import { useAppWidth } from "@/lib/layout";
 
 const fmtDate = (iso: string) =>
   new Date(iso).toLocaleString("tr-TR", { timeZone: "Europe/Istanbul", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
@@ -41,7 +42,7 @@ export default function Kazancim() {
   const [error, setError] = useState<string | null>(null);
   const [perf, setPerf] = useState<PerformanceStats | null>(null);
   const [incentives, setIncentives] = useState<IncentiveStatus[]>([]);
-  const { width } = useWindowDimensions();
+  const width = useAppWidth();
 
   useFocusEffect(
     useCallback(() => {

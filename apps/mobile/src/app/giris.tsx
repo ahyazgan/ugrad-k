@@ -1,17 +1,18 @@
 import { router } from "expo-router";
 import { useState } from "react";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { Text, TextInput, View, useWindowDimensions } from "react-native";
+import { Text, TextInput, View } from "react-native";
 import { BigTitle, HandTag, InkChip, Wordmark } from "@/components/Neo";
 import { Sticker } from "@/components/Sticker";
 import { Button, Card, ErrorBox, Muted, Screen, colors, font, radii } from "@/components/ui";
 import { api, ApiError } from "@/lib/api";
+import { useAppWidth } from "@/lib/layout";
 
 export default function Giris() {
   const [phone, setPhone] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { width } = useWindowDimensions();
+  const width = useAppWidth();
   // "Selam." satırının sağındaki boşluğa sığacak çıkartma genişliği
   const phoneSticker = Math.max(48, Math.min(104, width - 32 - 240));
 
