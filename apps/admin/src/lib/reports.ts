@@ -1,3 +1,4 @@
+import { ORDER_STATUS_LABELS } from "@yazgan/shared";
 import type { AdminOrder, OrderRating } from "./repo";
 import { istDate } from "./dates";
 
@@ -11,7 +12,9 @@ export interface Report {
     delivered: number;
     cancelled: number;
     cancelRate: number; // 0..1
-    revenueKurus: number; // teslim edilenlerin KDV hariç toplamı
+    /** Teslim edilemeyip göndericiye iade edilen */
+    returned: number;
+    revenueKurus: number; // teslim edilen ve iade edilenlerin KDV hariç toplamı
     avgOrderKurus: number;
     avgDeliveryMin: number | null;
     urgentDelivered: number;
@@ -56,7 +59,9 @@ const avg1 = (xs: number[]) => (xs.length ? Math.round((xs.reduce((a, b) => a + 
 export function buildReport(orders: AdminOrder[], from: string, to: string, ratings: OrderRating[] = []): Report {
   const delivered = orders.filter((o) => o.status === "teslim_edildi");
   const cancelled = orders.filter((o) => o.status === "iptal");
-  const revenueKurus = delivered.reduce((s, o) => s + o.subtotalKurus, 0);
+  // İade edilen iş de faturalanır (gidiş + dönüş ayağı)
+  const returned = orders.filter((o) => o.status === "geri_teslim");
+  const revenueKurus = [...delivered, ...returned].reduce((s, o) => s + o.subtotalKurus, 0);
   const times = delivered.map(deliveryMinutes).filter((x): x is number => x != null);
   const urgent = delivered.filter((o) => o.urgent);
   const urgentOnTime = urgent.filter((o) => (deliveryMinutes(o) ?? Infinity) <= URGENT_TARGET_MIN);
@@ -72,6 +77,10 @@ export function buildReport(orders: AdminOrder[], from: string, to: string, rati
       d.delivered++;
       d.revenueKurus += o.subtotalKurus;
     }
+  }
+  for (const o of returned) {
+    const d = o.returnedAt ? daily.get(istDate(o.returnedAt)) : undefined;
+    if (d) d.revenueKurus += o.subtotalKurus;
   }
 
   const hourly = Array.from({ length: 24 }, (_, hour) => ({ hour, orders: 0 }));
@@ -103,8 +112,9 @@ export function buildReport(orders: AdminOrder[], from: string, to: string, rati
       delivered: delivered.length,
       cancelled: cancelled.length,
       cancelRate: orders.length ? cancelled.length / orders.length : 0,
+      returned: returned.length,
       revenueKurus,
-      avgOrderKurus: delivered.length ? Math.round(revenueKurus / delivered.length) : 0,
+      avgOrderKurus: delivered.length + returned.length ? Math.round(revenueKurus / (delivered.length + returned.length)) : 0,
       avgDeliveryMin: avg(times),
       urgentDelivered: urgent.length,
       urgentOnTimeRate: urgent.length ? urgentOnTime.length / urgent.length : null,
@@ -129,16 +139,7 @@ export function buildReport(orders: AdminOrder[], from: string, to: string, rati
   };
 }
 
-const STATUS_TR: Record<AdminOrder["status"], string> = {
-  beklemede: "Beklemede",
-  onaylandi: "Onaylandı",
-  kuryeye_atandi: "Kuryeye atandı",
-  alindi: "Alındı",
-  yolda: "Yolda",
-  teslim_edildi: "Teslim edildi",
-  iptal: "İptal",
-  sorunlu: "Sorunlu",
-};
+const STATUS_TR = ORDER_STATUS_LABELS;
 
 /** Türkçe Excel uyumlu CSV: ";" ayraç, ondalık virgül, UTF-8 BOM */
 export function ordersCsv(orders: AdminOrder[]): string {

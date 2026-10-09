@@ -1,9 +1,17 @@
 "use client";
 
-import { formatTL, type PlaceDetails, type PlaceSuggestion, type ServiceLevel } from "@yazgan/shared";
+import { formatTL, type PlaceDetails, type PlaceSuggestion, type PricingSettings, type ServiceLevel } from "@yazgan/shared";
 import { useEffect, useId, useRef, useState } from "react";
+import { Sticker } from "@/components/Sticker";
+import { HandNote } from "@/components/ui";
 import { placeDetails, quote, searchPlaces, SiteApiError, type SiteQuote } from "@/lib/api";
+import { baseRows, economyWindowText } from "@/lib/pricing-info";
 import { APP_URL, whatsappLink } from "@/lib/site";
+
+/** Visible keyboard focus: text fields keep the ink border and get an offset ring. */
+const FIELD_FOCUS = "outline-none focus:border-brand focus-visible:ring-2 focus-visible:ring-brand/60 focus-visible:ring-offset-2";
+/** Visually hidden radio/checkbox inside a label: draw the ring on the label instead. */
+const CONTROL_FOCUS = "has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-brand/60 has-[:focus-visible]:ring-offset-2";
 
 const newToken = () => (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : String(Math.random()).slice(2));
 
@@ -72,7 +80,7 @@ function AddressField({
         aria-controls={listId}
         aria-autocomplete="list"
         autoComplete="off"
-        className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-base outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
+        className={`w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-base ${FIELD_FOCUS}`}
         placeholder={placeholder}
         value={text}
         onChange={(e) => {
@@ -123,8 +131,10 @@ function AddressField({
 
 function Toggle({ id, label, hint, checked, onChange }: { id: string; label: string; hint: string; checked: boolean; onChange: (v: boolean) => void }) {
   return (
-    <label className={`flex cursor-pointer items-start gap-3 rounded-xl border p-3 text-sm ${checked ? "border-brand bg-brand-light" : "border-slate-200 bg-white"}`}>
-      <input type="checkbox" data-testid={id} className="mt-0.5 h-4 w-4 accent-[#111114]" checked={checked} onChange={(e) => onChange(e.target.checked)} />
+    <label
+      className={`flex cursor-pointer items-start gap-3 rounded-xl border p-3 text-sm ${CONTROL_FOCUS} ${checked ? "border-brand bg-brand-light" : "border-slate-200 bg-white"}`}
+    >
+      <input type="checkbox" data-testid={id} className="mt-0.5 h-4 w-4 accent-[#111114] focus-visible:outline-none" checked={checked} onChange={(e) => onChange(e.target.checked)} />
       <span>
         <span className="block font-semibold text-slate-900">{label}</span>
         <span className="text-slate-500">{hint}</span>
@@ -147,7 +157,7 @@ function LevelPicker({ value, onChange }: { value: ServiceLevel; onChange: (v: S
         {LEVELS.map((l) => (
           <label
             key={l.value}
-            className={`cursor-pointer rounded-xl border p-2.5 text-center text-sm ${value === l.value ? "border-brand bg-brand-light" : "border-slate-200 bg-white"}`}
+            className={`cursor-pointer rounded-xl border p-2.5 text-center text-sm ${CONTROL_FOCUS} ${value === l.value ? "border-brand bg-brand-light" : "border-slate-200 bg-white"}`}
           >
             <input
               type="radio"
@@ -166,8 +176,61 @@ function LevelPicker({ value, onChange }: { value: ServiceLevel; onChange: (v: S
   );
 }
 
-/** Adres → anında fiyat. Sunucuda uygulama ile aynı fiyat fonksiyonu (pricing.ts) çalışır. */
-export function PriceCalculator({ compact = false }: { compact?: boolean }) {
+/**
+ * Empty state before both addresses are picked: a dashed "receipt preview" listing the opening fee and
+ * km tiers of the current tariff, with the total left blank ("— TL").
+ */
+function ReceiptPreview({ settings, stickerClassName = "" }: { settings: PricingSettings; stickerClassName?: string }) {
+  const rows = baseRows(settings);
+  return (
+    <div className="relative rounded-2xl border-2 border-dashed border-slate-300 bg-neo-bg/40 px-4 pt-4 pb-3" data-testid="receipt-preview">
+      <Sticker name="fis" className={`absolute -top-6 -right-3 w-16 rotate-6 ${stickerClassName}`} />
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 pr-12">
+        <span className="text-xs font-extrabold tracking-[0.14em] text-neo-muted uppercase">Fiş önizlemesi</span>
+        <HandNote variant="ink" className="-rotate-2 text-xl">
+          adresi yaz, kalemleri gör
+        </HandNote>
+      </div>
+      <ul className="mt-3 space-y-1.5 text-sm">
+        {rows.map((r) => (
+          <li key={r.label} className="flex items-baseline gap-2">
+            <span className="text-slate-700">{r.label}</span>
+            <span aria-hidden="true" className="min-w-4 flex-1 -translate-y-[3px] border-b border-dotted border-slate-400" />
+            <span className="font-semibold whitespace-nowrap text-brand">{r.value}</span>
+          </li>
+        ))}
+        <li className="flex items-baseline gap-2 text-slate-500">
+          <span>Hizmet ve zaman ekleri</span>
+          <span aria-hidden="true" className="min-w-4 flex-1 -translate-y-[3px] border-b border-dotted border-slate-300" />
+          <span className="whitespace-nowrap">adrese göre</span>
+        </li>
+      </ul>
+      <div className="mt-3 flex items-baseline justify-between border-t-2 border-dashed border-slate-300 pt-3">
+        <span className="font-black text-brand">Toplam</span>
+        <span className="text-2xl font-black text-slate-400">
+          <span aria-hidden="true">— TL</span>
+          <span className="sr-only">henüz hesaplanmadı</span>
+        </span>
+      </div>
+      <p className="mt-1 text-xs text-slate-500">Tutarlar KDV hariçtir. İki adresi seçin, fiyat anında hesaplansın.</p>
+    </div>
+  );
+}
+
+/**
+ * Adres → anında fiyat. Sunucuda uygulama ile aynı fiyat fonksiyonu (pricing.ts) çalışır.
+ * `settings` is the live tariff read on the server (getPricingSettings); it only drives the copy here,
+ * the quote itself is always recomputed server-side.
+ */
+export function PriceCalculator({
+  settings,
+  compact = false,
+  receiptStickerClassName,
+}: {
+  settings: PricingSettings;
+  compact?: boolean;
+  receiptStickerClassName?: string;
+}) {
   const [pickup, setPickup] = useState<PlaceDetails | null>(null);
   const [dropoff, setDropoff] = useState<PlaceDetails | null>(null);
   const [serviceLevel, setServiceLevel] = useState<ServiceLevel>("standart");
@@ -207,20 +270,20 @@ export function PriceCalculator({ compact = false }: { compact?: boolean }) {
     : null;
 
   return (
-    <div className="rounded-[26px] bg-white p-5 shadow-xl shadow-brand/5 sm:p-6" id="fiyat-hesapla">
+    <div className="scroll-mt-24 rounded-[26px] bg-white p-5 shadow-xl shadow-brand/5 sm:p-6" id="fiyat-hesapla">
       <div className="grid gap-4">
         <AddressField id="pickup" label="Nereden?" placeholder="Alış adresi, ör. Kavacık" value={pickup} onChange={setPickup} />
         <AddressField id="dropoff" label="Nereye?" placeholder="Teslim adresi, ör. Levent" value={dropoff} onChange={setDropoff} />
         <LevelPicker value={serviceLevel} onChange={setServiceLevel} />
         <div className={`grid gap-2 ${compact ? "" : "sm:grid-cols-2"}`}>
           <Toggle id="opt-roundtrip" label="Gidiş-dönüş" hint="İmzalatıp geri getir" checked={roundTrip} onChange={setRoundTrip} />
-          <Toggle id="opt-large" label="Büyük paket" hint="10 kg üzeri" checked={largePackage} onChange={setLargePackage} />
+          <Toggle id="opt-large" label="Büyük paket" hint={`${settings.heavyThresholdKg.toLocaleString("tr-TR")} kg üzeri`} checked={largePackage} onChange={setLargePackage} />
         </div>
       </div>
 
       <div className="mt-5 border-t border-slate-100 pt-5" aria-live="polite">
         {!pickup || !dropoff ? (
-          <p className="text-sm text-slate-500">İki adresi seçin, fiyat anında hesaplansın.</p>
+          <ReceiptPreview settings={settings} stickerClassName={receiptStickerClassName} />
         ) : error ? (
           <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
         ) : !shown ? (
@@ -268,7 +331,7 @@ export function PriceCalculator({ compact = false }: { compact?: boolean }) {
               ) : null}
             </div>
             <p className="mt-2 text-xs text-slate-500">
-              Fiyat şu anki saate göre hesaplandı; gece, Pazar ve resmi tatillerde ek ücret uygulanır. Ekonomi yalnızca Pazartesi–Cumartesi öğleden önceki alışlarda seçilebilir. Alışta 15 dakikayı aşan bekleme teslimatta eklenir.
+              Fiyat şu anki saate göre hesaplandı; gece, Pazar ve resmi tatillerde ek ücret uygulanır. Ekonomi yalnızca {economyWindowText(settings)} arası alışlarda seçilebilir. Alışta {settings.waitingFreeMinutes} dakikayı aşan bekleme teslimatta eklenir.
             </p>
           </div>
         )}

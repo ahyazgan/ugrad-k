@@ -30,6 +30,7 @@ Bu dosya Claude Code için proje hafızasıdır. Her oturumda önce bunu oku.
 - Gece 22:00–07:00 +%50, **Pazar +%50**, resmi tatil +%50 — ayrı parametreler, toplanmaz, en yükseği uygulanır
 - Uzak alış: merkeze (Beykoz) tahmini yol mesafesi 40 km'yi aşan her km 10 TL, en fazla 300 TL
 - Motosiklet sınırı 20 kg; üstü reddedilir
+- Değer beyanı: 1.000 TL'ye kadar ücretsiz güvence, üstü %0,5 (en az 25 TL), en fazla 100.000 TL; satır `insurance`, indirim dışı. Teslim kodu: `order_secrets` (kurye göremez), `verify_delivery_code` RPC, doğrulanmadan teslim kapanmaz. docs/kurulum.md §26
 - Bekleme: ilk 15 dk ücretsiz, sonra her 10 dk 50 TL
 - Gidiş-dönüş: dönüş ayağı %50 indirimli
 - 10 kg üzeri / büyük paket: +150 TL
@@ -45,11 +46,13 @@ Bu dosya Claude Code için proje hafızasıdır. Her oturumda önce bunu oku.
 - Köprü: alış veya teslimden biri Avrupa yakasındaysa 1 geçiş (15 Temmuz/FSM motosiklet 25 TL, yalnız Anadolu→Avrupa yönü ücretli)
 - Arife günleri 13:00'ten itibaren tatil sayılır; tatil listesi `holidays` tablosunda
 - Tutarlar kuruş (tam sayı) tutulur; fiyat her zaman sunucuda yeniden hesaplanır
+- Acil taahhüt kaçarsa acil ek ücreti kadar kredi, müşterinin sonraki siparişinden düşülür (fiyat satırı `credit`, indirim dışı)
+- Kampanya/davet kodu: satır `promo` (eksi; kurumsal indirim tabanından düşer), `packages/shared/promo.ts` + `_shared/promo.ts`; davet ödülü ve geri kazanma `ops_settings`. docs/kurulum.md §27
 - Dinamik yoğunluk zammı ve dakika ücreti yok (B2B öngörülebilirlik). Enflasyon: panel → Fiyatlar → endeks aracı (üç ayda bir TÜFE; köprü hariç). Maliyet/marj tahmini `packages/shared/cost.ts`. Gerekçeler: `docs/fiyat-arastirmasi.md` §8
 
 ## Sipariş durumları
 `beklemede → onaylandi → kuryeye_atandi → alindi → yolda → teslim_edildi`
-Ek: `iptal`, `sorunlu`
+Ek: `iptal`, `sorunlu`; teslim edilemezse `yolda → geri_donuyor → geri_teslim` (göndericiye iade, `completed_at`); teslim edilemezse `yolda → geri_donuyor → geri_teslim` (göndericiye iade, dönüş ayağı ücreti; `report_failed_delivery`, docs/kurulum.md §33). Tamamlanmış iş = `teslim_edildi` veya `geri_teslim` (`orders.completed_at`; hakediş, fatura, raporlar)
 
 ## Kurallar (Claude Code için)
 - Arayüz dili **Türkçe**, kod ve değişken adları İngilizce
@@ -58,6 +61,8 @@ Ek: `iptal`, `sorunlu`
 - KVKK: konum/adres/telefon verisi için aydınlatma metni ve açık rıza ekranı zorunlu
 - Kurye çalışma saatleri kaydedilir (BTK bildirimi için rapor alınabilmeli)
 - Fiyat hesabı tek fonksiyonda; mobil, panel ve yapay zeka asistanı aynı fonksiyonu kullanır
+- Ekranda gösterilen tarife rakamları canlı `pricing_settings`'ten okunur (site `lib/pricing-settings.ts` ISR 1 sa, mobil `usePricingSettings()`); `DEFAULT_PRICING_SETTINGS` yalnız demo/yedek. Metne rakam yazılmaz, yardımcı fonksiyon eklenir (site `lib/pricing-info.ts`)
+- Mobil yönlendirme tek kural: `lib/session.tsx` → `entryRoute()`. Gruplardan `/`'a yönlendirilmez (grup ana sekmesine çözülür → sonsuz döngü); çıkış/hesap silmede `router.replace` yok, sekme düzeni yönlendirir
 - Değişiklik yapmadan önce planı kısaca anlat, onay al
   - **İstisna (2026-10-08):** Kullanıcı tüm fazları otomatik yürütme izni verdi. Claude fazları sırayla kendisi
     tamamlar, sorun çıkarsa çözer ve devam eder. API anahtarı / hesap gerektiren adımlar sahte (mock) sağlayıcıyla
@@ -71,13 +76,25 @@ Ek: `iptal`, `sorunlu`
 - `apps/mobile/` — Expo SDK 57 + expo-router (`src/app/`). Supabase env yoksa **DEMO modu** (sahte veri, kod 123456). `pnpm --filter @yazgan/mobile e2e:web` tarayıcıda tam akışı test eder
 - `apps/admin/` — Next.js 16 + Tailwind 4 panel. Supabase env yoksa **DEMO modu** (admin@yazgankurye.com / demo1234). Kurye hesabı oluşturma `/api/kuryeler` (service role yalnız sunucuda). `pnpm --filter @yazgan/admin e2e:web`
 - Herkese açık Edge Functions: `site-api` (fiyat/adres/başvuru/kurye başvurusu/değerlendirme; IP hız sınırı `hit_rate_limit`), `api` (kurumsal REST, `yk_live_` anahtar SHA-256), `email-inbound` (Postmark → asistan, SPF/DKIM + kayıtlı müşteri), `health` (GET ayrıntısız; cron uyarı), `webhook-dispatch` (HMAC imzalı kurumsal webhook kuyruğu)
-- Edge Functions: auto-dispatch (otomatik onay + kurye atama, `packages/shared/assignment.ts`), admin-order (telefon siparişi), quote, create-order, places, send-sms, reprice-order, notify-dispatch, payment-init/callback/refund, invoice-dispatch/monthly, whatsapp-webhook, assistant-voice, account-delete
-- Operasyon ayarları `ops_settings` (panel → Otomasyon): otomatik onay/atama, kapasite, mesafe, ödeme süresi
+- Edge Functions: auto-dispatch (otomatik onay + kurye atama, `packages/shared/assignment.ts`), admin-order (telefon siparişi), quote, create-order, places, send-sms, reprice-order, notify-dispatch, payment-init/callback/refund, invoice-dispatch/monthly, whatsapp-webhook, assistant-voice, account-delete, courier-earnings, winback (günlük, varsayılan kapalı), sos (kurye acil durum; JWT), readiness (yalnız yönetici; canlıya hazırlık denetimi, gizli değer döndürmez)
+- Kurye hakedişi: `cost_settings` (ödeme modeli = maliyet modeli, `packages/shared/cost.ts` `courierEarning`), `courier_earnings` (Edge Function `courier-earnings`, 5 dk cron), `courier_payouts` (RPC `create_courier_payout`/`cancel_courier_payout`). Kuryeye ödemeli siparişte teslimde `cash_collection` (nakit/iban/alinmadi) zorunlu; nakit hakedişten düşülür. Panel `/hakedis`, kurye uygulaması Kazancım sekmesi. docs/kurulum.md §23
+- Kurye belgeleri: `courier_document_types` (= `packages/shared/compliance.ts` `COURIER_DOCUMENT_TYPES`, schema-sync testi), `courier_documents`, bucket `courier-docs`. `ops_settings.enforce_courier_documents` açıkken zorunlu belgesi eksik/süresi dolmuş kurye `start_shift` ile vardiyaya giremez, auto-dispatch iş vermez; süresi dolan/yaklaşan belgeler `system_health` uyarısı. docs/kurulum.md §24
+- Operasyon ayarları `ops_settings` (panel → Otomasyon): otomatik onay/atama, kapasite, mesafe, ödeme süresi, iş teklifi süresi, varış yarıçapı, mola sınırı, teslim edilemedi bekleme süresi
+- Kurye uygulaması saha özellikleri (2026-10-12, docs/kurulum.md §29–40):
+  - İş teklifi kabul/ret + geri sayım (`courier_offers`, `respond_offer`/`expire_offers`, `packages/shared/offers.ts`); ret eden kurye o işe tekrar önerilmez
+  - Adrese vardım (`mark_arrived`, konum tetikleyicisiyle otomatik varış); bekleme varıştan ölçülür; `notifications.kind` (varis_alis/varis_teslim/mesaj_*)
+  - Mola (`courier_breaks`, `start_break`/`end_break`; yanıtsız tekliflerde otomatik mola), BTK raporunda net süre
+  - SOS (`courier_incidents`, Edge Function `sos`, panel `SosBanner`; `ADMIN_ALERT_PHONES`)
+  - Teslim edilemedi → iade (`report_failed_delivery`, fiyat satırı `failed_return`)
+  - Durak sırası (`packages/shared/route.ts` `planStops`), uygulama içi mesajlaşma (`order_messages`, numara paylaşmadan; 90 gün saklama)
+  - Çevrimdışı kuyruk (`apps/mobile/src/lib/outbox*.ts`; RPC'ler `p_occurred_at` alır, `event_time()` 6 saatle sınırlı)
+- Vardiya planı (`shift_templates`, `shift_bookings`, `book_shift`; panel `/vardiya-plani`, kurye "Vardiyam"), performans puanı (`courier_performance_stats` + `packages/shared/performance.ts`; otomatik atamada ±3 km), hedef primleri (`courier_incentives`, `compute_incentive_awards` → hesaplaşmaya eklenir; panel `/primler`), talep yoğunluğu (`demand_stats`, `packages/shared/demand.ts`; panel `/yogunluk`, kurye "Yoğun bölgeler")
 - Kuyruklar (outbox): `notifications` ve `invoices` tabloları; dakikalık cron ile işlenir (docs/kurulum.md §6)
 - Yapay zeka asistanı: `supabase/functions/_shared/assistant.ts` (Claude, araçlar aynı sipariş API'sini kullanır; geçmiş yalnızca sona eklenir)
 - Panel: Raporlar (`/raporlar`, `lib/reports.ts`, CSV `;` + ondalık virgül), Canlı harita (`/harita`, Leaflet + OSM; karo URL'si env ile değişir). E2E'de harita karoları `scripts/e2e-tile-stub.cjs` ile sahte PNG'den gelir
-- Kurulum ve canlıya alma: `docs/kurulum.md`; mağaza: `docs/magaza.md`
+- Kurulum ve canlıya alma: `docs/kurulum.md` (§28: panel → Otomasyon → Canlıya hazırlık, yedek, deneme ortamı); mağaza: `docs/magaza.md`
 - `pnpm test` (vitest), `pnpm test:functions` (Deno), `pnpm test:db` (yerel Postgres'te migration + RLS), `pnpm test:all`
+- `e2e:web` betikleri `scripts/e2e-run.cjs` ile sunucuyu başlatıp kapatır (Windows dahil; pnpm betikleri Windows'ta cmd.exe ile çalışır, `&`/`kill` kullanma). Önce build/`export:web` gerekir
 - Google'ın eski Distance Matrix/Places API'leri yeni projelerde açılamıyor → **Routes API** ve **Places API (New)** kullanılıyor
 
 ## Yol haritası
@@ -91,4 +108,12 @@ Ek: `iptal`, `sorunlu`
 - [~] Faz 8: App Store / Google Play yayını — kod hazır (EAS, hesap silme, yasal sayfalar, `docs/magaza.md`); mağaza hesapları ve gönderim kullanıcıda
 - [x] Dış kanallar (2026-10-10): marka tek dosyada, web sitesi + SEO, tarayıcıdan sipariş (Expo web, ödeme dönüşü), kurumsal başvuru ve kurye başvurusu (panel → Başvurular), e-postayla sipariş, kurumsal API + webhook, teslim sonrası puan + Google yorum, sistem izleme (panel → Otomasyon → Sistem durumu). Kurulum: docs/kurulum.md §16–22
 - [x] Fiyat algoritması v2 (2026-10-08): hizmet seviyeleri (ekonomi/standart/acil), Pazar eki, uzak alış, 20 kg sınırı, kurumsal indirim kapsamı, endeks aracı, maliyet/marj simülasyonu (`docs/fiyat-arastirmasi.md` §8)
+- [x] Kurye hakedişi ve nakit mutabakatı (2026-10-08)
+- [x] Kurye belge ve uyum takibi (2026-10-08)
+- [x] Değerli gönderi: değer beyanı sigortası + teslim kodu (2026-10-08)
+- [x] Müşteri büyütme: kampanya kodları, davet ödülü, geri kazanma (İYS onaylı, varsayılan kapalı) (2026-10-08)
+- [x] ETA ve 60 dk acil taahhüdü (2026-10-08): `packages/shared/eta.ts`, `orders.sla_due_at` (tetikleyici), auto-dispatch erken uyarı (`_shared/sla.ts`), kaçan taahhütte `customer_credits` → sonraki siparişte "credit" satırı (`_shared/credits.ts`). docs/kurulum.md §25
+- [x] Canlıya alma hazırlığı (2026-10-08): `readiness` denetimi + panel kartı, yedek/deneme ortamı/geri alma rehberi (docs/kurulum.md §28)
+- [x] Kurye saha özellikleri (2026-10-12): iş teklifi, varış + bekleme, mola, SOS, teslim edilemedi → iade, durak sırası, mesajlaşma, çevrimdışı kuyruk, vardiya planlama, performans puanı, hedef primi, talep yoğunluğu (docs/kurulum.md §29–40)
 - [x] Ek geliştirmeler (2026-10-09): panelden telefon siparişi, otomatik onay + kurye atama, ödenmemiş kart siparişi iptali, kademeli km + %75 ek ücret tavanı (panelden tek tıkla eski tarifeye dönüş), raporlar + CSV, canlı haritalar (panel, takip sayfası, müşteri ve kurye uygulaması)
+- [x] Boş alan + Neo tutarlılığı (2026-10-09): boş durumlar tek bileşen (`EmptyState`: mobil `components/Neo.tsx`, panel `components/ui.tsx`); site fiş önizlemeli hesaplayıcı, teslim kanıtı/taahhüt bölümleri, CTA bandı, `PageHero`; panel hafif Neo (siyah + lime, Archivo, `@fontsource`), kokpit genel bakış, menü sayaçları, zengin demo verisi. Kurallar: boş alan = sonraki adım veya tek çıkartma + tek eylem; güvenlik/para/hata ekranlarında çıkartma yok; sitede uydurma yorum/rakam yok, örnekler "Örnek" damgalı ve `pricing.ts` ile hesaplanır

@@ -4,10 +4,11 @@ import { useEffect, useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import { BigTitle, HandTag, InkChip, InkPillBar, RouteCard, RouteStop } from "@/components/Neo";
 import { Sticker } from "@/components/Sticker";
-import { Card, ErrorBox, Loading, Muted, Row, Screen, Title, colors, font, radii } from "@/components/ui";
+import { Button, Card, ErrorBox, Field, Loading, Muted, Row, Screen, Title, colors, font, radii } from "@/components/ui";
 import { api, ApiError, type OrderInput, type QuoteResponse } from "@/lib/api";
 import { draftToInput, useOrderDraft } from "@/lib/order-draft";
 import { payOrder } from "@/lib/payment";
+import { usePricingSettings } from "@/lib/pricing-settings";
 import { useSession } from "@/lib/session";
 
 const PAYMENT_OPTIONS: { value: OrderInput["paymentMethod"]; label: string; hint: string; corporateOnly?: boolean; disabled?: boolean }[] = [
@@ -18,6 +19,7 @@ const PAYMENT_OPTIONS: { value: OrderInput["paymentMethod"]; label: string; hint
 
 export default function Ozet() {
   const { draft, update, reset } = useOrderDraft();
+  const P = usePricingSettings();
   const { profile } = useSession();
   const input = draftToInput(draft);
   // Teklif, hesaplandığı girdinin anahtarıyla saklanır; girdi değişince eski teklif gösterilmez
@@ -25,6 +27,7 @@ export default function Ozet() {
   const [result, setResult] = useState<{ key: string; quote?: QuoteResponse; error?: string } | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [codeText, setCodeText] = useState(draft.promoCode);
   const current = result?.key === key ? result : null;
   const quote = current?.quote ?? null;
   const error = submitError ?? current?.error ?? null;
@@ -92,6 +95,34 @@ export default function Ozet() {
         }
       />
 
+      <Card>
+        <Field
+          label="Kampanya veya davet kodu"
+          placeholder="Varsa girin"
+          autoCapitalize="characters"
+          value={codeText}
+          onChangeText={setCodeText}
+          testID="promo-code"
+        />
+        <View style={{ flexDirection: "row", gap: 8 }}>
+          <View style={{ flex: 1 }}>
+            <Button title="Uygula" variant="secondary" onPress={() => update({ promoCode: codeText.trim() })} disabled={!codeText.trim()} testID="apply-promo" />
+          </View>
+          {draft.promoCode ? (
+            <View style={{ flex: 1 }}>
+              <Button
+                title="Kodu kaldır"
+                variant="secondary"
+                onPress={() => {
+                  setCodeText("");
+                  update({ promoCode: "" });
+                }}
+              />
+            </View>
+          ) : null}
+        </View>
+      </Card>
+
       {error ? <ErrorBox message={error} /> : null}
       {!quote && !error ? <Loading /> : null}
 
@@ -106,7 +137,7 @@ export default function Ozet() {
           ))}
           <View style={{ height: 1, backgroundColor: colors.bg }} />
           <Row label="Ara toplam (KDV hariç)" value={formatTL(quote.quote.subtotalKurus)} />
-          <Row label="KDV %20" value={formatTL(quote.quote.vatKurus)} />
+          <Row label={`KDV %${P.vatPct.toLocaleString("tr-TR")}`} value={formatTL(quote.quote.vatKurus)} />
           <Row label="Toplam" value={formatTL(quote.quote.totalKurus)} bold />
           {draft.paymentMethod === "cari" ? (
             <Muted>Kurumsal indiriminiz ay sonu faturanızda uygulanır.</Muted>
@@ -169,7 +200,7 @@ export default function Ozet() {
         testID="confirm-order"
       />
       <Muted style={{ textAlign: "center" }}>
-        Bekleme süresi 15 dakikayı aşarsa her 10 dakika için 50 TL + KDV eklenir.
+        {`Bekleme süresi ${P.waitingFreeMinutes} dakikayı aşarsa her ${P.waitingBlockMinutes} dakika için ${formatTL(P.waitingBlockFeeKurus)} + KDV eklenir.`}
       </Muted>
     </Screen>
   );

@@ -1,5 +1,6 @@
 // İş mantığı — Deno.serve'den bağımsız, sahte Ctx ile test edilebilir.
 import {
+  applyFailedDeliveryReturn,
   applyWaitingFee,
   buildQuote,
   orderRowFromQuote,
@@ -9,7 +10,9 @@ import {
   type QuoteResult,
 } from "../../../packages/shared/index.ts";
 import type { Ctx } from "./context.ts";
+import { markCreditsUsed, openCredits, withCredits } from "./credits.ts";
 import { HttpError, json, readJson } from "./http.ts";
+import { applyDiscountCode, recordRedemption } from "./promo.ts";
 
 export function quoteResponse(q: QuoteResult) {
   return {
@@ -24,11 +27,14 @@ export function quoteResponse(q: QuoteResult) {
 }
 
 export async function handleQuote(req: Request, ctx: Ctx): Promise<Response> {
-  await ctx.getUser(req);
+  const user = await ctx.getUser(req);
   const order = parseOrderRequest(await readJson(req));
   const pricing = await ctx.loadPricing();
   const q = await buildQuote(order, { maps: ctx.maps, ...pricing });
-  return json(quoteResponse(q));
+  // Kampanya/davet kodu ve telafi kredisi teklifte de görünür (sipariş verince düşülür)
+  const promo = await applyDiscountCode(ctx, user.id, order.promoCode, q.quote);
+  const { quote } = withCredits(promo.quote, await openCredits(ctx, user.id));
+  return json(quoteResponse({ ...q, quote }));
 }
 
 /**
@@ -58,7 +64,10 @@ export async function createOrderForCustomer(ctx: Ctx, userId: string, order: Or
   }
 
   const pricing = await ctx.loadPricing();
-  const q = await buildQuote(order, { maps: ctx.maps, ...pricing });
+  const built = await buildQuote(order, { maps: ctx.maps, ...pricing });
+  const promo = await applyDiscountCode(ctx, userId, order.promoCode, built.quote);
+  const credit = withCredits(promo.quote, await openCredits(ctx, userId));
+  const q = { ...built, quote: credit.quote };
 
   const { data, error } = await ctx.admin
     .from("orders")
@@ -75,6 +84,8 @@ export async function createOrderForCustomer(ctx: Ctx, userId: string, order: Or
     if ((error as { code?: string }).code === "23505") throw new HttpError(409, "Bu dış referansla bir sipariş zaten var", "externalRef");
     throw new Error(`Sipariş kaydedilemedi: ${error.message}`);
   }
+  await markCreditsUsed(ctx, credit.used, data.id);
+  await recordRedemption(ctx, userId, data.id, promo.redemption);
   return { order: data, quote: q };
 }
 
@@ -110,7 +121,7 @@ export async function handleRepriceOrder(req: Request, ctx: Ctx): Promise<Respon
 
   const { data: order, error } = await ctx.admin
     .from("orders")
-    .select("id, courier_id, status, waiting_minutes, price_quote, total_kurus")
+    .select("id, courier_id, status, waiting_minutes, price_quote, total_kurus, failed_at, round_trip, pickup_side, dropoff_side")
     .eq("id", body.orderId)
     .single();
   if (error || !order) throw new HttpError(404, "Sipariş bulunamadı");
@@ -119,12 +130,17 @@ export async function handleRepriceOrder(req: Request, ctx: Ctx): Promise<Respon
     const { data: p } = await ctx.admin.from("profiles").select("role").eq("id", user.id).single();
     if (p?.role !== "admin") throw new HttpError(403, "Bu sipariş için yetkiniz yok");
   }
-  if (["teslim_edildi", "iptal"].includes(order.status) && order.courier_id === user.id) {
+  if (["teslim_edildi", "iptal", "geri_teslim"].includes(order.status) && order.courier_id === user.id) {
     throw new HttpError(409, "Kapanmış siparişin fiyatı değiştirilemez");
   }
 
   const { settings } = await ctx.loadPricing();
-  const quote: PriceQuote = applyWaitingFee(order.price_quote, order.waiting_minutes ?? 0, settings);
+  let quote: PriceQuote = applyWaitingFee(order.price_quote, order.waiting_minutes ?? 0, settings);
+  // Teslim edilemedi → göndericiye iade ücreti (dönüşte Anadolu→Avrupa ücretli geçiş varsa köprü)
+  if (order.failed_at) {
+    const extraBridge = order.pickup_side === "avrupa" && order.dropoff_side === "anadolu" ? 1 : 0;
+    quote = applyFailedDeliveryReturn(quote, { roundTrip: !!order.round_trip, extraBridgeCrossings: extraBridge }, settings);
+  }
   const changed = quote.totalKurus !== order.total_kurus;
   if (changed) {
     const { error: uErr } = await ctx.admin

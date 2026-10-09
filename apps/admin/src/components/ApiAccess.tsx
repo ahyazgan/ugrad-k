@@ -90,7 +90,7 @@ export function ApiAccess({ accounts }: { accounts: CorporateAccount[] }) {
 
   return (
     <Card title="API ve webhook">
-      <p className="mb-3 text-sm text-slate-600">
+      <p className="mb-3 text-sm text-ink-soft">
         Kurumsal müşteri kendi yazılımından sipariş açabilir (API) ve sipariş durumu değiştikçe kendi sistemine bildirim alabilir (webhook). Belge:{" "}
         <span className="font-mono">/api-belgeleri</span> (web sitesi).
       </p>
@@ -137,7 +137,7 @@ export function ApiAccess({ accounts }: { accounts: CorporateAccount[] }) {
               </div>
             ) : null}
             <ErrorText>{error}</ErrorText>
-            <Table head={["Ad", "Anahtar", "Kullanıcı", "Oluşturma", "Son kullanım", ""]} empty="Anahtar yok">
+            <Table head={["Ad", "Anahtar", "Kullanıcı", "Oluşturma", "Son kullanım", ""]} empty="Henüz API anahtarı yok. Yukarıdan bir ad verip anahtar oluşturun.">
               {data.keys.map((k) => (
                 <tr key={k.id}>
                   <Td>{k.name}</Td>
@@ -147,7 +147,7 @@ export function ApiAccess({ accounts }: { accounts: CorporateAccount[] }) {
                   <Td className="whitespace-nowrap">{fmtDateTime(k.lastUsedAt)}</Td>
                   <Td>
                     {k.revokedAt ? (
-                      <span className="text-xs text-slate-500">İptal edildi</span>
+                      <span className="text-xs text-muted">İptal edildi</span>
                     ) : (
                       <Button variant="ghost" onClick={() => repo.revokeApiKey(k.id).then(reload)}>
                         İptal et
@@ -163,14 +163,14 @@ export function ApiAccess({ accounts }: { accounts: CorporateAccount[] }) {
             <WebhookForm key={accountId} accountId={accountId} initial={data.webhook} onSaved={reload} />
             {data.deliveries.length ? (
               <div className="mt-4">
-                <Table head={["Zaman", "Olay", "Sipariş", "Durum", "Deneme", "Hata"]}>
+                <Table head={["Zaman", "Olay", "Sipariş", "Durum", "Deneme", "Hata"]} num={[4]} empty="Henüz webhook gönderimi yok.">
                   {data.deliveries.map((d) => (
                     <tr key={d.id}>
                       <Td className="whitespace-nowrap">{fmtDateTime(d.createdAt)}</Td>
                       <Td className="font-mono text-xs">{d.event}</Td>
                       <Td>{d.orderNo ?? "—"}</Td>
                       <Td className={DELIVERY[d.status]?.[1]}>{DELIVERY[d.status]?.[0] ?? d.status}</Td>
-                      <Td>{d.attempts}</Td>
+                      <Td num>{d.attempts}</Td>
                       <Td className="text-xs text-red-700">{d.lastError ?? ""}</Td>
                     </tr>
                   ))}

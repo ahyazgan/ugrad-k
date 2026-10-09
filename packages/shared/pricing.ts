@@ -75,6 +75,14 @@ export interface PricingSettings {
   serviceCenterLng: number;
   /** Merkezden bu kadar yol-km'ye kadar alış ücretsiz */
   freePickupRadiusKm: number;
+  /** Değer beyanı olmadan sorumluluk sınırı; beyan bunun üstündeki kısım için sigortalanır */
+  freeCoverageKurus: number;
+  /** Beyan edilen değerin sigortalanan kısmına uygulanan oran (%) */
+  insuranceRatePct: number;
+  /** En düşük sigorta ücreti */
+  insuranceMinKurus: number;
+  /** Kabul edilen en yüksek beyan; null = sınırsız */
+  maxDeclaredValueKurus: number | null;
   /** Ücretsiz yarıçapın dışındaki her yol-km için konumlanma ücreti (0 = kapalı) */
   remotePickupPerKmKurus: number;
   /** Uzak alış ücretinin üst sınırı */
@@ -119,6 +127,11 @@ export const DEFAULT_PRICING_SETTINGS: PricingSettings = {
   freePickupRadiusKm: 40,
   remotePickupPerKmKurus: 1_000,
   remotePickupMaxKurus: 30_000,
+  // Değer beyanı: 1.000 TL'ye kadar sorumluluk ücretsiz, üstü %0,5 (en az 25 TL), en fazla 100.000 TL
+  freeCoverageKurus: 100_000,
+  insuranceRatePct: 0.5,
+  insuranceMinKurus: 2_500,
+  maxDeclaredValueKurus: 10_000_000,
   corporateTiers: [
     { minDeliveries: 20, discountPct: 15 },
     { minDeliveries: 50, discountPct: 25 },
@@ -156,6 +169,8 @@ export interface PriceInput {
   bridgeCrossings?: number;
   /** Alışta beklenen dakika (teslimattan sonra gerçek süreyle yeniden hesaplanır) */
   waitingMinutes?: number;
+  /** Müşterinin beyan ettiği gönderi değeri (kuruş) */
+  declaredValueKurus?: number | null;
   holidays?: Holiday[];
 }
 
@@ -169,7 +184,15 @@ export type PriceLineCode =
   | "heavy"
   | "return_leg"
   | "waiting"
-  | "bridge";
+  | "bridge"
+  /** Değer beyanı sigortası */
+  | "insurance"
+  /** Önceki gecikmeli acil teslimin telafisi (eksi tutar) */
+  | "credit"
+  /** Kampanya veya davet indirimi (eksi tutar) */
+  | "promo"
+  /** Teslim edilemeyen gönderinin göndericiye iadesi (dönüş ayağı kuralı) */
+  | "failed_return";
 
 export interface PriceLine {
   code: PriceLineCode;
@@ -270,6 +293,22 @@ export function economyAvailableAt(at: Date, settings: PricingSettings, holidays
 /** Hizmet seviyesinin yüzde etkisi: acil +, ekonomi − */
 export function serviceLevelPct(level: ServiceLevel, settings: PricingSettings): number {
   return level === "acil" ? settings.urgentSurchargePct : level === "ekonomi" ? -settings.economyDiscountPct : 0;
+}
+
+/**
+ * Değer beyanı sigortası: beyanın ücretsiz sorumluluk sınırını aşan kısmının yüzdesi (en az insuranceMinKurus).
+ * Beyan üst sınırı aşarsa PricingError.
+ */
+export function insuranceFeeKurus(declaredKurus: number | null | undefined, settings: PricingSettings = DEFAULT_PRICING_SETTINGS): number {
+  if (!declaredKurus || declaredKurus <= 0) return 0;
+  if (settings.maxDeclaredValueKurus != null && declaredKurus > settings.maxDeclaredValueKurus) {
+    throw new PricingError(
+      `En fazla ${formatTL(settings.maxDeclaredValueKurus)} değerinde gönderi taşıyoruz; daha değerli gönderiler için bizi arayın`,
+    );
+  }
+  const insured = declaredKurus - settings.freeCoverageKurus;
+  if (insured <= 0) return 0;
+  return Math.max(settings.insuranceMinKurus, Math.ceil((insured * settings.insuranceRatePct) / 100 / 100) * 100);
 }
 
 /** Merkezden alış noktasına tahmini yol-km (kuş uçuşu × 1,35) ve uzak alış ücreti */
@@ -450,6 +489,15 @@ export function calculatePrice(
     });
   }
 
+  const insurance = insuranceFeeKurus(input.declaredValueKurus, settings);
+  if (insurance > 0) {
+    lines.push({
+      code: "insurance",
+      label: `Değer beyanı sigortası (${tl(input.declaredValueKurus!)} TL beyan, ${tl(settings.freeCoverageKurus)} TL üstü %${settings.insuranceRatePct.toLocaleString("tr-TR")})`,
+      amountKurus: insurance,
+    });
+  }
+
   const crossings = input.bridgeCrossings ?? 0;
   if (!Number.isInteger(crossings) || crossings < 0) {
     throw new PricingError("Köprü geçiş sayısı geçersiz");
@@ -495,7 +543,16 @@ export function corporateTierFor(
 }
 
 /** Kurumsal indirime tabi kalemler (taşıma bedeli). Köprü, bekleme, ağır paket ve uzak alış indirimsizdir. */
-export const DISCOUNTABLE_LINE_CODES: PriceLineCode[] = ["base", "extra_km", "economy", "urgent", "night_holiday", "return_leg"];
+export const DISCOUNTABLE_LINE_CODES: PriceLineCode[] = [
+  "base",
+  "extra_km",
+  "economy",
+  "urgent",
+  "night_holiday",
+  "return_leg",
+  "failed_return",
+  "promo",
+];
 
 export function discountableKurus(quote: Pick<PriceQuote, "lines">): number {
   return quote.lines.filter((l) => DISCOUNTABLE_LINE_CODES.includes(l.code)).reduce((s, l) => s + l.amountKurus, 0);
@@ -506,6 +563,24 @@ export interface MonthlyInvoiceItem {
   /** İndirime tabi kısım (verilmezse tamamı) */
   discountableKurus?: number;
 }
+
+/**
+ * Müşteri kredisini (ör. acil taahhüt telafisi) teklife eksi satır olarak ekler; ara toplamı sıfırın altına indirmez.
+ * Dönen `usedKurus` kullanılan kredi tutarıdır.
+ */
+export function applyCredit(quote: PriceQuote, creditKurus: number, label: string, code: "credit" | "promo" = "credit"): { quote: PriceQuote; usedKurus: number } {
+  const used = Math.max(0, Math.min(Math.round(creditKurus), quote.subtotalKurus));
+  if (used === 0) return { quote, usedKurus: 0 };
+  const lines = [...quote.lines, { code, label, amountKurus: -used }];
+  const subtotalKurus = quote.subtotalKurus - used;
+  const vatPct = quote.subtotalKurus > 0 ? Math.round((quote.vatKurus / quote.subtotalKurus) * 10_000) / 100 : DEFAULT_PRICING_SETTINGS.vatPct;
+  const vatKurus = pct(subtotalKurus, vatPct);
+  return { quote: { ...quote, lines, subtotalKurus, vatKurus, totalKurus: subtotalKurus + vatKurus }, usedKurus: used };
+}
+
+/** Acil teslim ek ücreti (taahhüt kaçarsa telafi edilen tutar) */
+export const urgentSurchargeKurus = (quote: Pick<PriceQuote, "lines">) =>
+  quote.lines.filter((l) => l.code === "urgent").reduce((s, l) => s + l.amountKurus, 0);
 
 /** Siparişin kayıtlı teklifinden fatura kalemi (teklif yoksa tamamı indirime tabi sayılır) */
 export function monthlyInvoiceItem(subtotalKurus: number, quote?: Pick<PriceQuote, "lines"> | null): MonthlyInvoiceItem {
@@ -558,6 +633,20 @@ export function formatTL(kurus: number): string {
   );
 }
 
+/** Satırlar değişince toplamları yeniden hesaplar; KDV oranı teklifin kendisinden korunur (sipariş anındaki oran) */
+function retotal(quote: PriceQuote, lines: PriceLine[], settings: PricingSettings): PriceQuote {
+  const subtotalKurus = lines.reduce((s, l) => s + l.amountKurus, 0);
+  const vatPct = quote.subtotalKurus > 0 ? Math.round((quote.vatKurus / quote.subtotalKurus) * 10_000) / 100 : settings.vatPct;
+  const vatKurus = pct(subtotalKurus, vatPct);
+  return { ...quote, lines, subtotalKurus, vatKurus, totalKurus: subtotalKurus + vatKurus };
+}
+
+/** Satırı köprü satırından önce (yoksa sona) ekler */
+function insertBeforeBridge(lines: PriceLine[], line: PriceLine) {
+  const bridgeIdx = lines.findIndex((l) => l.code === "bridge");
+  lines.splice(bridgeIdx === -1 ? lines.length : bridgeIdx, 0, line);
+}
+
 /**
  * Alışta oluşan beklemeyi onaylanmış teklife ekler (veya günceller). Diğer kalemler
  * sipariş anındaki gibi kalır; yalnızca bekleme satırı ve toplamlar yeniden hesaplanır.
@@ -570,18 +659,44 @@ export function applyWaitingFee(
   const fee = waitingFeeKurus(waitingMinutes, settings);
   const lines = quote.lines.filter((l) => l.code !== "waiting");
   if (fee > 0) {
-    const waitingLine: PriceLine = {
+    insertBeforeBridge(lines, {
       code: "waiting",
       label: `Bekleme (${waitingMinutes} dk, ilk ${settings.waitingFreeMinutes} dk ücretsiz)`,
       amountKurus: fee,
-    };
-    // Köprü satırından önce, değilse sona
-    const bridgeIdx = lines.findIndex((l) => l.code === "bridge");
-    lines.splice(bridgeIdx === -1 ? lines.length : bridgeIdx, 0, waitingLine);
+    });
   }
-  const subtotalKurus = lines.reduce((s, l) => s + l.amountKurus, 0);
-  // KDV oranı teklifin kendisinden korunur (sipariş anındaki oran)
-  const vatPct = quote.subtotalKurus > 0 ? Math.round((quote.vatKurus / quote.subtotalKurus) * 10_000) / 100 : settings.vatPct;
-  const vatKurus = pct(subtotalKurus, vatPct);
-  return { ...quote, lines, subtotalKurus, vatKurus, totalKurus: subtotalKurus + vatKurus };
+  return retotal(quote, lines, settings);
+}
+
+/** Gidişin ek ücretler dahil taşıma bedeli (dönüş ayağı bu tutar üzerinden hesaplanır) */
+const OUTBOUND_TRANSPORT_CODES: PriceLineCode[] = ["base", "extra_km", "economy", "urgent", "night_holiday"];
+/** İade dönüşündeki ek köprü geçişi satırının etiketi (yeniden hesapta tanınır) */
+export const FAILED_RETURN_BRIDGE_LABEL = "Köprü / tünel geçişi (iade dönüşü)";
+
+/**
+ * Teslim edilemeyen gönderinin göndericiye iadesi. Gidiş-dönüş kuralıyla aynı: dönüş ayağı, gidişin
+ * ek ücretler dahil taşıma bedelinin %(100 − returnLegDiscountPct)'i. Sipariş zaten gidiş-dönüşse dönüş
+ * ayağı alınmıştır, ek ücret yok. Dönüşte ücretli köprü yönüne (Anadolu→Avrupa) geçiliyorsa
+ * `extraBridgeCrossings` kadar geçiş eklenir. Kuryenin dönüş km'si hakedişe girsin diye meta güncellenir.
+ * Tekrar çağrılırsa önceki iade satırları değiştirilir (idempotent).
+ */
+export function applyFailedDeliveryReturn(
+  quote: PriceQuote,
+  opts: { roundTrip: boolean; extraBridgeCrossings?: number },
+  settings: PricingSettings = DEFAULT_PRICING_SETTINGS,
+): PriceQuote {
+  const lines = quote.lines.filter((l) => l.code !== "failed_return" && !(l.code === "bridge" && l.label === FAILED_RETURN_BRIDGE_LABEL));
+  if (opts.roundTrip) return retotal(quote, lines, settings);
+  const outbound = lines.filter((l) => OUTBOUND_TRANSPORT_CODES.includes(l.code)).reduce((s, l) => s + l.amountKurus, 0);
+  insertBeforeBridge(lines, {
+    code: "failed_return",
+    label: `Teslim edilemedi – göndericiye iade (dönüş ayağı, %${settings.returnLegDiscountPct} indirimli)`,
+    amountKurus: outbound - pct(outbound, settings.returnLegDiscountPct),
+  });
+  const crossings = opts.extraBridgeCrossings ?? 0;
+  if (crossings > 0 && settings.bridgeFeeKurus > 0) {
+    lines.push({ code: "bridge", label: FAILED_RETURN_BRIDGE_LABEL, amountKurus: crossings * settings.bridgeFeeKurus });
+  }
+  const next = retotal(quote, lines, settings);
+  return { ...next, meta: { ...quote.meta, returnDistanceKm: quote.meta.returnDistanceKm ?? quote.meta.distanceKm } };
 }

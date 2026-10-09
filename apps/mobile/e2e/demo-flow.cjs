@@ -29,20 +29,39 @@ fs.mkdirSync(out, { recursive: true });
   await page.getByRole('checkbox').nth(1).click();
   await tid('kvkk-accept').click();
   await tid('address-pickup').waitFor();
+  // Demo müşterinin geçmiş siparişlerinden son 3 adres çipi
+  await tid('recent-chip-2').waitFor();
   await shot('04-form-bos');
   for (const [target, q] of [['pickup','beykoz'],['dropoff','levent']]) {
     await tid(`address-${target}`).click();
+    // Arama boşken: "Konumumu kullan" + son adresler
+    await tid('use-my-location').waitFor();
+    await tid('recent-0').waitFor();
+    if (target === 'pickup') await shot('05a-adres-bos');
     await tid('address-search').fill(q);
     await tid('suggestion-0').click();
     await tid('address-details').fill(target==='pickup'?'Kat 2':'Kanyon AVM, B Blok');
+    // Seçilen adres: mini harita pin onayı + yaka/köprü ipucu (Levent Avrupa yakasında)
+    await tid('tile-map').waitFor();
+    if (target === 'dropoff') await tid('side-hint').getByText(/^Avrupa yakası · köprü geçişi \+[\d.,]+ TL$/).waitFor();
     if (target==='dropoff') await shot('05-adres');
     await tid('address-save').click();
     await tid('address-pickup').waitFor();
   }
   await tid('level-acil').click();
+  await tid('declared-value').fill('25.000');
+  await page.getByText('Teslim kodu ile teslim').click();
   await shot('06-form-dolu');
   await tid('see-price').click();
   await page.getByText('Toplam', { exact: true }).waitFor();
+  await page.getByText(/Değer beyanı sigortası/).waitFor();
+  // Kampanya kodu: bilinmeyen kod hata, geçerli kod indirim satırı
+  await tid('promo-code').fill('YOKKOD');
+  await tid('apply-promo').click();
+  await page.getByText('Kod bulunamadı').waitFor();
+  await tid('promo-code').fill('hosgeldin');
+  await tid('apply-promo').click();
+  await page.getByText('Kampanya HOSGELDIN (%20)').waitFor();
   await shot('07-ozet');
   const text = await page.locator('body').innerText();
   console.log('OZET:', text.match(/Fiyat[\s\S]*?Toplam\s*[\d.,]+ TL/)?.[0]?.replace(/\n+/g,' | '));
@@ -52,11 +71,25 @@ fs.mkdirSync(out, { recursive: true });
   await page.getByText('Ödendi (kart)').waitFor();
   await shot('08-siparis-yeni');
   await page.getByText('Kuryeniz:', { exact: false }).waitFor({ timeout: 20000 });
+  await tid('delivery-code').waitFor();
+  // Tahmini teslim ve acil taahhüdü
+  await tid('eta').waitFor();
+  await page.getByText(/Acil teslim taahhüdü: \d{2}:\d{2}/).waitFor();
   // Canlı harita: kurye işareti ve konum yaşı görünür, karolar yüklenir
   await tid('marker-courier').waitFor();
   await page.getByText(/Kurye konumu · az önce/).waitFor();
   if (!tiles.count) throw new Error('harita karoları istenmedi');
   await shot('09-siparis-ilerledi');
+  // Kuryeye yaz: mesaj gider, kurye cevap verir
+  await tid('open-chat').click();
+  await tid('chat-input').fill('Merhaba, resepsiyon 3. katta');
+  await tid('chat-send').click();
+  await page.getByText('Merhaba, resepsiyon 3. katta').waitFor();
+  await page.getByText('Tamam, 5 dakika içinde oradayım').waitFor();
+  await page.getByText(/okundu/).waitFor();
+  await shot('09a-mesaj');
+  await page.goBack();
+  await page.getByText('Kuryeniz:', { exact: false }).waitFor();
   console.log('DURUM:', (await page.locator('body').innerText()).match(/YK-\d+[\s\S]{0,40}/)?.[0]?.replace(/\n/g,' | '));
   if (errors.length) throw new Error('Tarayıcı hataları: ' + JSON.stringify(errors.slice(0, 10)));
   // Geri tuşu müşteri sekmelerine dönmeli (giriş ekranına değil)
@@ -64,6 +97,7 @@ fs.mkdirSync(out, { recursive: true });
   await tid('address-pickup').waitFor();
   // Hesap silme: devam eden sipariş varken engellenir
   await page.getByText('Hesabım').click();
+  await page.getByText('Davet kodunuz: DEMO23').waitFor();
   await tid('delete-account').click();
   await tid('delete-account-confirm').click();
   await page.getByText('Devam eden siparişiniz varken hesap silinemez').waitFor();
@@ -75,6 +109,11 @@ fs.mkdirSync(out, { recursive: true });
   await tid('rating-submit').click();
   await tid('rating-thanks').waitFor();
   await shot('09b-degerlendirme');
+  // Teslim sonrası: aynı rotayla tekrar gönder → adresler (tarifleriyle) taslağa dolar
+  await tid('reorder').click();
+  await tid('address-pickup').getByText(/Beykoz/).waitFor();
+  await tid('address-dropoff').getByText(/Beşiktaş/).waitFor();
+  await tid('address-dropoff').getByText('Kanyon AVM, B Blok').waitFor();
   console.log('✓ müşteri akışı geçti');
 
   // ───────── Kurye akışı
@@ -99,19 +138,70 @@ fs.mkdirSync(out, { recursive: true });
   await kp.getByRole('checkbox').nth(1).click();
   await kt('kvkk-accept').click();
   await kp.getByText('Vardiya kapalı').waitFor();
+  // Sigorta 10 gün içinde bitiyor: uyarı görünür ama vardiya engellenmez
+  await kt('doc-warning').waitFor();
+  await kp.getByText(/Zorunlu trafik sigortası: 10 gün kaldı/).waitFor();
   await kt('shift-toggle').click();
   await kp.getByText('Vardiyadasınız').waitFor();
+  // İş teklifleri: geri sayım, kabul ve nedenle ret
+  await kp.locator('[data-testid^="offer-YK"]').nth(1).waitFor();
+  await kp.getByText(/Aktif işler \(1\)/).waitFor();
+  const countdown = await kt('offer-countdown').first().innerText();
+  if (!/^[12]:\d\d$/.test(countdown)) throw new Error('geri sayım yok: ' + countdown);
+  await kshot('09-kurye-teklif');
+  await kt('offer-accept').first().click();
   await kp.getByText(/Aktif işler \(2\)/).waitFor();
+  await kt('offer-decline').click();
+  await kt('decline-reason-Çok uzak').click();
+  await kp.locator('[data-testid^="offer-YK"]').waitFor({ state: 'detached' });
+  // Mola: molada yeni teklif gelmez, moladan dönülür
+  await kt('break-toggle').click();
+  await kp.getByText('Moladasınız').waitFor();
+  await kt('break-info').getByText(/0 dk · molada yeni iş teklifi gelmez/).waitFor();
+  await kp.getByText(/Elinizdeki 2 iş devam ediyor/).waitFor();
+  await kshot('09b-kurye-mola');
+  await kt('break-toggle').click();
+  await kp.getByText('Vardiyadasınız').waitFor();
+  await kp.getByText(/Aktif işler \(2\)/).waitFor();
+  // Durak sırası: iki işin 4 durağı, her işte alış teslimden önce
+  await kp.getByText('Durak sırası').waitFor();
+  const stopTexts = [];
+  for (let i = 0; i < 4; i++) stopTexts.push(await kt(`stop-${i}`).innerText());
+  console.log('DURAKLAR', stopTexts.map((t) => t.replace(/\n+/g, ' ')).join(' | '));
+  for (const no of new Set(stopTexts.map((t) => t.match(/YK-\d+/)[0]))) {
+    const a = stopTexts.findIndex((t) => t.includes(`Alış · ${no}`));
+    const d = stopTexts.findIndex((t) => t.includes(`Teslim · ${no}`));
+    if (a === -1 || d === -1 || a > d) throw new Error('durak sırası hatalı: ' + stopTexts.join(' / '));
+  }
   await kshot('10-kurye-isler');
   await kp.locator('[data-testid^="job-"]').first().click();
   await kt('tile-map').waitFor();
   await kt('marker-pickup').waitFor();
   await kt('marker-dropoff').waitFor();
-  await kt('waiting').fill('27');
+  // Müşteriye yaz: hazır cevap
+  await kt('open-chat').click();
+  // Boş yazışma: zarf boş durumu + ortada büyük hazır cevap çipleri, üstte sipariş şeridi
+  await kt('chat-empty').waitFor();
+  await kt('chat-order-strip').waitFor();
+  await kshot('11a0-kurye-mesaj-bos');
+  await kt('quick-Kapıdayım').click();
+  await kp.getByText('Tamam, teşekkürler').waitFor();
+  await kp.getByText(/okundu/).waitFor();
+  await kshot('11a-kurye-mesaj');
+  await kp.goBack();
+  await kt('arrive-pickup').waitFor();
+  // Varış: "Vardım" sonrası bekleme otomatik ölçülür, elle giriş kalkar
+  await kt('waiting').waitFor();
+  await kt('arrive-pickup').click();
+  await kp.getByText(/Alış adresine vardınız/).waitFor();
+  await kt('waiting-measured').getByText('Bekleme: 0 dk').waitFor();
+  if (await kt('waiting').count()) throw new Error('varıştan sonra elle bekleme girişi kalmamalı');
   await kshot('11-kurye-is');
   await kt('pickup').click();
   await kt('on-the-way').waitFor();
   await kt('on-the-way').click();
+  await kt('arrive-dropoff').click();
+  await kp.getByText(/Teslim adresine vardınız/).waitFor();
   await kt('deliver').click();
   await kt('receiver').fill('Resepsiyon - Zeynep');
   const pad = await kt('signature-pad').boundingBox();
@@ -119,15 +209,152 @@ fs.mkdirSync(out, { recursive: true });
   await kp.mouse.down();
   for (let i = 1; i <= 12; i++) await kp.mouse.move(pad.x + 30 + i * 20, pad.y + 100 + (i % 2 ? -30 : 30), { steps: 3 });
   await kp.mouse.up();
+  // Teslim kodu: yanlış kod hak düşer, doğru kodla açılır
+  await kt('delivery-code-input').fill('0000');
+  await kt('verify-code').click();
+  await kp.getByText('Kod yanlış, 4 hakkınız kaldı').waitFor();
+  await kt('delivery-code-input').fill('4821');
+  await kt('verify-code').click();
+  await kp.getByText('Kod doğru').waitFor();
+  // Kuryeye ödemeli sipariş: tahsilat seçilmeden teslim tamamlanamaz
+  await kp.getByText(/^Tahsilat: [\d.,]+ TL$/).waitFor();
+  if (await kt('complete-delivery').isEnabled()) throw new Error('tahsilat seçilmeden teslim açık');
+  await kt('cash-nakit').click();
   await kshot('12-kurye-teslim');
   await kt('complete-delivery').click();
-  await kp.getByText(/Bugün teslim edilen \(1\)/).waitFor();
+  await kp.getByText(/Bugün tamamlanan \(1\)/).waitFor();
   await kp.getByText(/Aktif işler \(1\)/).waitFor();
+  // Teslim edilemedi → göndericiye iade: varış, neden, arama, adres fotoğrafı; iade teslimi kanıtla
+  await kp.locator('[data-testid^="job-"]').first().click();
+  await kt('arrive-pickup').click();
+  await kp.getByText(/Alış adresine vardınız/).waitFor();
+  // Çevrimdışı: işlemler telefonda sıraya alınır, ekran akmaya devam eder, bağlantı gelince gider
+  const setOnline = (v) => kp.evaluate((on) => {
+    Object.defineProperty(navigator, 'onLine', { configurable: true, get: () => on });
+    window.dispatchEvent(new Event(on ? 'online' : 'offline'));
+  }, v);
+  await setOnline(false);
+  await kt('pickup').click();
+  await kp.getByText(/Bağlantı yok: işlem kaydedildi/).waitFor();
+  await kt('on-the-way').click();
+  // Ana ekran da yığında açık: banner iki yerde olabilir
+  await kt('outbox-pending').last().getByText('📶 Bağlantı yok: 3 işlem bekliyor').waitFor();
+  await kshot('11b-kurye-cevrimdisi');
+  await setOnline(true);
+  await kp.waitForFunction(() => !document.querySelector('[data-testid="outbox-pending"]'), null, { timeout: 20000 });
+  await kt('arrive-dropoff').waitFor();
+  await kt('arrive-dropoff').click();
+  await kp.getByText(/Teslim adresine vardınız/).waitFor();
+  await kt('failed-open').click();
+  await kt('failed-reason-alici_yok').click();
+  const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
+  const [chooser] = await Promise.all([kp.waitForEvent('filechooser'), kt('failed-photo').click()]);
+  await chooser.setFiles({ name: 'kapi.png', mimeType: 'image/png', buffer: png });
+  await kp.getByText('Fotoğrafı yeniden çek').waitFor();
+  if (await kt('failed-submit').isEnabled()) throw new Error('alıcı aranmadan iade başlatılabiliyor');
+  await kt('failed-call-plus').click();
+  await kt('failed-calls').getByText('Arama: 1 (+)').waitFor();
+  await kshot('12a-kurye-teslim-edilemedi');
+  await kt('failed-submit').click();
+  await kt('return-deliver').click();
+  await kp.getByText('Teslim edilemeyen paket göndericiye iade ediliyor').waitFor();
+  await kt('receiver').fill('Ayşe Gönderici');
+  const pad2 = await kt('signature-pad').boundingBox();
+  await kp.mouse.move(pad2.x + 30, pad2.y + 100);
+  await kp.mouse.down();
+  for (let i = 1; i <= 8; i++) await kp.mouse.move(pad2.x + 30 + i * 25, pad2.y + 100 + (i % 2 ? -25 : 25), { steps: 3 });
+  await kp.mouse.up();
+  await kt('cash-nakit').click();
+  await kt('complete-delivery').click();
+  await kp.getByText(/Bugün tamamlanan \(2\)/).waitFor();
+  // Vardiyada, elde iş yok: "Aktif işler (0)" başlığı yerine boş durum kartı (kask)
+  await kt('jobs-empty').getByText('Yol açık, iş yok.').waitFor();
+  if (await kp.getByText(/Aktif işler \(/).count()) throw new Error('iş yokken "Aktif işler" başlığı kalmamalı');
+  await kp.getByText(/Göndericiye iade edildi/).waitFor();
+  await kshot('12e-kurye-is-yok');
+  // Boşta: önümüzdeki saatin yoğun bölgeleri (geçmiş talep), uzaklıkla
+  await kp.getByText('Yoğun bölgeler (önümüzdeki saat)').waitFor();
+  const areas = await kp.getByTestId('busy-area').allInnerTexts();
+  console.log('YOGUN:', areas.map((a) => a.replace(/\n+/g, ' ')).join(' | '));
+  if (areas.length !== 3 || !/^1\. Kadıköy · [\d,]+ km/.test(areas[0])) throw new Error('yoğun bölgeler eksik');
+  // Kazancım: teslimat ve elde tutulan nakit
+  await kp.getByRole('tab', { name: /Kazancım/ }).click();
+  await kt('earnings-net').waitFor();
+  await kt('my-performance').getByText(/^\d+ · (Altın|Gümüş|Gelişmeli|Riskli)$/).waitFor();
+  // Primler: bugünün hedef ilerlemesi ve dünkü kazanılan prim bakiyede
+  await kt('incentive-progress').getByText(/^bugün \d+\/8 iş · \d+ iş daha → 100,00 TL$/).waitFor();
+  await kt('incentive-award').waitFor();
+  await kp.getByText('Hedef primleri').waitFor();
+  const earn = await kp.locator('body').innerText();
+  if (!/Elinizdeki nakit tahsilat/.test(earn) || !/YK-\d+/.test(earn)) throw new Error('kazanç ekranı eksik');
+  console.log('KAZANC:', earn.match(/Hesaplaşılmamış kazanç[\s\S]{0,160}/)?.[0]?.replace(/\n+/g, ' | '));
+  await kshot('12b-kurye-kazanc');
+  // Vardiya planı: boş bir dilim al, sonra bırak
+  await kp.getByRole('tab', { name: /Vardiyam/ }).click();
+  // Demo kuryesinin yarın için önceden alınmış bir vardiyası var ("Sıradaki vardiyan" kartı için)
+  await kt('my-shift-summary').getByText(/^1 vardiya · \d+ saat \(14 gün\)$/).waitFor();
+  await kp.locator('[role="button"]:not([aria-disabled="true"])').filter({ hasText: /^Al$/ }).first().click();
+  await kp.getByText(/vardiyası alındı/).waitFor();
+  await kt('my-shift-summary').getByText(/^2 vardiya · \d+ saat \(14 gün\)$/).waitFor();
+  await kshot('12d-kurye-vardiya');
+  await kp.locator('[role="button"]').filter({ hasText: /^Bırak$/ }).first().click();
+  await kp.getByText(/^Vardiya bırakıldı/).waitFor();
+  await kt('my-shift-summary').getByText(/^1 vardiya · \d+ saat \(14 gün\)$/).waitFor();
+  await kp.getByRole('tab', { name: /Hesabım/ }).click();
+  await kp.getByText('Belgelerim').waitFor();
+  await kp.getByText(/Süresi yaklaşıyor ·/).waitFor();
+  await kp.getByRole('tab', { name: /İşlerim/ }).click();
+  // Acil durum: tür seç, bildir; yönetici görünce onay; kurye molaya alınır
+  await kt('sos-open').click();
+  await kt('call-112').waitFor();
+  if (await kt('sos-send').isEnabled()) throw new Error('tür seçilmeden SOS gönderilebiliyor');
+  await kt('sos-kind-arac_ariza').click();
+  await kt('sos-send').click();
+  await kt('sos-status').getByText(/Araç arızası/).waitFor();
+  await kt('sos-acknowledged').waitFor({ timeout: 15000 });
+  await kshot('12c-kurye-sos');
+  // Bildirimden sonra: yöneticiyi ara + kontrol listesi + "Sorun çözüldü"
+  await kt('sos-call-manager').waitFor();
+  await kt('sos-resolved').scrollIntoViewIfNeeded();
+  await kshot('12c2-kurye-sos-alt');
+  await kp.goBack();
+  await kp.getByText('Moladasınız').waitFor();
+  await kt('break-toggle').click();
+  await kp.getByText('Vardiyadasınız').waitFor();
   // Elde paket yokken vardiya kapatılabilir
   await kt('shift-toggle').click();
   await kp.getByText('Vardiya kapalı').waitFor();
+  // Vardiya kapalı: "Aktif işler (0) —" yerine sıradaki vardiya + bugünün özet şeridi
+  await kt('next-shift').getByText(/^Yarın · \d{2}:\d{2}–\d{2}:\d{2}$/).waitFor();
+  await kt('today-strip').getByText(/^2 iş · [\d.,]+ TL · (Altın|Gümüş|Gelişmeli|Riskli)$/).waitFor();
+  if (await kp.getByText(/Aktif işler \(/).count()) throw new Error('vardiya kapalıyken "Aktif işler" görünmemeli');
   await kshot('13-kurye-bitti');
+  // Çıkış: sekme düzeni doğrudan giriş ekranına yönlendirir (eskiden "/" yönlendirmesi sonsuz döngüye giriyordu)
+  await kp.getByRole('tab', { name: /Hesabım/ }).click();
+  await kp.getByRole('button', { name: 'Çıkış yap' }).click();
+  await kt('phone').waitFor({ timeout: 10000 });
   if (errors.length) throw new Error('Tarayıcı hataları: ' + JSON.stringify(errors.slice(0, 10)));
   console.log('✓ kurye akışı geçti');
+
+  // ───────── Hesap silme (devam eden siparişi olmayan müşteri): onaydan sonra giriş ekranına dönülür
+  const dp = await (await browser.newContext({ viewport: { width: 390, height: 844 } })).newPage();
+  dp.on('pageerror', e => errors.push(e.message));
+  dp.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
+  const dt = id => dp.getByTestId(id);
+  await dp.goto(`http://localhost:${process.env.PORT || 8099}/`);
+  await dt('phone').fill('05329876543');
+  await dt('send-otp').click();
+  await dt('otp').fill('123456');
+  await dt('verify').click();
+  await dp.getByRole('checkbox').nth(0).click();
+  await dp.getByRole('checkbox').nth(1).click();
+  await dt('kvkk-accept').click();
+  await dt('address-pickup').waitFor();
+  await dp.getByRole('tab', { name: /Hesabım/ }).click();
+  await dt('delete-account').click();
+  await dt('delete-account-confirm').click();
+  await dt('phone').waitFor({ timeout: 10000 });
+  if (errors.length) throw new Error('Tarayıcı hataları: ' + JSON.stringify(errors.slice(0, 10)));
+  console.log('✓ çıkış ve hesap silme geçti');
   await browser.close();
 })().catch(e => { console.error('FAIL', e.message); process.exit(1); });

@@ -19,7 +19,7 @@ const healthy: HealthSnapshot = {
   orders_problem: 0,
   couriers_on_shift: 2,
   couriers_stale: 0,
-  heartbeats: { "notify-dispatch": ago(1), "auto-dispatch": ago(1), "webhook-dispatch": ago(2), "invoice-dispatch": ago(3) },
+  heartbeats: { "notify-dispatch": ago(1), "auto-dispatch": ago(1), "webhook-dispatch": ago(2), "invoice-dispatch": ago(3), "courier-earnings": ago(4) },
 };
 const env = (k: string) => ({ NOTIFY_SECRET: "s", ADMIN_ALERT_PHONES: "+905550000001" } as Record<string, string>)[k];
 const cronReq = () => new Request("http://x", { method: "POST", headers: { "x-notify-secret": "s" } });
@@ -32,6 +32,12 @@ Deno.test("sağlık: sorunsuz özet sorun üretmez; geciken görev ve bekleyen s
   assertEquals(issues.map((i) => i.key).sort(), ["invoices_failed", "job:auto-dispatch", "job:notify-dispatch", "orders_waiting"]);
   assertEquals(issues.find((i) => i.key === "job:notify-dispatch")!.severity, "critical");
   assert(issues.find((i) => i.key === "job:auto-dispatch")!.message.includes("hiç çalışmadı"));
+});
+
+Deno.test("sağlık: kurye belgesi süresi uyarısı", () => {
+  const issues = evaluateHealth({ ...healthy, courier_docs_expired: 1, courier_docs_expiring: 3 }, NOW);
+  assertEquals(issues.map((i) => [i.key, i.severity]), [["courier_docs_expired", "warning"], ["courier_docs_expiring", "warning"]]);
+  assert(issues[1]!.message.startsWith("3 kurye belgesinin"));
 });
 
 Deno.test("sağlık: kesinti izleyicisi ayrıntı görmez", async () => {

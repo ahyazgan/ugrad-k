@@ -55,6 +55,13 @@ describe("rankCouriers", () => {
     expect(r.every((x) => !x.eligible)).toBe(true);
   });
 
+  it("moladaki kurye en yakın olsa da uygun değil", () => {
+    const r = rankCouriers(order(), [courier("molada", 41.12, 29.1, { onBreak: true }), courier("bos", 41.1, 29.08)], cfg);
+    expect(r[0]!.courier.id).toBe("bos");
+    expect(r[0]!.eligible).toBe(true);
+    expect(r.find((x) => x.courier.id === "molada")!.reason).toBe("on_break");
+  });
+
   it("yük cezası: yakın ama yoğun kurye yerine biraz uzaktaki boş kurye", () => {
     const busyNear = courier("yogun", 41.125, 29.11, { activeOrders: 2 }); // ~0.5 km + 6
     const idleBit = courier("bos", 41.15, 29.09, { activeOrders: 0 }); // ~4 km

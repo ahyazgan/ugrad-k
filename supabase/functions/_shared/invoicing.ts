@@ -94,9 +94,10 @@ export async function handleInvoiceMonthly(req: Request, ctx: Ctx): Promise<Resp
       .from("orders")
       .select("subtotal_kurus, price_quote")
       .eq("corporate_account_id", body.corporateAccountId)
-      .eq("status", "teslim_edildi")
-      .gte("delivered_at", start)
-      .lt("delivered_at", end),
+      // Teslim edilen ve teslim edilemeyip göndericiye iade edilen işler (tamamlanma ayına göre)
+      .in("status", ["teslim_edildi", "geri_teslim"])
+      .gte("completed_at", start)
+      .lt("completed_at", end),
     ctx.loadPricing(),
   ]);
   if (!acc.data) throw new HttpError(404, "Kurumsal hesap bulunamadı");

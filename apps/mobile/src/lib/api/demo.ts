@@ -6,12 +6,23 @@
  * 0555 000 00 00 numarasıyla giriş yapılırsa KURYE ekranları açılır.
  */
 import {
+  applyPromo,
+  applyFailedDeliveryReturn,
   applyWaitingFee,
+  courierBalance,
+  demandCell,
+  istanbulWeekHour,
+  courierEarning,
+  DEFAULT_COST_MODEL,
   DEFAULT_PRICING_SETTINGS,
+  istanbulDay,
   ORDER_TRANSITIONS,
   buildQuote,
   mockMapsProvider,
+  normalizeCode,
   parseOrderRequest,
+  promoDiscountKurus,
+  promoLabel,
   PricingError,
   ValidationError,
   type OrderStatus,
@@ -19,9 +30,12 @@ import {
 import {
   ApiError,
   type Api,
+  type CashCollection,
   type Shift,
   type ConsentType,
   type CourierPosition,
+  type Incident,
+  type ShiftSlot,
   type OrderDetail,
   type OrderInput,
   type Profile,
@@ -62,6 +76,37 @@ export function createDemoApi(): Api {
   let shift: Shift | null = null;
   let seq = 1000;
   let courierSeeded = false;
+  /** Teslimde bildirilen tahsilat (yalnız kuryeye ödemeli siparişler) */
+  const cash = new Map<string, CashCollection>();
+  const codeTries = new Map<string, number>();
+  const codeVerified = new Set<string>();
+  let incident: Incident | null = null;
+  /** Demo vardiya planı: varsayılan dilimler (veritabanı varsayılanlarıyla aynı), alınanlar */
+  const SLOT_TIMES: Record<number, [string, string, number][]> = Object.fromEntries(
+    [1, 2, 3, 4, 5, 6].map((d) => [d, [["08:00", "12:00", 2], ["12:00", "16:00", 2], ["16:00", "20:00", 2], ["20:00", "24:00", 1]]]),
+  );
+  SLOT_TIMES[7] = [["10:00", "14:00", 1], ["14:00", "18:00", 1], ["18:00", "22:00", 1]];
+  const myShiftBookings = new Map<string, { id: string; startsAt: string }>();
+  /** Başkalarının aldığı (demo): her gün ilk dilimde 1 kişi */
+  const othersBooked = (startsAt: string) => (new Date(startsAt).getUTCHours() === 5 || new Date(startsAt).getUTCHours() === 7 ? 1 : 0);
+  const istTs = (day: string, time: string) =>
+    time === "24:00" ? new Date(new Date(`${day}T00:00:00+03:00`).getTime() + 86_400_000).toISOString() : new Date(`${day}T${time}:00+03:00`).toISOString();
+  // Demo kuryesinin planında yarının ikinci dilimi hazır alınmış olsun ("Sıradaki vardiyan" kartı için).
+  // İlk dilim boş kalır: e2e "ilk boş dilimi al → bırak" akışı bu kaydı etkilemez.
+  {
+    const day = istanbulDay(new Date(Date.now() + 86_400_000));
+    const dow = ((new Date(`${day}T12:00:00Z`).getUTCDay() + 6) % 7) + 1;
+    const second = SLOT_TIMES[dow]?.[1];
+    if (second) {
+      const startsAt = istTs(day, second[0]);
+      myShiftBookings.set(startsAt, { id: `bk-${startsAt}`, startsAt });
+    }
+  }
+  /** Demo yazışmaları: sipariş → mesajlar (rol: yazan taraf) */
+  const chats = new Map<string, { id: string; role: "musteri" | "kurye" | "admin"; body: string; createdAt: string; readAt: string | null }[]>();
+  const chatListeners = new Map<string, Set<() => void>>();
+  const chatNotify = (id: string) => chatListeners.get(id)?.forEach((l) => l());
+  const myRole = () => (profile?.role === "kurye" ? "kurye" : "musteri");
   const notifyJobs = () => jobListeners.forEach((l) => l());
 
   const emit = () => listeners.forEach((l) => l(session));
@@ -102,6 +147,16 @@ export function createDemoApi(): Api {
     weightKg: req.weightKg,
     scheduledPickupAt: req.scheduledPickupAt,
     priceQuote: q.quote,
+    durationSeconds: q.durationSeconds,
+    declaredValueKurus: req.declaredValueKurus,
+    deliveryCodeRequired: req.deliveryCode,
+    deliveryCode: req.deliveryCode ? "4821" : null,
+    slaDueAt: req.serviceLevel === "acil" ? new Date(new Date(now).getTime() + 60 * 60_000).toISOString() : null,
+    slaMissed: null,
+    arrivedPickupAt: null,
+    arrivedDropoffAt: null,
+    failedReason: null,
+    failedAt: null,
     paymentMethod: req.paymentMethod,
     paymentStatus: "odenmedi",
     paidKurus: null,
@@ -117,7 +172,14 @@ export function createDemoApi(): Api {
   const quoteFor = async (input: OrderInput) => {
     try {
       const req = parseOrderRequest(input);
-      return { req, q: await buildQuote(req, { maps, settings: DEFAULT_PRICING_SETTINGS, holidays: [] }) };
+      const q = await buildQuote(req, { maps, settings: DEFAULT_PRICING_SETTINGS, holidays: [] });
+      // Demo kampanya kodu: HOSGELDIN (%20); diğer kodlar bulunamaz
+      if (req.promoCode) {
+        if (normalizeCode(req.promoCode) !== "HOSGELDIN") throw new ApiError("Kod bulunamadı", "promoCode", 400);
+        const p = { code: "HOSGELDIN", kind: "yuzde" as const, value: 20, maxDiscountKurus: null };
+        q.quote = applyPromo(q.quote, promoLabel(p), promoDiscountKurus(p, q.quote));
+      }
+      return { req, q };
     } catch (e) {
       if (e instanceof ValidationError) throw new ApiError(e.message, e.field, 400);
       if (e instanceof PricingError) throw new ApiError(e.message, undefined, 400);
@@ -125,15 +187,16 @@ export function createDemoApi(): Api {
     }
   };
 
-  /** Demo kuryesine iki iş atar */
+  /** Demo kuryesine bir atanmış iş ve iki iş teklifi (2 dk süreli) verir */
   async function seedCourierJobs() {
     if (courierSeeded) return;
     courierSeeded = true;
-    const routes: [string, string, boolean][] = [
-      ["mock-beykoz", "mock-levent", true],
-      ["mock-uskudar", "mock-kadikoy", false],
+    const routes: [string, string, boolean, boolean][] = [
+      ["mock-beykoz", "mock-levent", true, false],
+      ["mock-uskudar", "mock-kadikoy", false, true],
+      ["mock-kadikoy", "mock-atasehir", false, true],
     ];
-    for (const [from, to, urgent] of routes) {
+    for (const [from, to, urgent, offer] of routes) {
       const pickup = await maps.placeDetails(from);
       const dropoff = await maps.placeDetails(to);
       const { req, q } = await quoteFor({
@@ -143,6 +206,9 @@ export function createDemoApi(): Api {
         roundTrip: false,
         weightKg: null,
         largePackage: false,
+        declaredValueKurus: null,
+        // İlk demo işi teslim kodlu (kod: 4821)
+        deliveryCode: urgent,
         packageDescription: "İmzalı sözleşme zarfı",
         customerNote: "Resepsiyona bırakılabilir",
         scheduledPickupAt: null,
@@ -154,23 +220,85 @@ export function createDemoApi(): Api {
         ...detailFrom(id, req, q, now),
         status: "kuryeye_atandi",
         courierName: "Demo Kurye",
+        offerExpiresAt: offer ? new Date(Date.now() + 120_000).toISOString() : null,
+        pickupPoint: { lat: req.pickup.lat, lng: req.pickup.lng },
+        dropoffPoint: { lat: req.dropoff.lat, lng: req.dropoff.lng },
         history: [
           { status: "beklemede", at: now, note: null },
           { status: "onaylandi", at: now, note: null },
-          { status: "kuryeye_atandi", at: now, note: null },
+          { status: "kuryeye_atandi", at: now, note: offer ? "Otomatik atama (teklif)" : null },
         ],
       });
     }
   }
 
-  function move(id: string, to: OrderStatus, note: string | null = null) {
+  let customerSeeded = false;
+  /**
+   * Demo müşterisine teslim edilmiş üç geçmiş sipariş verir: "Son adresler", "Aynı rotayla tekrar gönder"
+   * ve Siparişlerim listesi boş görünmesin. Numaraları yeni siparişlerle (YK-1001…) çakışmaz; hepsi
+   * yeni siparişten eskidir, listede altta kalır.
+   */
+  async function seedCustomerHistory() {
+    if (customerSeeded) return;
+    customerSeeded = true;
+    const DAY = 86_400_000;
+    const past: [no: string, from: string, to: string, daysAgo: number, details: [string, string], rating: number | null][] = [
+      ["YK-0987", "mock-beykoz", "mock-levent", 2, ["Kat 2", "Kanyon AVM, B Blok"], 5],
+      ["YK-0979", "mock-kadikoy", "mock-atasehir", 6, ["Moda Cad. No: 12", "Resepsiyon"], null],
+      ["YK-0964", "mock-uskudar", "mock-sisli", 12, ["Kat 4", "Plaza girişi, güvenlik"], 4],
+    ];
+    for (const [orderNo, from, to, daysAgo, [pickupDetails, dropoffDetails], rating] of past) {
+      const pickup = await maps.placeDetails(from);
+      const dropoff = await maps.placeDetails(to);
+      const { req, q } = await quoteFor({
+        pickup: { ...pickup, details: pickupDetails, contactName: "Ayşe Gönderici", contactPhone: "+905321112233" },
+        dropoff: { ...dropoff, details: dropoffDetails, contactName: "Ali Alıcı", contactPhone: "+905334445566" },
+        serviceLevel: "standart",
+        roundTrip: false,
+        weightKg: null,
+        largePackage: false,
+        declaredValueKurus: null,
+        deliveryCode: false,
+        packageDescription: "İmzalı sözleşme zarfı",
+        scheduledPickupAt: null,
+        paymentMethod: "kart",
+      });
+      const created = Date.now() - daysAgo * DAY;
+      const at = (min: number) => new Date(created + min * 60_000).toISOString();
+      const id = `demo-past-${orderNo}`;
+      orders.set(id, {
+        ...detailFrom(id, req, q, at(0)),
+        orderNo,
+        status: "teslim_edildi",
+        paymentStatus: "odendi",
+        paidKurus: q.quote.totalKurus,
+        courierName: "Mehmet (demo)",
+        rating,
+        history: [
+          { status: "beklemede", at: at(0), note: null },
+          { status: "onaylandi", at: at(1), note: null },
+          { status: "kuryeye_atandi", at: at(3), note: null },
+          { status: "alindi", at: at(18), note: null },
+          { status: "yolda", at: at(19), note: null },
+          { status: "teslim_edildi", at: at(52), note: null },
+        ],
+      });
+    }
+  }
+
+  /** Demo: tarayıcı çevrimdışıysa ağ hatası gibi davranır (çevrimdışı kuyruğu denemek için) */
+  const failIfOffline = () => {
+    if (typeof navigator !== "undefined" && navigator.onLine === false) throw new ApiError("Network request failed");
+  };
+
+  function move(id: string, to: OrderStatus, note: string | null = null, at?: string) {
     const o = orders.get(id);
     if (!o) throw new ApiError("Sipariş bulunamadı", undefined, 404);
     if (!ORDER_TRANSITIONS[o.status].includes(to)) {
       throw new ApiError(`Bu işlem şu an yapılamaz (${o.status} → ${to})`);
     }
     o.status = to;
-    o.history.push({ status: to, at: new Date().toISOString(), note });
+    o.history.push({ status: to, at: at ?? new Date().toISOString(), note });
     notify(id);
     notifyJobs();
     return o;
@@ -220,6 +348,7 @@ export function createDemoApi(): Api {
         email: null,
         corporateAccountId: null,
       };
+      if (!courier) await seedCustomerHistory();
       emit();
       return session;
     },
@@ -261,6 +390,8 @@ export function createDemoApi(): Api {
     searchPlaces: (input, token) => maps.autocomplete(input, token),
     placeDetails: (id, token) => maps.placeDetails(id, token),
 
+    getPricingSettings: async () => DEFAULT_PRICING_SETTINGS,
+
     async quote(input) {
       requireSession();
       const { q } = await quoteFor(input);
@@ -280,7 +411,11 @@ export function createDemoApi(): Api {
     },
     async listOrders() {
       requireSession();
-      return [...orders.values()].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+      // Konumlar "Son adresler" için (gerçek API'de de seçilir)
+      return [...orders.values()]
+        .filter((o) => o.courierName !== "Demo Kurye")
+        .map((o) => ({ ...o, pickupPoint: { lat: o.pickupLat, lng: o.pickupLng }, dropoffPoint: { lat: o.dropoffLat, lng: o.dropoffLng } }))
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
     },
     async getOrder(id) {
       const o = orders.get(id);
@@ -331,10 +466,10 @@ export function createDemoApi(): Api {
 
     // ───────── Kurye
     async getOpenShift() {
-      return shift;
+      return shift ? { ...shift, break: shift.break ? { ...shift.break } : null } : null;
     },
     async startShift() {
-      shift ??= { id: "demo-shift", startedAt: new Date().toISOString() };
+      shift ??= { id: "demo-shift", startedAt: new Date().toISOString(), break: null };
       await seedCourierJobs();
       notifyJobs();
       return shift;
@@ -343,23 +478,94 @@ export function createDemoApi(): Api {
       shift = null;
       notifyJobs();
     },
+    async startBreak() {
+      if (!shift) throw new ApiError("Mola için önce vardiyayı başlatın");
+      shift.break ??= { startedAt: new Date().toISOString(), auto: false };
+      // Bekleyen teklifler geri alınır
+      for (const o of orders.values()) {
+        if (o.courierName === "Demo Kurye" && o.offerExpiresAt && o.status === "kuryeye_atandi") {
+          move(o.id, "onaylandi", "Kurye molada; teklif geri alındı");
+          o.courierName = null;
+          o.offerExpiresAt = null;
+        }
+      }
+      notifyJobs();
+    },
+    async endBreak() {
+      if (shift) shift.break = null;
+      notifyJobs();
+    },
     async listCourierJobs() {
       requireSession();
       return [...orders.values()]
         .filter((o) => o.courierName === "Demo Kurye")
         .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
     },
-    async courierAction(orderId, action) {
+    async raiseSos({ kind }) {
+      failIfOffline();
+      if (!incident) {
+        incident = { id: "demo-sos", kind, createdAt: new Date().toISOString(), acknowledgedAt: null };
+        // Demo: yönetici birkaç saniyede görür
+        setTimeout(() => {
+          if (incident) incident.acknowledgedAt = new Date().toISOString();
+        }, 3000);
+      }
+      if (shift) shift.break ??= { startedAt: new Date().toISOString(), auto: false };
+      notifyJobs();
+      return { id: incident.id };
+    },
+    async myOpenIncident() {
+      return incident ? { ...incident } : null;
+    },
+    async markArrived(orderId, stop, _at, occurredAt) {
+      failIfOffline();
+      const o = orders.get(orderId);
+      if (!o) throw new ApiError("Sipariş bulunamadı", undefined, 404);
+      if (stop === "alis" && (o.status !== "kuryeye_atandi" || o.offerExpiresAt)) throw new ApiError("Alış adresine varış yalnız paket alınmadan önce bildirilir");
+      if (stop === "teslim" && o.status !== "yolda" && o.status !== "sorunlu") throw new ApiError("Teslim adresine varış paket yoldayken bildirilir");
+      const now = occurredAt ?? new Date().toISOString();
+      // Demo: konum kontrolü yok (gerçekte adrese 300 m içinde olmalı)
+      if (stop === "alis") o.arrivedPickupAt ??= now;
+      else o.arrivedDropoffAt ??= now;
+      notify(orderId);
+      return { arrivedAt: (stop === "alis" ? o.arrivedPickupAt : o.arrivedDropoffAt)! };
+    },
+    async respondOffer(orderId, accept, opts = {}) {
+      const o = orders.get(orderId);
+      if (!o || !o.offerExpiresAt || o.status !== "kuryeye_atandi" || o.courierName !== "Demo Kurye") {
+        return { ok: false, message: "Bu teklif artık geçerli değil" };
+      }
+      const expired = Date.now() > new Date(o.offerExpiresAt).getTime() + 10_000;
+      if (accept && !expired) {
+        o.offerExpiresAt = null;
+        notify(orderId);
+        notifyJobs();
+        return { ok: true, message: null };
+      }
+      const timedOut = !!opts.timeout || expired;
+      const back = move(orderId, "onaylandi", timedOut ? "Teklif süresi doldu" : `Teklif reddedildi${opts.reason ? `: ${opts.reason}` : ""}`);
+      back.courierName = null;
+      back.offerExpiresAt = null;
+      notifyJobs();
+      return accept ? { ok: false, message: "Teklifin süresi doldu; iş başka kuryeye verilecek" } : { ok: true, message: null };
+    },
+    async courierAction(orderId, action, opts = {}) {
+      failIfOffline();
+      const at = opts.occurredAt;
+      if (orders.get(orderId)?.offerExpiresAt && action.type !== "release") throw new ApiError("Önce işi kabul edin");
       switch (action.type) {
         case "pickup": {
-          const o = move(orderId, "alindi");
-          o.waitingMinutes = action.waitingMinutes;
+          const o = move(orderId, "alindi", null, at);
+          // Varış bildirildiyse bekleme varıştan ölçülür
+          o.waitingMinutes = o.arrivedPickupAt
+            ? Math.max(0, Math.floor((Date.now() - new Date(o.arrivedPickupAt).getTime()) / 60_000))
+            : action.waitingMinutes;
           o.priceQuote = applyWaitingFee(o.priceQuote, action.waitingMinutes, DEFAULT_PRICING_SETTINGS);
           o.totalKurus = o.priceQuote.totalKurus;
           return;
         }
         case "on_the_way":
-          move(orderId, "yolda");
+          move(orderId, "yolda", null, at);
           return;
         case "problem":
           move(orderId, "sorunlu", action.note);
@@ -370,16 +576,218 @@ export function createDemoApi(): Api {
           notifyJobs();
           return;
         }
-        case "deliver":
+        case "deliver": {
           if (!action.pod.photoUri && !action.pod.signatureSvg) {
             throw new ApiError("Teslim için fotoğraf veya imza gerekli");
           }
-          move(orderId, "teslim_edildi");
+          const o = orders.get(orderId);
+          if (o?.deliveryCodeRequired && !codeVerified.has(orderId)) {
+            throw new ApiError("Alıcının teslim kodu doğrulanmadı");
+          }
+          if (o?.paymentMethod === "nakit" && o.paymentStatus !== "odendi" && !action.pod.cashCollection) {
+            throw new ApiError("Kuryeye ödemeli siparişte tahsilat bilgisi gerekli");
+          }
+          if (o && action.pod.cashCollection) {
+            cash.set(orderId, action.pod.cashCollection);
+            if (action.pod.cashCollection === "nakit") {
+              o.paymentStatus = "odendi";
+              o.paidKurus = o.totalKurus;
+            }
+          }
+          move(orderId, "teslim_edildi", null, at);
           return;
+        }
+        case "return_deliver": {
+          if (!action.pod.photoUri && !action.pod.signatureSvg) throw new ApiError("Teslim için fotoğraf veya imza gerekli");
+          const o = orders.get(orderId);
+          if (o?.paymentMethod === "nakit" && o.paymentStatus !== "odendi" && !action.pod.cashCollection) {
+            throw new ApiError("Kuryeye ödemeli siparişte tahsilat bilgisi gerekli");
+          }
+          if (o && action.pod.cashCollection) cash.set(orderId, action.pod.cashCollection);
+          move(orderId, "geri_teslim", null, at);
+          return;
+        }
       }
     },
+    async repriceOrder() {
+      failIfOffline();
+      // Demo: ücretler işlem anında teklife eklenir
+    },
+    async reportFailedDelivery(orderId, input, opts = {}) {
+      failIfOffline();
+      const o = orders.get(orderId);
+      if (!o) throw new ApiError("Sipariş bulunamadı", undefined, 404);
+      if (!input.photoUri) throw new ApiError("Adresin fotoğrafını çekin (kanıt)");
+      if (input.reason !== "alici_reddetti" && input.reason !== "adres_bulunamadi" && !o.arrivedDropoffAt) {
+        throw new ApiError("Önce teslim adresine vardığınızı bildirin");
+      }
+      if (input.reason === "alici_yok" && input.callAttempts < 1) throw new ApiError("Alıcıyı en az bir kez arayın");
+      // Demo: en az bekleme süresi (gerçekte 10 dk) denetlenmez
+      move(orderId, "geri_donuyor", `Teslim edilemedi: ${input.reason}${input.note.trim() ? ` — ${input.note.trim()}` : ""}`, opts.occurredAt);
+      o.failedReason = input.reason;
+      o.failedAt = opts.occurredAt ?? new Date().toISOString();
+      o.priceQuote = applyFailedDeliveryReturn(o.priceQuote, { roundTrip: o.roundTrip }, DEFAULT_PRICING_SETTINGS);
+      o.totalKurus = o.priceQuote.totalKurus;
+      notify(orderId);
+    },
     async pushLocation() {
+      failIfOffline();
       // Demo: konum sunucuya gönderilmez
+    },
+    async myPerformance() {
+      return { offersAccepted: 23, offersDeclined: 1, offersTimedOut: 2, delivered: 31, urgentDelivered: 8, urgentOnTime: 7, ratingCount: 11, ratingAvg: 4.7, released: 1, failedDeliveries: 0, shiftsBooked: 10, shiftsAttended: 9, lateCancels: 0 };
+    },
+    async demandStats() {
+      requireSession();
+      // Demo: bu ve sonraki saatte Anadolu yakasında üç yoğun hücre (8 haftalık örnek)
+      const rows = [0, 1].flatMap((ahead) => {
+        const { weekday, hour } = istanbulWeekHour(new Date(Date.now() + ahead * 3_600_000));
+        return [
+          { ...demandCell({ lat: 40.9905, lng: 29.0291 }), orders: 22, district: "Kadıköy" },
+          { ...demandCell({ lat: 41.0226, lng: 29.0155 }), orders: 14, district: "Üsküdar" },
+          { ...demandCell({ lat: 40.9923, lng: 29.1244 }), orders: 9, district: "Ataşehir" },
+        ].map((c) => ({ ...c, weekday, hour }));
+      });
+      return { weeks: 8, rows };
+    },
+    async myIncentives() {
+      requireSession();
+      const today = istanbulDay(new Date());
+      const doneToday = [...orders.values()].filter((o) => o.courierName === "Demo Kurye" && o.status === "teslim_edildi").length;
+      return [
+        {
+          id: "demo-inc-1",
+          title: "Günlük hedef",
+          kind: "hedef" as const,
+          period: "gunluk" as const,
+          tiers: [
+            { target: 8, rewardKurus: 10_000 },
+            { target: 12, rewardKurus: 25_000 },
+          ],
+          bonusPct: null,
+          weekdays: null,
+          startHour: 0,
+          endHour: 24,
+          startsOn: today,
+          endsOn: null,
+          periodStart: today,
+          periodEnd: today,
+          jobs: 5 + doneToday,
+          earningKurus: 0,
+        },
+      ];
+    },
+    async courierEarnings() {
+      requireSession();
+      const items = [...orders.values()]
+        .filter((o) => o.courierName === "Demo Kurye" && o.status === "teslim_edildi")
+        .map((o) => {
+          const e = courierEarning(o.priceQuote, DEFAULT_COST_MODEL, DEFAULT_PRICING_SETTINGS);
+          return {
+            orderId: o.id,
+            orderNo: o.orderNo,
+            deliveredAt: [...o.history].reverse().find((h) => h.status === "teslim_edildi")?.at ?? new Date().toISOString(),
+            km: e.km,
+            totalKurus: e.totalKurus,
+            cashCollectedKurus: cash.get(o.id) === "nakit" ? o.totalKurus : 0,
+          };
+        })
+        .sort((a, b) => b.deliveredAt.localeCompare(a.deliveredAt));
+      const yesterday = istanbulDay(new Date(Date.now() - 86_400_000));
+      const incentives = [{ id: "demo-award-1", title: "Günlük hedef", periodStart: yesterday, periodEnd: yesterday, amountKurus: 10_000, detail: "9 iş" }];
+      return {
+        unpaid: courierBalance(items, 10_000),
+        items,
+        incentives,
+        payouts: [],
+        rates: { perJobKurus: DEFAULT_COST_MODEL.courierPerJobKurus, perKmKurus: DEFAULT_COST_MODEL.courierPerKmKurus },
+      };
+    },
+    async verifyDeliveryCode(orderId, code) {
+      const o = orders.get(orderId);
+      if (!o?.deliveryCode) return { ok: true, remaining: 5 };
+      const tries = (codeTries.get(orderId) ?? 0);
+      if (tries >= 5) throw new ApiError("Teslim kodu 5 kez yanlış girildi; yöneticiyi arayın");
+      if (code.trim() === o.deliveryCode) {
+        codeVerified.add(orderId);
+        return { ok: true, remaining: 5 - tries };
+      }
+      codeTries.set(orderId, tries + 1);
+      return { ok: false, remaining: 4 - tries };
+    },
+    async myReferralCode() {
+      requireSession();
+      return "DEMO23";
+    },
+    async courierDocuments() {
+      requireSession();
+      const day = (n: number) => istanbulDay(new Date(Date.now() + n * 86_400_000));
+      return [
+        { kind: "ehliyet", number: "A2-348812", expiresAt: day(1400) },
+        { kind: "kurye_faaliyet_belgesi", number: "KFB-2026-11873", expiresAt: day(500) },
+        { kind: "ruhsat", number: null, expiresAt: null },
+        { kind: "trafik_sigortasi", number: null, expiresAt: day(10) },
+      ];
+    },
+    async listShiftSlots(fromDay, days) {
+      const out: ShiftSlot[] = [];
+      for (let i = 0; i < days; i++) {
+        const day = new Date(new Date(`${fromDay}T12:00:00+03:00`).getTime() + i * 86_400_000).toISOString().slice(0, 10);
+        const dow = ((new Date(`${day}T12:00:00Z`).getUTCDay() + 6) % 7) + 1;
+        (SLOT_TIMES[dow] ?? []).forEach(([s, e, required], k) => {
+          const startsAt = istTs(day, s);
+          const mine = myShiftBookings.get(startsAt);
+          out.push({ templateId: dow * 10 + k, day, startsAt, endsAt: istTs(day, e), required, booked: othersBooked(startsAt) + (mine ? 1 : 0), mine: !!mine, bookingId: mine?.id ?? null });
+        });
+      }
+      return out;
+    },
+    async bookShift(templateId, day) {
+      const slot = (await this.listShiftSlots(day, 1)).find((x) => x.templateId === templateId);
+      if (!slot) throw new ApiError("Bu gün için böyle bir vardiya yok");
+      if (slot.mine) return;
+      if (new Date(slot.startsAt).getTime() < Date.now()) throw new ApiError("Vardiya ancak önümüzdeki 14 gün için alınabilir");
+      if (slot.booked >= slot.required) throw new ApiError("Bu vardiya dolu");
+      myShiftBookings.set(slot.startsAt, { id: `bk-${slot.startsAt}`, startsAt: slot.startsAt });
+    },
+    async cancelShiftBooking(bookingId) {
+      for (const [k, b] of myShiftBookings) {
+        if (b.id === bookingId) {
+          myShiftBookings.delete(k);
+          return { lateCancel: new Date(b.startsAt).getTime() - Date.now() < 2 * 3_600_000 };
+        }
+      }
+      throw new ApiError("Vardiya bulunamadı");
+    },
+    async listMessages(orderId) {
+      const me = myRole();
+      return (chats.get(orderId) ?? []).map((m) => ({ id: m.id, senderRole: m.role, body: m.body, createdAt: m.createdAt, mine: m.role === me, readAt: m.readAt }));
+    },
+    async sendMessage(orderId, body) {
+      const text = body.trim();
+      if (!text || text.length > 1000) throw new ApiError("Mesaj 1–1000 karakter olmalı");
+      const list = chats.get(orderId) ?? [];
+      const me = myRole();
+      list.push({ id: `m${list.length + 1}`, role: me, body: text, createdAt: new Date().toISOString(), readAt: null });
+      chats.set(orderId, list);
+      chatNotify(orderId);
+      // Demo: karşı taraf birkaç saniyede okur ve kısa cevap verir
+      setTimeout(() => {
+        for (const m of list) if (m.role === me) m.readAt ??= new Date().toISOString();
+        const reply = me === "kurye" ? "Tamam, teşekkürler" : "Tamam, 5 dakika içinde oradayım";
+        if (list.at(-1)?.role === me) list.push({ id: `m${list.length + 1}`, role: me === "kurye" ? "musteri" : "kurye", body: reply, createdAt: new Date().toISOString(), readAt: null });
+        chatNotify(orderId);
+      }, 1500);
+    },
+    async markMessagesRead(orderId) {
+      const me = myRole();
+      for (const m of chats.get(orderId) ?? []) if (m.role !== me) m.readAt ??= new Date().toISOString();
+    },
+    subscribeMessages(orderId, onChange) {
+      const set = chatListeners.get(orderId) ?? new Set();
+      set.add(onChange);
+      chatListeners.set(orderId, set);
+      return () => set.delete(onChange);
     },
     subscribeCourierJobs(onChange) {
       jobListeners.add(onChange);

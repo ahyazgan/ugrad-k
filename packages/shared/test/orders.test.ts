@@ -25,6 +25,14 @@ describe("sipariş durumları", () => {
     expect(canTransition("yolda", "iptal")).toBe(false);
   });
 
+  it("teslim edilemedi: yoldan göndericiye dönüş, iade son durumdur", () => {
+    expect(canTransition("yolda", "geri_donuyor")).toBe(true);
+    expect(canTransition("geri_donuyor", "geri_teslim")).toBe(true);
+    expect(canTransition("alindi", "geri_donuyor")).toBe(false);
+    expect(canTransition("geri_donuyor", "teslim_edildi")).toBe(false);
+    expect(isFinalStatus("geri_teslim")).toBe(true);
+  });
+
   it("geçiş tablosu yalnızca bilinen durumları içerir", () => {
     for (const targets of Object.values(ORDER_TRANSITIONS)) {
       for (const t of targets) expect(ORDER_STATUSES).toContain(t);

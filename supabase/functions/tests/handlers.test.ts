@@ -55,6 +55,62 @@ Deno.test("create-order: fiyat sunucuda hesaplanır, istemci fiyatı yok sayıl�
   assertEquals(row.bridge_crossings, 1);
 });
 
+Deno.test("create-order: gecikme telafisi kredisi düşülür ve kullanıldı işaretlenir", async () => {
+  const customer_credits = [
+    { id: "cr1", customer_id: "u1", amount_kurus: 20_000, reason: "YK-1001 acil teslim gecikmesi telafisi", used_order_id: null },
+    { id: "cr2", customer_id: "u1", amount_kurus: 9_999_999, reason: "çok büyük", used_order_id: null },
+  ];
+  const { ctx, inserted, updated } = fakeCtx({ tables: { profiles, current_consents: consented, customer_credits } });
+  const plain = await (await handler((r) => handleQuote(r, ctx))(post(orderBody()))).json();
+  const credit = plain.quote.lines.find((l: { code: string }) => l.code === "credit");
+  assertEquals(credit.amountKurus, -20_000);
+  const res = await handler((r) => handleCreateOrder(r, ctx))(post(orderBody()));
+  assertEquals(res.status, 201);
+  const row = inserted.orders![0]!;
+  assertEquals(row.subtotal_kurus, plain.quote.subtotalKurus);
+  assertEquals(updated.customer_credits!.map((c) => [c.id, c.used_order_id]), [["cr1", "new-id"]]);
+});
+
+Deno.test("kampanya kodu: teklif ve siparişte indirim, kullanım kaydı; geçersiz kod 400", async () => {
+  const promo_codes = [{ code: "HOSGELDIN", kind: "yuzde", value: "20", per_customer_limit: 1, min_subtotal_kurus: 0, active: true }];
+  const { ctx, inserted } = fakeCtx({ tables: { profiles, current_consents: consented, promo_codes, promo_redemptions: [], orders: [] } });
+  const q = await (await handler((r) => handleQuote(r, ctx))(post(orderBody({ promoCode: " hosgeldin " })))).json();
+  const line = q.quote.lines.find((l: { code: string }) => l.code === "promo");
+  assert(line.label.startsWith("Kampanya HOSGELDIN"));
+  assert(line.amountKurus < 0);
+  const res = await handler((r) => handleCreateOrder(r, ctx))(post(orderBody({ promoCode: "HOSGELDIN" })));
+  assertEquals(res.status, 201);
+  assertEquals(inserted.orders![0]!.promo_code, "HOSGELDIN");
+  assertEquals(inserted.promo_redemptions![0]!.amount_kurus, -line.amountKurus);
+  // Aynı müşteri ikinci kez kullanamaz
+  const again = await handler((r) => handleQuote(r, ctx))(post(orderBody({ promoCode: "HOSGELDIN" })));
+  assertEquals(again.status, 400);
+  assertEquals(await again.json(), { error: "Bu kodu daha önce kullandınız", field: "promoCode" });
+  const unknown = await handler((r) => handleQuote(r, ctx))(post(orderBody({ promoCode: "YOKKOD" })));
+  assertEquals((await unknown.json()).error, "Kod bulunamadı");
+});
+
+Deno.test("davet kodu: yalnız ilk sipariş, kendi kodu olmaz, davet eden kaydedilir", async () => {
+  const tables = {
+    profiles: [...profiles.map((p) => ({ ...p, referred_by: null })), { id: "ref1", role: "musteri", referral_code: "ABC234" }],
+    current_consents: consented,
+    promo_codes: [],
+    promo_redemptions: [],
+    orders: [] as Record<string, unknown>[],
+    ops_settings: [{ id: 1, referral_reward_kurus: 10_000 }],
+  };
+  const { ctx, inserted, updated } = fakeCtx({ tables });
+  const res = await handler((r) => handleCreateOrder(r, ctx))(post(orderBody({ promoCode: "abc234" })));
+  const data = await res.json();
+  assertEquals(res.status, 201, JSON.stringify(data));
+  assertEquals(data.quote.lines.find((l: { code: string }) => l.code === "promo").amountKurus, -10_000);
+  assertEquals(inserted.promo_redemptions![0]!.kind, "davet");
+  assertEquals(updated.profiles!.find((p) => p.id === "u1")!.referred_by, "ref1");
+  // Artık ilk sipariş değil
+  const second = await handler((r) => handleQuote(r, ctx))(post(orderBody({ promoCode: "ABC234" })));
+  assertEquals((await second.json()).error, "Davet kodu yalnız ilk siparişte geçerli");
+});
+
 Deno.test("create-order: cari ödeme yalnız kurumsal", async () => {
   const { ctx } = fakeCtx({ tables: { profiles, current_consents: consented } });
   const res = await handler((r) => handleCreateOrder(r, ctx))(post(orderBody({ paymentMethod: "cari" })));

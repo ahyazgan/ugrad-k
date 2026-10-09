@@ -1,6 +1,8 @@
 // Bildirim kuyruğunu işler (notify-dispatch).
 import {
+  buildEventNotifications,
   buildNotifications,
+  type NotificationKind,
   type NotificationConfig,
   type NotificationOrder,
   type OrderStatus,
@@ -24,11 +26,17 @@ export function toNotificationOrder(r: Row): NotificationOrder {
     trackingToken: r.tracking_token,
     pickupAddress: r.pickup_address,
     dropoffAddress: r.dropoff_address,
+    pickupContactName: r.pickup_contact_name ?? null,
+    pickupContactPhone: r.pickup_contact_phone ?? null,
     dropoffContactName: r.dropoff_contact_name,
     dropoffContactPhone: r.dropoff_contact_phone,
     podReceiverName: r.pod_receiver_name,
     cancelReason: r.cancel_reason,
     problemNote: r.problem_note,
+    failedReason: r.failed_reason ?? null,
+    returnReceiverName: r.return_receiver_name ?? null,
+    deliveryCode: (Array.isArray(r.secret) ? r.secret[0] : r.secret)?.delivery_code ?? null,
+    assignment: r.offer_expires_at ? (r.offer_accepted_at ? "accepted" : "offer") : "direct",
     customer: {
       fullName: r.customer?.full_name ?? null,
       phone: r.customer?.phone ?? null,
@@ -70,12 +78,28 @@ export async function handleNotifyDispatch(
       const { data: order, error: oErr } = await ctx.admin
         .from("orders")
         .select(
-          "*, customer:profiles!orders_customer_id_fkey(full_name, phone, push_token), courier:couriers(profile:profiles(full_name, phone, push_token))",
+          "*, customer:profiles!orders_customer_id_fkey(full_name, phone, push_token), courier:couriers(profile:profiles(full_name, phone, push_token)), secret:order_secrets(delivery_code)",
         )
         .eq("id", n.order_id)
         .single();
       if (oErr || !order) throw new Error(`Sipariş okunamadı: ${oErr?.message}`);
-      const messages = buildNotifications(n.event as OrderStatus, toNotificationOrder(order), cfg);
+      const no = toNotificationOrder(order);
+      if (typeof n.kind === "string" && n.kind.startsWith("mesaj_")) {
+        // Mesaj bildirimi: o tarafa yazan son mesaj
+        const { data: last } = await ctx.admin
+          .from("order_messages")
+          .select("sender_role, body")
+          .eq("order_id", n.order_id)
+          .in("sender_role", n.kind === "mesaj_musteri" ? ["kurye", "admin"] : ["musteri", "admin"])
+          .order("created_at", { ascending: false })
+          .limit(1);
+        const m = ((last ?? []) as Row[])[0];
+        no.lastMessage = m ? { senderRole: m.sender_role, body: m.body } : null;
+      }
+      const messages =
+        n.kind && n.kind !== "durum"
+          ? buildEventNotifications(n.kind as NotificationKind, no, cfg)
+          : buildNotifications(n.event as OrderStatus, no, cfg);
       results = await Promise.all(messages.map((m) => deliver(m, deps)));
       const failed = results.filter((r) => !r.ok);
       if (!messages.length) status = "skipped";

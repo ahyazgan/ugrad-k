@@ -27,6 +27,22 @@ Kodun tamamı yazıldı ve testlerden geçti. Bu rehber, sistemi **gerçek hesap
 20. [E-postayla sipariş (Postmark)](#20-e-postayla-sipariş)
 21. [Kurumsal API ve webhook](#21-kurumsal-api-ve-webhook)
 22. [Sistem izleme ve kesinti alarmı](#22-sistem-izleme)
+23. [Kurye hakedişi ve nakit tahsilatı](#23-kurye-hakedişi-ve-nakit-tahsilatı)
+24. [Kurye belgeleri ve uyum](#24-kurye-belgeleri-ve-uyum)
+25. [Acil teslim taahhüdü ve tahmini varış](#25-acil-teslim-taahhüdü-60-dk-ve-tahmini-varış)
+26. [Değerli gönderiler](#26-değerli-gönderiler-değer-beyanı-ve-teslim-kodu)
+27. [Kampanya, davet ve geri kazanma](#27-kampanya-davet-ve-geri-kazanma)
+28. [Canlıya alma: hazırlık denetimi, yedek, deneme ortamı](#28-canlıya-alma)
+29. [Kurye iş teklifi (kabul / ret)](#29-kurye-iş-teklifi)
+30. [Adrese varış ve bekleme ölçümü](#30-adrese-varış-ve-bekleme-ölçümü)
+31. [Kurye molası](#31-kurye-molası)
+32. [Acil durum (SOS)](#32-acil-durum-sos)
+33. [Teslim edilemedi → göndericiye iade](#33-teslim-edilemedi--göndericiye-iade)
+34. [Durak sırası](#34-durak-sırası)
+35. [Uygulama içi mesajlaşma](#35-uygulama-içi-mesajlaşma)
+36. [Çevrimdışı çalışma](#36-çevrimdışı-çalışma)
+37. [Vardiya planlama](#37-vardiya-planlama)
+38. [Kurye performans puanı](#38-kurye-performans-puanı)
 
 ---
 
@@ -155,6 +171,24 @@ select cron.schedule('sistem-denetimi', '*/5 * * * *', $$
   );
 $$);
 
+-- Kurye hakedişi: teslim edilen siparişlerin kurye kazancı (§23)
+select cron.schedule('kurye-hakedis', '*/5 * * * *', $$
+  select net.http_post(
+    url := 'https://<ref>.supabase.co/functions/v1/courier-earnings',
+    headers := jsonb_build_object('x-notify-secret',
+      (select decrypted_secret from vault.decrypted_secrets where name = 'notify_secret'))
+  );
+$$);
+
+-- Geri kazanma mesajı (günlük 11:00 İstanbul; panel → Kampanyalar'dan açılır, §27)
+select cron.schedule('geri-kazanma', '0 8 * * *', $$
+  select net.http_post(
+    url := 'https://<ref>.supabase.co/functions/v1/winback',
+    headers := jsonb_build_object('x-notify-secret',
+      (select decrypted_secret from vault.decrypted_secrets where name = 'notify_secret'))
+  );
+$$);
+
 -- Eski hız sınırı sayaçlarını temizle (günlük)
 select cron.schedule('hiz-siniri-temizlik', '17 4 * * *', 'select public.purge_rate_limits()');
 ```
@@ -181,8 +215,15 @@ Panel → Otomasyon → **Sistem durumu** kartında her görevin en son ne zaman
    |---|---|
    | `siparis_alindi` | `{{1}} numaralı siparişiniz alındı. Canlı takip: {{2}}` |
    | `alici_gonderi_yolda` | `Merhaba {{1}}, size gönderilen paket Yazgan Kurye ile yola çıktı. Canlı takip: {{2}}` |
+   | `alici_gonderi_yolda_kod` | `Merhaba {{1}}, size gönderilen paket Yazgan Kurye ile yola çıktı. Teslim kodunuz: {{2}} (paketi alırken kuryeye söyleyin). Canlı takip: {{3}}` |
    | `teslim_edildi` | `{{1}} numaralı gönderi teslim edildi. Teslim alan: {{2}}` |
    | `yonetici_uyari` | `Yazgan Kurye uyarı: {{1}}` |
+   | `geri_kazanma` (Kategori: *Marketing*) | `Merhaba {{1}}, sizi özledik! Sonraki gönderinizde {{2}} indirim: {{3}} (14 gün geçerli). Mesaj almak istemiyorsanız RET yazın.` |
+   | `acil_gecikme` | `{{1}} numaralı acil gönderiniz gecikebilir, tahmini teslim {{2}}. Taahhüt aşılırsa acil ek ücreti sonraki siparişinizden düşülür. Takip: {{3}}` |
+   | `kurye_alista` | `Kuryemiz {{1}}, {{2}} numaralı gönderi için alış adresinizde. Paketi hazırlayabilirsiniz.` |
+   | `alici_kurye_kapida` | `Merhaba {{1}}, Yazgan Kurye kuryesi {{2}} adresinizde; paketinizi teslim almak için hazır olun.` |
+   | `teslim_edilemedi` | `{{1}} numaralı gönderiniz teslim edilemedi ({{2}}). Paket size geri getiriliyor; dönüş ayağı ücreti eklenir. Takip: {{3}}` |
+   | `alici_kurye_kapida_kod` | `Merhaba {{1}}, Yazgan Kurye kuryesi {{2}} adresinizde; paketinizi teslim almak için hazır olun. Teslim kodunuz: {{3}}.` |
 
 4. Webhook: Callback URL `https://<ref>.supabase.co/functions/v1/whatsapp-webhook`, Verify token: kendi belirlediğiniz rastgele metin → **messages** alanına abone olun.
 5. ```bash
@@ -259,6 +300,12 @@ Buradaki kodlar birim/uçtan uca testlerle doğrulandı, ancak dış servislere 
 - [ ] Kurumsal API: test anahtarıyla `/api/v1/ping`, sipariş aç, webhook'un imzasını doğrula
 - [ ] Değerlendirme: teslim SMS'indeki bağlantıdan puan; 5 puanda Google yorum sayfası açılıyor mu
 - [ ] Kesinti izleyicisi (UptimeRobot) kuruldu, test alarmı geldi
+- [ ] Kurye hakedişi: gerçek ödeme modeli girildi (Fiyatlar), bir haftalık hesaplaşma kuryeyle karşılaştırıldı
+- [ ] Kurye belgeleri: tüm kuryelerin zorunlu belgeleri bitiş tarihleriyle girildi
+- [ ] Acil taahhüt: gecikme uyarısı (`acil_gecikme`) ve telafi kredisi bir deneme siparişinde görüldü
+- [ ] Teslim kodu: alıcıya kodlu SMS/WhatsApp geldi, kurye kodu doğrulayıp teslim etti
+- [ ] Sigorta poliçesi değer beyanı sınırını karşılıyor; geri kazanma açılmadan önce İYS kaydı yapıldı
+- [ ] Panel → Otomasyon → **Canlıya hazırlık**: "eksik" madde kalmadı (§28)
 
 ## 15. Tüm ortam değişkenleri
 
@@ -284,6 +331,7 @@ Buradaki kodlar birim/uçtan uca testlerle doğrulandı, ancak dış servislere 
 | Vercel (web sitesi) | `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `NEXT_PUBLIC_SITE_URL` (ops.), `NEXT_PUBLIC_APP_URL` (ops.), `NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION` (ops.) | §17 |
 | EAS (mobil) | `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY`, `EXPO_PUBLIC_TRACKING_BASE_URL` | |
 | | `EXPO_PUBLIC_MAP_TILE_URL`, `EXPO_PUBLIC_MAP_TILE_ATTRIBUTION` (ops.) | Harita karoları (§3) |
+| | `EXPO_PUBLIC_DISPATCH_PHONE` (ops., E.164 ör. `+905xxxxxxxxx`) | Kurye acil durum ekranındaki "Yöneticiyi ara" numarası; boşsa `BRAND.phone`, o da boşsa düğme gizlenir |
 | `app.json` | `expo.extra.eas.projectId` | Push bildirimleri |
 
 `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` Edge Function'lara Supabase tarafından otomatik verilir.
@@ -358,3 +406,149 @@ Kayıtlı müşteriler `siparis@<alan adı>` adresine yazar; yapay zeka asistan�
   - `https://<alan adı>` ve `https://panel.<alan adı>/giris`
   Bildirim kanalı olarak telefonunuzu (SMS/uygulama) ekleyin. Supabase tamamen erişilemezse iç denetim de çalışamayacağı için bu dış izleyici gereklidir.
 
+## 23. Kurye hakedişi ve nakit tahsilatı
+
+- **Ödeme modeli**: panel → Fiyatlar → *Kurye ödeme ve maliyet modeli* (iş başı, km başı, acil ve gece/Pazar/tatil primi, ekonomide iş başı oranı, bekleme payı). Köprü geçişi kuryeye aynen iade edilir. Varsayılanlar öneridir (esnaf kurye: iş başı 150 TL + km başı 12 TL, yakıt kuryede); kuryelerle anlaştığınız rakamları girip kaydedin. Aynı model Fiyatlar sayfasındaki marj tahminini de besler.
+- **Hakediş**: §6 `kurye-hakedis` görevi teslim edilen her siparişin kurye kazancını 5 dakikada bir yazar (sipariş anındaki teklif ve o anki ödeme modeliyle). Panel → *Hakediş ve tahsilat* → "Hakedişleri güncelle" ile hemen de çalıştırılabilir. Kurye kendi kazancını uygulamada **Kazancım** sekmesinde görür.
+- **Nakit**: kuryeye ödemeli siparişte kurye teslimde "Nakit aldım / IBAN'a gönderdi / Alınamadı" seçer. Nakit kuryede kalır ve hakedişten düşülür; IBAN ve alınamayanlar *Tahsil edilecekler* listesine düşer, para hesaba geçince "Ödeme alındı" işaretlenir. IBAN ile ödeyecek müşterilere şirket IBAN'ını SMS/WhatsApp şablonlarında veya faturada verin.
+- **Hesaplaşma**: *Hesaplaş* o ana kadarki teslimatları kapatır. Net artıysa kuryeye o kadar ödeme yapın; eksiyse kurye elindeki nakitten o kadarını şirkete teslim eder. Yanlış hesaplaşma iptal edilebilir; teslimatlar yeniden ödenmemiş listesine döner. Her hesaplaşmanın dökümü CSV olarak indirilebilir (muhasebeciniz için).
+- **Vergi/SGK**: Esnaf (vergi muafiyetli veya şahıs şirketi) kuryelere yapılan ödemelerin belgelendirmesi (gider pusulası, fatura, stopaj) mali müşavirinizle netleştirilmelidir (docs/fiyat-arastirmasi.md §8.6).
+
+## 24. Kurye belgeleri ve uyum
+
+- **Belgeler**: panel → Kuryeler → *Belgeler*. Zorunlu: sürücü belgesi, kurye faaliyet belgesi, motosiklet ruhsatı, zorunlu trafik sigortası. İsteğe bağlı: SRC, muayene, kasko/ferdi kaza, adli sicil, vergi levhası. Bitiş tarihi ve isteğe bağlı dosya (fotoğraf/PDF, özel `courier-docs` deposu) girilir. Başvurudan gelen belgeler Başvurular sayfasındadır; onaydan sonra buraya tarihleriyle girin.
+- **Zorunluluk**: panel → Otomasyon → *Belgesi eksik kuryeyi çalıştırma* (varsayılan açık). Açıkken zorunlu belgesi eksik veya süresi dolmuş kurye vardiya başlatamaz, vardiyadayken belgesi dolarsa otomatik iş almaz. Belge bitiş günü dahil geçerlidir (İstanbul saati).
+- **Uyarılar**: Süresi dolan ve *Belge süresi uyarısı (gün)* içinde dolacak belgeler sistem denetiminde (§22) yöneticiye bildirilir; kurye de uygulamada uyarı görür (İşlerim, Hesabım → Belgelerim).
+- **Bildirim listesi**: Kuryeler → *Kurye listesi (CSV)* belge numaraları ve bitiş tarihleriyle; Ulaştırma Bakanlığı kurye bildirimi ve sigorta için kullanılabilir. Şirketin **P1 yetki belgesi** şirket düzeyindedir, burada tutulmaz.
+
+## 25. Acil teslim taahhüdü (60 dk) ve tahmini varış
+
+- **Taahhüt**: acil siparişte `sla_due_at` = sipariş zamanı (planlıysa alış zamanı, kartla ödemede ödeme zamanı) + panel → Otomasyon → *Acil teslim taahhüdü (dk)* (varsayılan 60).
+- **Erken uyarı**: §6 `otomatik-dagitim` görevi her dakika açık acil siparişlerin tahmini teslimini (kurye konumu, rota süresi, ortalama 25 km/s) hesaplar. Taahhüt aşılacaksa yöneticiye ve müşteriye **bir kez** haber verir (WhatsApp şablonu `acil_gecikme`, yoksa SMS/push).
+- **Telafi**: teslim taahhütten sonra olursa acil ek ücreti kadar `customer_credits` kaydı açılır ve müşterinin **sonraki siparişinden otomatik düşülür** (teklifte "Telafi" satırı). İade işlemi gerekmez; kart ödemesi değişmez.
+- **Görünürlük**: takip sayfası ve müşteri uygulaması tahmini teslim saatini ve taahhüdü gösterir; panelde acil siparişlerde kalan süre / "GECİKTİ" / "Taahhüt kaçtı" rozeti vardır.
+
+## 26. Değerli gönderiler: değer beyanı ve teslim kodu
+
+- **Değer beyanı**: müşteri gönderinin değerini girerse ücretsiz güvenceyi (varsayılan 1.000 TL) aşan kısım için sigorta ücreti fiyata eklenir (varsayılan %0,5, en az 25 TL; en fazla 100.000 TL beyan). Tümü panel → Fiyatlar'dan değişir; kurumsal indirime tabi değildir. **Bu tutarların bir sigorta poliçesiyle (emtia/nakliyat sorumluluk) karşılanması gerekir**; teminat sınırını poliçenize göre ayarlayın.
+- **Teslim kodu**: "Teslim kodu ile teslim" seçilen siparişte 4 haneli kod üretilir. Müşteri uygulamada görür; alıcıya gönderi yola çıkınca SMS/WhatsApp ile gider (şablon `alici_gonderi_yolda_kod`). Kurye kodu teslim ekranında doğrular; 5 yanlış denemede kilitlenir. Kurye kodu göremez. Yönetici gerekirse siparişi panelden kodsuz kapatabilir (sipariş detayında kod ve yanlış deneme sayısı görünür).
+- **Kurumsal API**: `declaredValueKurus` ve `deliveryCode` alanları; kod oluşturma yanıtında `order.deliveryCode` olarak döner.
+
+## 27. Kampanya, davet ve geri kazanma
+
+- **Kampanya kodları**: panel → Kampanyalar. Yüzde veya tutar; en fazla indirim, en düşük sipariş, son gün, toplam kullanım ve "yalnız ilk sipariş" koşulları. Müşteri kodu uygulamada sipariş özetinde, WhatsApp/e-posta asistanında veya kurumsal API'de (`promoCode`) girer; kod sunucuda doğrulanır. İndirim taşıma bedeline uygulanır, köprü/bekleme/sigorta/uzak alış indirimsizdir; kurumsal ay sonu indirimi indirimli tutar üzerinden hesaplanır. İptal edilen siparişin kod kullanımı geri alınır.
+- **Davet**: her bireysel müşterinin uygulamada (Hesabım) davet kodu vardır. Yeni müşteri ilk siparişinde bu kodu girerse *Davet ödülü* kadar indirim alır; gönderisi teslim edilince davet edene aynı tutarda kredi yazılır ve sonraki siparişinden otomatik düşülür. Tutar panel → Kampanyalar'dan (0 = kapalı).
+- **Geri kazanma**: varsayılan **kapalı**. Açılırsa §6 `geri-kazanma` görevi günde bir kez, **ticari ileti onayı veren**, en az bir teslimatı olan ve belirlenen gün kadar sipariş vermeyen bireysel müşterilere kişiye özel, tek kullanımlık, 14 gün geçerli indirim kodu gönderir (aynı kişiye en fazla 60 günde bir).
+  - **Yasal**: ticari elektronik ileti için **İYS (iys.org.tr)** kaydı ve izin yüklemesi zorunludur; SMS sağlayıcınızda (Netgsm) İYS entegrasyonunu açın. WhatsApp şablonu *Marketing* kategorisinde onaylanmalıdır.
+  - Müşteri "RET" yazarsa onayı kaldırılır ve bir daha kampanya mesajı gitmez (sipariş bilgilendirmeleri devam eder).
+
+## 28. Canlıya alma
+
+- **Hazırlık denetimi**: panel → Otomasyon → *Canlıya hazırlık* (`readiness` Edge Function, yalnız yönetici). Hangi servisin gerçek, hangisinin sahte (deneme) sağlayıcıyla çalıştığını, iyzico'nun test ortamında olup olmadığını, zamanlanmış görevlerin son çalışmasını, tarife / kurye ödeme modeli / gelecek yıl tatillerinin girilip girilmediğini ve belgeleri tam kurye sayısını gösterir. Gizli anahtarların değerini asla göstermez, yalnız "var/yok". **"Eksik" madde kalmadan gerçek müşteri almayın**; "uyarı" maddeleri bilinçli bırakılabilir (ör. WhatsApp yokken SMS).
+- **Deneme ortamı (staging)**: ikinci bir ücretsiz Supabase projesi açın, aynı migration'ları ve fonksiyonları oraya yükleyin (§1). Deneme projesinde iyzico **sandbox**, Netgsm yerine boş bırakılmış SMS (deneme modu) kullanın; panelin ikinci bir Vercel ortamını (Preview) bu projeye bağlayın. Fiyat veya otomasyon değişikliğini önce orada deneyin.
+- **Yedekleme**:
+  - Supabase Pro planı günlük yedek alır (7 gün). Gerçek müşteri verisi için **PITR** (anlık geri dönüş) eklentisini açın: Dashboard → Database → Backups.
+  - Ek olarak haftada bir dış kopya: `npx supabase db dump --data-only -f yedek-$(date +%F).sql` (bilgisayarınızda; dosya kişisel veri içerir, şifreli diskte saklayın, 2 yıldan eski kopyaları silin — KVKK saklama süresi).
+  - Teslim fotoğrafları ve belgeler Storage'dadır; veritabanı yedeğine dahil değildir. Gerekirse `supabase storage` ile ayda bir indirin.
+- **Hata izleme**: Edge Function hataları Supabase → Edge Functions → Logs'ta; panel/web hataları Vercel → Logs'ta. Önemli sorunlar zaten yöneticiye mesajla gelir (§22). Daha fazlası istenirse Supabase *Log Drains* ile bir log servisine (ör. Better Stack) aktarılabilir.
+- **Geri alma**: kötü bir sürümde panel için Vercel → Deployments → önceki sürüm → *Promote*; fonksiyonlar için önceki commit'e dönüp `pnpm deploy:functions`. Veritabanı migration'ları geri alınmaz; düzeltme yeni migration ile yapılır.
+
+## 29. Kurye iş teklifi
+
+- **Nasıl çalışır**: otomatik atama (§6 `otomatik-dagitim`) işi kuryeye **teklif** olarak gönderir. Kurye uygulamasında telefon titrer, geri sayımlı bir kart çıkar: *Kabul et* ya da *Reddet* (hazır nedenler: çok uzak, elimde başka iş var, paket aracıma uygun değil, mola vereceğim, diğer). Uygulama kapalıysa push/SMS ile "Yeni iş teklifi" gider.
+- **Süre**: panel → Otomasyon → *Teklif yanıt süresi (sn)* (varsayılan 60). Süre dolarsa iş sıradaki uygun kuryeye geçer; yanıt vermeyen kuryeye aynı iş 10 dakika, reddedene hiç tekrar önerilmez. Kabul edilmemiş teklifte kurye paketi alamaz.
+- **Müşteri**: "Kurye atandı" bildirimi kurye kabul edince gider (ret/süre dolması müşteriye yansımaz).
+- **Yönetici ataması** teklif değildir, doğrudan geçerlidir (kuryeyi telefonla aradığınız durumlar için). Teklif özelliğini kapatmak için Otomasyon → *İşi kuryeye teklif olarak gönder* işaretini kaldırın.
+- **Kayıt**: her teklif ve sonucu (`courier_offers`) sipariş detayında *Kurye teklifleri* kartında; kabul oranı kurye performansında kullanılır.
+
+## 30. Adrese varış ve bekleme ölçümü
+
+- **Otomatik varış**: kuryenin konumu alış/teslim adresine *Otomatik varış mesafesi* (varsayılan 100 m) yaklaşınca varış işaretlenir. Doğruluğu 100 m'den kötü konum sayılmaz. Kurye uygulamada *Alış/Teslim adresine vardım* da diyebilir; bunun için adrese en fazla *'Vardım' için en fazla uzaklık* (300 m) mesafede olmalı. İkisi de panel → Otomasyon'dan değişir.
+- **Mesajlar**: alışa varışta gönderene (alış yetkilisi müşteriden farklıysa ona WhatsApp/SMS, değilse müşteriye) "kurye kapıda"; teslime varışta alıcıya "kurye adresinizde" (teslim kodu varsa kodla birlikte). WhatsApp şablonları: `kurye_alista`, `alici_kurye_kapida`, `alici_kurye_kapida_kod` (§8).
+- **Bekleme ücreti**: varış kaydı varsa bekleme, varıştan paketin alınmasına kadar **otomatik ölçülür** (planlı alışta planlanan saatten önce geçen süre sayılmaz) ve kuryenin elle girdiği değerin yerine geçer. Varış yoksa kuryenin girdiği süre kullanılır. Sipariş detayında "varıştan ölçüldü / kuryenin girdiği" diye görünür; itirazlarda bu kaydı kullanın.
+- **Müşteri**: uygulamada "Kurye alış adresinde / teslim adresinde" satırı görünür.
+
+## 31. Kurye molası
+
+- **Kurye**: vardiyadayken *Mola ver*; molada yeni iş teklifi gelmez, bekleyen teklifler geri alınır (kabul oranını etkilemez). Elinde iş yoksa molada konumu paylaşılmaz. *Moladan dön* ile devam eder; vardiya bitince açık mola da kapanır.
+- **Otomatik mola**: üst üste *Yanıtsız teklif sonrası otomatik mola* (varsayılan 3) teklife yanıt vermeyen kurye molaya alınır ve push/SMS ile haber verilir (telefonu cebinde unutan kuryeye iş gitmeye devam etmesin). 0 = kapalı.
+- **Uzun mola**: *En uzun mola* (varsayılan 45 dk) aşılınca yöneticiye bir kez WhatsApp/SMS uyarısı gider.
+- **BTK raporu**: panel → Çalışma saatleri. Vardiya başına mola süresi ve **net çalışma** süresi; CSV'de *Mola (saat)* ve *Net çalışma (saat)* sütunları.
+- Panelde molada olan kurye *Molada* olarak (kurye listesi, genel bakış, canlı harita) görünür; elle atama listesinde "molada" uyarısıyla yer alır.
+
+## 32. Acil durum (SOS)
+
+- **Kurye**: vardiyadayken İşlerim ekranında *🚨 Acil durum (SOS)* → tür (kaza, tehlike/saldırı, sağlık, araç arızası, diğer) → *Yöneticiye acil durum bildir*. Ekranda önce **112 Acil Çağrı** düğmesi vardır; hayati tehlikede önce 112 aranmalıdır. Alarm verilen kurye molaya alınır (yeni iş gelmez, bekleyen teklifler geri alınır).
+- **Yönetici**: `ADMIN_ALERT_PHONES` numaralarına **hemen** WhatsApp/SMS gider (kurye adı ve telefonu, tür, not, Google Haritalar konum bağlantısı, elindeki iş). Panelin her sayfasının üstünde kırmızı bant çıkar: *Konumu aç*, *Kuryeyi ara*, *Gördüm*, *Kapat…* (ne yapıldığı yazılır). Kurye "Gördüm"ü uygulamada görür.
+- **Tekrar**: görülmeyen alarm 5 dakikada bir, en fazla 3 kez yeniden gönderilir (§6 `otomatik-dagitim`). Kayıtlar panel → Kuryeler → *Acil durum kayıtları*.
+- **Kurulum**: `sos` Edge Function'ını yükleyin (`pnpm deploy:functions`); `ADMIN_ALERT_PHONES` boşsa alarm kimseye gitmez (Canlıya hazırlık kartı "eksik" gösterir). İş kazası halinde SGK'ya 3 iş günü içinde iş kazası bildirimi yapılması gerekir; kayıt bunun için tarih ve konum sağlar.
+
+## 33. Teslim edilemedi → göndericiye iade
+
+- **Kurye**: teslim adresinde *Teslim edilemedi* → neden (alıcıya ulaşılamadı, adres bulunamadı, alıcı teslim almadı, iş yeri kapalı, diğer), alıcıyı arama, **adres fotoğrafı (zorunlu)**, not. Alıcıya ulaşılamadı / kapalı / diğer nedenlerinde kurye teslim adresine vardığını bildirmiş (§30) ve en az *Teslim edilemedi için en az bekleme* (varsayılan 10 dk) beklemiş olmalı; "alıcıya ulaşılamadı"da en az bir arama şart. Sipariş **Göndericiye dönüyor** olur; kurye paketi alış adresine götürüp fotoğraf/imzayla *Göndericiye teslim eder* → **Göndericiye iade edildi**.
+- **Ücret**: dönüş ayağı kuralı — gidişin ek ücretler dahil taşıma bedelinin %50'si (`return_leg_discount_pct`), satır "Teslim edilemedi – göndericiye iade". Gidiş-dönüş siparişte dönüş zaten alındığı için ek ücret yok. Dönüşte ücretli köprü yönüne (Anadolu→Avrupa) geçiliyorsa köprü eklenir. Kurumsal indirime tabidir; kurye dönüş km'si için de hakediş alır. İade edilen iş faturalanır (bireyselde hemen, kurumsalda ay sonu).
+- **Bildirim**: müşteriye neden ve iade bilgisi (WhatsApp şablonu `teslim_edilemedi`, yoksa SMS), alıcıya SMS, yöneticiye uyarı; iade tamamlanınca müşteriye "geri teslim edildi".
+- **Panel**: sipariş detayında *Teslim edilemedi* kartı (neden, arama sayısı, adres fotoğrafı, iade kanıtı). Yönetici yolda/sorunlu siparişte *Göndericiye iade başlat* diyebilir (kanıt şartı yok). Raporlarda "iade" sayısı; ciroya dahildir.
+- **Kurumsal API**: `status` `geri_donuyor` / `geri_teslim`, `failedReason`, `returnedAt` alanları; webhook olayları aynı.
+
+## 34. Durak sırası
+
+- Kurye elinde birden fazla iş varken İşlerim ekranında **Durak sırası** kartı çıkar: alış, teslim ve iade durakları önerilen sırayla, her birine tahmini varış dakikasıyla. Kural: bir işin alışı teslimden önce gelir; acil işin taahhüdü kaçacaksa uzak da olsa önce gidilir (packages/shared/route.ts `planStops`, 8 durağa kadar en iyi sıralama).
+- *Sıradakine git* telefonun haritasında ilk durağı, *Tüm rota* Google Haritalar'da tüm durakları sırayla açar. Kart, sıra bir acil taahhüdü kaçıracaksa uyarır.
+- Panel → Canlı harita'da her kuryenin *Sıradaki* durağı görünür.
+- Sıra öneridir; kurye istediği işi açıp ilerleyebilir. Otomatik atama kurye başına en fazla iş sayısını (Otomasyon → *Kurye başına en fazla aktif iş*) aşmaz.
+
+## 35. Uygulama içi mesajlaşma
+
+- **Müşteri** sipariş ekranında *Kuryeye yaz*, **kurye** iş ekranında *Müşteriye yaz*: sipariş üzerinden yazışma, hazır cevaplar ("Kapıdayım", "5 dakika içinde oradayım", "Resepsiyona bırakabilirsiniz"…), okundu bilgisi. Telefon numarası paylaşmak gerekmez.
+- Yazışma kurye işi kabul ettiğinde açılır, iş bittikten 2 saat sonra kapanır; kişi başı saatte en fazla 30 mesaj. Yeni mesajda karşı tarafa **yalnız push** bildirimi gider (SMS ücreti yok).
+- **Panel**: sipariş detayında *Mesajlar* kartı; yönetici tüm yazışmayı canlı görür ve "destek" olarak ikisine birden yazabilir.
+- **KVKK**: yazışmalar tamamlanan/iptal siparişlerde 90 gün sonra otomatik silinir (§6 `otomatik-dagitim`). Aydınlatma metninde "sipariş yazışmaları" veri kategorisi olarak belirtilmeli.
+- **Numara gizleme (maskeli arama)**: arama için hâlâ gerçek numara kullanılır. İstenirse Netgsm Sanal Santral / numara maskeleme hizmeti alınarak "Ara" düğmeleri ara numaraya yönlendirilebilir (hesap ve sözleşme sizde).
+
+## 36. Çevrimdışı çalışma
+
+- Kurye asansörde, otoparkta veya çekmeyen bir binadayken *Paketi aldım*, *Yola çıktım*, *Vardım*, *Teslim et* (fotoğraf/imza dahil), *Teslim edilemedi*, *Göndericiye teslim* ve **SOS** telefonda sıraya alınır; ekran akmaya devam eder. Konum noktaları da dakikada bir saklanır (en fazla 120).
+- Bağlantı gelince (uygulama öne geldiğinde, 15 saniyede bir veya *Şimdi dene*) işlemler **yapıldıkları saatle** ve sırayla gönderilir: teslim saati, bekleme ölçümü, acil taahhüt ve BTK kayıtları doğru kalır. Sunucu en fazla 6 saat geriye kabul eder; bir işlem siparişin önceki adımından önceye yazılamaz.
+- Sunucunun reddettiği işlem (ör. "Önce işi kabul edin") *Gönderilemedi* olarak İşlerim ekranında kalır; kurye silip yeniden yapabilir. Aynı siparişin sonraki işlemleri o çözülene kadar bekler.
+- Çevrimdışı yapılamayanlar: iş teklifini kabul/ret, teslim kodunu doğrulama (sunucu doğrular), işi bırakma, mesajlaşma.
+- SOS çevrimdışıysa ekranda "İnternet yok, şimdi 112'yi veya yöneticinizi arayın" uyarısı çıkar; alarm bağlantı gelir gelmez basıldığı saat notuyla gider.
+
+## 37. Vardiya planlama
+
+- **Şablon**: panel → Vardiya planı → *Haftalık şablon*. Her gün için zaman dilimleri ve gereken kurye sayısı (varsayılan: Pzt–Cmt 08–12, 12–16, 16–20 için 2, 20–24 için 1; Pazar 10–14, 14–18, 18–22 için 1). 0 = o dilimde kurye gerekmez.
+- **Kurye**: uygulamada *Vardiyam* sekmesinden önümüzdeki 14 günün dilimlerini alır/bırakır. Dolu dilim alınamaz. Başlangıca 2 saatten az kala bırakmak **geç iptal** sayılır (performans puanına yansır).
+- **Panel**: haftalık tablo (yeşil dolu, sarı eksik, kırmızı boş), toplam eksik kurye-dilim; eksik dilime *+ kurye* ile atama (dolu dilime de atanabilir), × ile kaldırma. Geçmiş dilimlerde gerçek vardiya kaydına göre *geldi / gelmedi* (dilimin en az yarısı çalışıldıysa geldi).
+- **Otomatik**: dilimden 1 saat önce kuryeye hatırlatma; dilim başladıktan 15 dakika sonra vardiya açılmadıysa kuryeye uyarı ve yöneticiye WhatsApp/SMS (§6 `otomatik-dagitim`).
+- Vardiya planı öneridir; plan dışı vardiya açmak serbesttir. Çalışma saatleri (BTK) raporu gerçek vardiya kayıtlarından gelir.
+
+## 38. Kurye performans puanı
+
+- Son 30 günden 0–100 puan (packages/shared/performance.ts): teklif kabul %25, acil taahhüdü tutturma %20, müşteri puanı %20, aldığı işi bırakmadan tamamlama %15, vardiya planına uyum (gelmeme ve geç iptal düşürür) %20. Az verili bileşen hesaba girmez; yeni kurye "Yeni" görünür.
+- Kademeler: 85+ Altın, 70–84 Gümüş, 50–69 Gelişmeli, 50 altı Riskli.
+- **Otomatik atama**: 70 nötr; her 10 puan 1 km avantaj/dezavantaj (en fazla ±3 km). Yani yakın ama düşük puanlı kurye yerine biraz uzaktaki yüksek puanlı kurye seçilebilir.
+- **Panel**: Kuryeler → *Performans (30 gün)* sütunu; tıklayınca bileşenler. **Kurye**: Kazancım sekmesinde kendi puanı ve bileşenleri.
+- Puan prim veya ceza için tek başına kullanılmamalı; kuryeyle konuşurken bileşenlere bakın (ör. düşük kabul oranı uzak bölgeden kaynaklanabilir).
+
+## 39. Kurye hedef primleri
+
+- **Panel → Kurye primleri**: iki tür kampanya.
+  - *Hedef*: gün veya hafta (Pzt–Paz) içinde N iş → ödül; en fazla 5 kademe, ulaşılan **en yüksek** kademe ödenir (ör. 8 iş 100 TL, 12 iş 250 TL → 13 iş yapan 250 TL alır).
+  - *Yüzde ek*: kapsamdaki işlerin hakedişine +%X (ör. yağmurlu gün 16:00–20:00 %25, hafta sonu %20).
+- Kapsam: gün seçimi, saat aralığı ve tarih aralığı (İstanbul saati, işin tamamlandığı an). Göndericiye iade edilen iş de tamamlanmış sayılır.
+- Ödül **dönem kapanınca** yazılır: `courier-earnings` (5 dk cron) hakedişlerden sonra `compute_incentive_awards()` çalıştırır; son 14 günün kapanmış dönemlerine bakar, aynı dönem için ikinci kez yazmaz. Hakediş sayfasındaki *Hakedişleri güncelle* de hesaplar.
+- Primler hesaplaşmaya girer: **net = hakediş + prim − kuryedeki nakit** (`courier_payouts.incentive_kurus`). Hesaplaşma iptal edilirse primler yeniden ödenmemiş olur. Yalnız primi olan kurye de hesaplaşılabilir.
+- **Kurye**: Kazancım sekmesinde bugünün/bu haftanın ilerlemesi (ör. "bugün 6/8 iş · 2 iş daha → 100 TL") ve kazanılan primler.
+- Kampanyayı *Durdur*: kapanmamış dönem için ödül yazılmaz; kazanılmış primler kalır. Kural değiştirmek için durdurup yenisini açın (geçmiş ödüller eski kurala göre kalır).
+- Bütçe: hedef primleri iş başı maliyeti artırır; Fiyatlar → maliyet simülasyonunda marjı kontrol edin.
+
+## 40. Talep yoğunluğu (ısı haritası)
+
+- **Panel → Talep yoğunluğu**: son 4/8/12 hafta veya 6 ayın siparişleri; alış zamanı (planlı alış varsa o) İstanbul hafta günü × saat ve ~1 km'lik alış hücresi (iptaller hariç). Kaynak `demand_stats()` RPC'si, hesap `packages/shared/demand.ts`.
+  - *Hafta günü × saat* tablosu: haftalık ortalama sipariş (tek tonlu mavi; koyu = yoğun). Hücreye tıklayınca harita ve sıralama o gün/saate süzülür.
+  - *Sıcak bölgeler*: haritada sıra numaralı işaretler ve ilçe listesi (ilçe, hücredeki alış adreslerinde en sık geçen).
+  - *Vardiya önerisi*: her vardiya dilimi için öneri = dilimin en yoğun saatindeki haftalık ortalama sipariş ÷ kurye başına saatlik iş (varsayılan 1,5; yukarı yuvarlanır, talep varsa en az 1). **Uygula**, Vardiya planındaki gereken kurye sayısını değiştirir. Dilimi olmayan ama talep gelen saatler ayrıca listelenir.
+  - Ortalamanın paydası, yeni işletmede ilk siparişten bu yana geçen haftadır; 30'dan az sipariş veya 2 haftadan az veride "Az veri" uyarısı çıkar.
+- **Kurye uygulaması**: vardiyada, molada değil ve elinde iş yokken *Yoğun bölgeler (önümüzdeki saat)* kartı — bu ve sonraki saatin en yoğun 3 bölgesi, uzaklık ve yol tarifi. Veri 30 dk önbellekte.
+- **KVKK**: ham koordinat dönmez, yalnız hücre merkezi; kurye en az 3 siparişli hücreleri görür (tek bir müşterinin adresi seçilemez). Müşteri erişemez.
+- Dinamik fiyat (yoğunluk zammı) **yoktur** (B2B öngörülebilirlik, bkz. fiyat kuralları); yoğunluk yalnız kurye konumlandırma ve vardiya planı içindir.

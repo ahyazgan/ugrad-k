@@ -9,6 +9,8 @@ const TONE: Record<OrderStatus, string> = {
   teslim_edildi: "bg-emerald-100 text-emerald-800",
   iptal: "bg-slate-100 text-slate-600",
   sorunlu: "bg-red-100 text-red-800",
+  geri_donuyor: "bg-orange-100 text-orange-800",
+  geri_teslim: "bg-stone-200 text-stone-700",
 };
 
 export function StatusBadge({ status }: { status: OrderStatus }) {

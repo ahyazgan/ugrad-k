@@ -16,6 +16,8 @@ import {
   type PlaceDetails,
 } from "../../../packages/shared/index.ts";
 import type { Ctx } from "./context.ts";
+import { openCredits, withCredits } from "./credits.ts";
+import { applyDiscountCode } from "./promo.ts";
 import { createOrderForCustomer } from "./handlers.ts";
 import { HttpError } from "./http.ts";
 
@@ -41,8 +43,9 @@ Kurallar:
 - KVKK: Müşterinin onayı yoksa sipariş almadan önce aydınlatma metni bağlantısını paylaş ({KVKK_URL}) ve kişisel verilerinin (adres, konum, telefon) sipariş için işlenmesine onay verip vermediğini sor. Yalnızca açıkça onaylarsa record_kvkk_consent çağır.
 - Şikâyet, hasar, kayıp, ödeme sorunu veya müşteri insanla görüşmek isterse handoff_to_human çağır ve bir temsilcinin döneceğini söyle.
 - Kısa, sıcak ve net yaz; WhatsApp için başlık veya tablo kullanma, gerekirse kısa madde işaretleri kullan. Kişisel verileri gereğinden fazla tekrarlama.
-- Hizmet seviyeleri: "standart" (varsayılan, aynı gün en kısa sürede), "acil" (60 dk içinde, ek ücretli) ve "ekonomi" (gün içinde teslim, indirimli; yalnızca Pazartesi–Cumartesi sabah 07:00 ile öğleden sonra arası alışlarda). Müşteri acele etmediğini söylerse ekonomiyi önerebilirsin.
-- Gece 22:00–07:00, Pazar ve resmi tatil ek ücretlerini, uzak alış ücretini fiyat aracı zaten hesaplar; sorulursa açıkla. 20 kg üzeri gönderi motosikletle taşınamaz.`;
+- Hizmet seviyeleri: "standart" (varsayılan, aynı gün en kısa sürede), "acil" (60 dk içinde teslim taahhüdü, ek ücretli; taahhüt kaçarsa acil ek ücreti sonraki siparişten otomatik düşülür) ve "ekonomi" (gün içinde teslim, indirimli; yalnızca Pazartesi–Cumartesi sabah 07:00 ile öğleden sonra arası alışlarda). Müşteri acele etmediğini söylerse ekonomiyi önerebilirsin.
+- Gece 22:00–07:00, Pazar ve resmi tatil ek ücretlerini, uzak alış ücretini fiyat aracı zaten hesaplar; sorulursa açıkla. 20 kg üzeri gönderi motosikletle taşınamaz.
+- Değerli gönderi (para değeri olan evrak, cihaz, numune): değerini sor (1.000 TL'ye kadar ücretsiz güvence, üstüne küçük sigorta ücreti fiyata eklenir) ve alıcıya SMS teslim kodu isteyip istemediğini sor.`;
 
 const str = { type: "string" } as const;
 const nullableStr = { type: ["string", "null"] } as const;
@@ -72,8 +75,10 @@ export const TOOLS: Tool[] = [
         round_trip: { type: "boolean" },
         weight_kg: { type: ["number", "null"] },
         large_package: { type: "boolean" },
+        declared_value_tl: { type: ["number", "null"], description: "Müşteri gönderinin değerini söylediyse TL; yoksa null" },
+        promo_code: { ...nullableStr, description: "Müşterinin verdiği kampanya veya davet kodu; yoksa null" },
       },
-      required: ["pickup_place_id", "dropoff_place_id", "service_level", "round_trip", "weight_kg", "large_package"],
+      required: ["pickup_place_id", "dropoff_place_id", "service_level", "round_trip", "weight_kg", "large_package", "declared_value_tl", "promo_code"],
       additionalProperties: false,
     },
   },
@@ -97,6 +102,9 @@ export const TOOLS: Tool[] = [
         round_trip: { type: "boolean" },
         weight_kg: { type: ["number", "null"] },
         large_package: { type: "boolean" },
+        declared_value_tl: { type: ["number", "null"], description: "Müşteri gönderinin değerini söylediyse TL; yoksa null" },
+        delivery_code: { type: "boolean", description: "Alıcıya SMS teslim kodu gönderilsin mi (değerli/önemli evrak)" },
+        promo_code: { ...nullableStr, description: "Müşterinin verdiği kampanya veya davet kodu; yoksa null" },
         payment_method: { type: "string", enum: ["nakit", "cari"] },
         customer_note: nullableStr,
       },
@@ -114,6 +122,9 @@ export const TOOLS: Tool[] = [
         "round_trip",
         "weight_kg",
         "large_package",
+        "declared_value_tl",
+        "delivery_code",
+        "promo_code",
         "payment_method",
         "customer_note",
       ],
@@ -192,6 +203,9 @@ async function quoteFor(tc: ToolContext, i: Record<string, unknown>) {
     roundTrip: i.round_trip === true,
     weightKg: i.weight_kg ?? null,
     largePackage: i.large_package === true,
+    declaredValueKurus: typeof i.declared_value_tl === "number" && i.declared_value_tl > 0 ? Math.round(i.declared_value_tl * 100) : null,
+    deliveryCode: i.delivery_code === true,
+    promoCode: typeof i.promo_code === "string" && i.promo_code.trim() ? i.promo_code : undefined,
   });
   return { req, p, d };
 }
@@ -207,7 +221,10 @@ export async function executeTool(name: string, input: Record<string, unknown>, 
     }
     case "get_price_quote": {
       const { req, p, d } = await quoteFor(tc, input);
-      const q = await buildQuote(req, { maps: ctx.maps, ...(await ctx.loadPricing()) });
+      const built = await buildQuote(req, { maps: ctx.maps, ...(await ctx.loadPricing()) });
+      // Kampanya/davet kodu ve gecikme telafisi kredisi siparişte düşülecek; teklifte de gösterilir
+      const promo = await applyDiscountCode(ctx, customer.profileId, req.promoCode, built.quote);
+      const q = { ...built, quote: withCredits(promo.quote, await openCredits(ctx, customer.profileId)).quote };
       return {
         from: p.address,
         to: d.address,

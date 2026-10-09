@@ -3,6 +3,7 @@
 import { useState, type FormEvent } from "react";
 import Link from "next/link";
 import { submitLead, SiteApiError, type LeadInput } from "@/lib/api";
+import { CARD } from "@/components/ui";
 
 const VOLUMES = ["1-10", "10-20", "20-50", "50+"];
 
@@ -36,10 +37,10 @@ export function LeadForm({ kind, sourcePage }: { kind: LeadInput["kind"]; source
     );
   }
 
-  const input = "w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 outline-none focus:border-brand focus:ring-2 focus:ring-brand/20";
+  const input = "w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 outline-none focus:border-brand focus-visible:ring-2 focus-visible:ring-brand/60 focus-visible:ring-offset-2";
   const bad = (field: string) => (error?.field === field ? "border-red-500" : "");
   return (
-    <form onSubmit={submit} className="grid gap-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm" noValidate>
+    <form onSubmit={submit} className={`grid gap-4 p-5 sm:p-6 ${CARD}`} noValidate>
       {kind === "kurumsal" ? (
         <label className="grid gap-1 text-sm font-semibold text-slate-700">
           Firma adı
@@ -82,7 +83,7 @@ export function LeadForm({ kind, sourcePage }: { kind: LeadInput["kind"]; source
       {/* Bal küpü: insanlar görmez, botlar doldurur */}
       <input className="hidden" tabIndex={-1} autoComplete="off" aria-hidden="true" name="website" value={f.website} onChange={set("website")} />
       <label className={`flex items-start gap-2 text-sm text-slate-600 ${error?.field === "kvkkConsent" ? "text-red-700" : ""}`}>
-        <input type="checkbox" data-testid="lead-consent" className="mt-1 h-4 w-4" checked={consent} onChange={(e) => setConsent(e.target.checked)} />
+        <input type="checkbox" data-testid="lead-consent" className="mt-1 h-4 w-4 accent-[#111114] focus-visible:ring-2 focus-visible:ring-brand/60 focus-visible:ring-offset-2 focus-visible:outline-none" checked={consent} onChange={(e) => setConsent(e.target.checked)} />
         <span>
           Bilgilerimin başvurumun değerlendirilmesi ve benimle iletişime geçilmesi amacıyla işlenmesine ilişkin{" "}
           <Link href="/kvkk#basvuru" className="text-brand underline" target="_blank">
@@ -92,7 +93,7 @@ export function LeadForm({ kind, sourcePage }: { kind: LeadInput["kind"]; source
         </span>
       </label>
       {error ? <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error.message}</p> : null}
-      <button type="submit" data-testid="lead-submit" disabled={state === "sending"} className="rounded-full bg-brand px-6 py-3.5 font-extrabold text-white hover:bg-black disabled:opacity-60">
+      <button type="submit" data-testid="lead-submit" disabled={state === "sending"} className="rounded-full bg-brand px-6 py-3.5 font-extrabold text-white hover:bg-black focus-visible:ring-2 focus-visible:ring-brand/60 focus-visible:ring-offset-2 focus-visible:outline-none disabled:opacity-60">
         {state === "sending" ? "Gönderiliyor…" : kind === "kurumsal" ? "Kurumsal hesap başvurusu gönder" : "Gönder"}
       </button>
     </form>

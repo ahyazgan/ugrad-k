@@ -134,3 +134,43 @@ Deno.test("dispatch: SMS hatası tekrar denemeye bırakılır, 5. denemede faile
   assertEquals(await run(1), "pending");
   assertEquals(await run(5), "failed");
 });
+
+Deno.test("dispatch: varış olayı (kind) olay bildirimiyle işlenir", async () => {
+  const { ctx } = fakeCtx({
+    tables: {
+      "rpc:claim_notifications": [{ id: 7, order_id: "o1", event: "yolda", kind: "varis_teslim", attempts: 1 }],
+      orders: [{ ...orderRow, status: "yolda", dropoff_contact_name: "Ali Veli", dropoff_contact_phone: "+905334445566" }],
+      notifications: [{ id: 7 }],
+    },
+  });
+  const { fetchFn } = recorder({ netgsm: { code: "00", jobid: "9" } });
+  const res = await handler((r) => handleNotifyDispatch(r, ctx, { env: envOf({ NOTIFY_SECRET: "s", ...sms }), fetchFn }))(
+    new Request("http://x", { method: "POST", headers: { "x-notify-secret": "s" } }),
+  );
+  const data = await res.json();
+  assertEquals(data.summary[0].status, "sent");
+  // Alıcıya "kapıda" mesajı; müşterinin push token'ı yok
+  assertEquals(data.summary[0].results.map((r: { role: string }) => r.role), ["receiver"]);
+});
+
+Deno.test("dispatch: mesaj bildirimi karşı tarafın son mesajıyla push olarak gider", async () => {
+  const { ctx } = fakeCtx({
+    tables: {
+      "rpc:claim_notifications": [{ id: 8, order_id: "o1", event: "yolda", kind: "mesaj_musteri", attempts: 1 }],
+      orders: [{ ...orderRow, status: "yolda", customer: { full_name: "Ayşe", phone: "+905321112233", push_token: "ExponentPushToken[c]" }, courier: { profile: { full_name: "Mehmet Kaya", phone: "+905551110001", push_token: "ExponentPushToken[k]" } } }],
+      order_messages: [{ order_id: "o1", sender_role: "kurye", body: "Kapıdayım" }],
+      notifications: [{ id: 8 }],
+    },
+  });
+  const sent: string[] = [];
+  const fetchFn = ((url: string, init?: RequestInit) => {
+    sent.push(`${url} ${init?.body ?? ""}`);
+    return Promise.resolve(Response.json({ data: [{ status: "ok" }] }));
+  }) as unknown as typeof fetch;
+  const data = await (await handler((r) => handleNotifyDispatch(r, ctx, { env: envOf({ NOTIFY_SECRET: "s" }), fetchFn }))(
+    new Request("http://x", { method: "POST", headers: { "x-notify-secret": "s" } }),
+  )).json();
+  assertEquals(data.summary[0].status, "sent");
+  assertEquals(sent.length, 1);
+  assertEquals(sent[0]!.includes("exp.host") && sent[0]!.includes("Kapıdayım") && sent[0]!.includes("ExponentPushToken[c]"), true);
+});

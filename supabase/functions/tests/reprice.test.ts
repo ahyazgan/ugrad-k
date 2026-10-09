@@ -48,3 +48,21 @@ Deno.test("reprice: kapanmış siparişte kurye 409", async () => {
   const res = await handler((r) => handleRepriceOrder(r, ctx))(post({ orderId: "o1" }));
   assertEquals(res.status, 409);
 });
+
+Deno.test("reprice: teslim edilemeyen işte iade ücreti; dönüşte ücretli köprü yönüne geçiliyorsa köprü", async () => {
+  const { ctx, updated } = fakeCtx({
+    userId: "k1",
+    tables: { orders: [order({ status: "geri_donuyor", waiting_minutes: 0, failed_at: "2026-10-07T12:00:00Z", round_trip: false, pickup_side: "avrupa", dropoff_side: "anadolu" })] },
+  });
+  const data = await (await handler((r) => handleRepriceOrder(r, ctx))(post({ orderId: "o1" }))).json();
+  const codes = data.quote.lines.map((l: { code: string }) => l.code);
+  assertEquals(codes.includes("failed_return"), true);
+  // 5 km: 350 + 2×25 = 400 TL → iade 200 TL; köprü 25 TL
+  assertEquals(data.quote.subtotalKurus, quote.subtotalKurus + 20_000 + 2_500);
+  assertEquals(updated.orders![0]!.total_kurus, data.quote.totalKurus);
+});
+
+Deno.test("reprice: iade teslim edildikten sonra kurye değiştiremez", async () => {
+  const { ctx } = fakeCtx({ userId: "k1", tables: { orders: [order({ status: "geri_teslim" })] } });
+  assertEquals((await handler((r) => handleRepriceOrder(r, ctx))(post({ orderId: "o1" }))).status, 409);
+});

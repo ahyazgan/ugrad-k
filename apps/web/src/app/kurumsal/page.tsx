@@ -1,9 +1,15 @@
-import { BRAND } from "@yazgan/shared";
+import { BRAND, formatTL, type PricingSettings } from "@yazgan/shared";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { LeadForm } from "@/components/LeadForm";
+import { PageHero } from "@/components/PageHero";
 import { Sticker } from "@/components/Sticker";
-import { corporateRows } from "@/lib/pricing-info";
+import { Card, SampleStamp } from "@/components/ui";
+import { corporateRows, returnLegPhrase, sampleMonthlyInvoice } from "@/lib/pricing-info";
+import { getPricingSettings } from "@/lib/pricing-settings";
+
+// ISR: re-read the live tariff (pricing_settings) at most once an hour.
+export const revalidate = 3600;
 
 export const metadata: Metadata = {
   title: "Kurumsal kurye hizmeti — hukuk büroları ve şirketler için",
@@ -11,36 +17,121 @@ export const metadata: Metadata = {
   alternates: { canonical: "/kurumsal" },
 };
 
-const BENEFITS = [
+const benefits = (s: PricingSettings) => [
   { title: "Ay sonu tek fatura", text: "Her teslimat için ayrı ödeme yok; ay sonunda tüm gönderiler tek e-faturada." },
-  { title: "Hacim indirimi", text: corporateRows().map((r) => `${r.label}: ${r.value}`).join(" · ") },
+  { title: "Hacim indirimi", text: corporateRows(s).map((r) => `${r.label}: ${r.value}`).join(" · ") },
   { title: "Teslim kanıtı", text: "Her teslimatta fotoğraf, teslim alan kişi ve imza. Süreli işlerde ispat elinizde." },
   { title: "Ekip hesabı", text: "Çalışanlarınız kendi telefonlarıyla aynı kurumsal hesaptan sipariş verir." },
-  { title: "Gidiş-dönüş imza turu", text: "Belgeyi götürür, imzalatır, geri getiririz; dönüş ayağı yarı fiyatına." },
+  { title: "Gidiş-dönüş imza turu", text: `Belgeyi götürür, imzalatır, geri getiririz; dönüş ayağı ${returnLegPhrase(s)}.` },
   { title: "E-posta ve API ile sipariş", text: `Siparişinizi ${BRAND.email.orders} adresine e-postayla iletin veya sisteminizi API ile bağlayın.` },
 ];
 
-export default function KurumsalPage() {
+const STEPS = [
+  { title: "Başvuru", text: "Formu doldurun: firma, yetkili kişi, telefon ve tahmini aylık gönderi." },
+  { title: "Sizi arıyoruz", text: "İhtiyacınızı ve gönderi düzeninizi konuşup hesabınızı açıyoruz." },
+  { title: "Ekip davet + ay sonu tek fatura", text: "Çalışanlarınız aynı hesaptan sipariş verir; ay sonunda tek fatura kesilir." },
+];
+
+/** Sample month-end invoice (stamped "Örnek"); every amount comes from calculateMonthlyInvoice. */
+function InvoiceMock({ settings: S }: { settings: PricingSettings }) {
+  const inv = sampleMonthlyInvoice(S);
+  const rows: Array<[string, number, string?]> = [
+    [`Taşıma bedeli (${inv.deliveryCount} teslimat)`, inv.discountableKurus],
+    [`Köprü geçişleri (${inv.bridgeJobs} ×, indirimsiz)`, inv.undiscountedKurus],
+    [`Kurumsal indirim (%${inv.discountPct})`, -inv.discountKurus, "text-emerald-700"],
+    ["Ara toplam (KDV hariç)", inv.subtotalKurus],
+    [`KDV (%${S.vatPct})`, inv.vatKurus],
+  ];
   return (
-    <div className="mx-auto max-w-6xl px-4 py-12">
-      <div className="grid gap-10 lg:grid-cols-2">
+    <div className="relative">
+      {/* Stays inside the card edge (rotated sticker overflowed the viewport by ~5px at 768px) */}
+      <Sticker name="fis" className="absolute -top-8 right-0 z-10 w-16 rotate-6 sm:w-20" />
+      <Card className="p-5 sm:p-6">
+        <div className="flex items-center gap-3 pr-14">
+          <span className="text-xs font-extrabold tracking-[0.14em] text-neo-muted uppercase">Ay sonu faturası</span>
+          <SampleStamp className="-rotate-3" />
+        </div>
+        <ul className="mt-4 space-y-2 border-t-2 border-dashed border-slate-200 pt-3 text-sm">
+          {rows.map(([label, amount, cls]) => (
+            <li key={label} className="flex items-baseline justify-between gap-3">
+              <span className="text-slate-700">{label}</span>
+              <span className={`font-semibold whitespace-nowrap ${cls ?? "text-brand"}`}>{formatTL(amount)}</span>
+            </li>
+          ))}
+        </ul>
+        <div className="mt-3 flex items-baseline justify-between border-t-2 border-dashed border-slate-200 pt-3">
+          <span className="font-black text-brand">Toplam</span>
+          <span className="text-2xl font-black text-brand">{formatTL(inv.totalKurus)}</span>
+        </div>
+        <p className="mt-3 text-xs text-neo-muted">
+          Örnek ay: {inv.deliveryCount - inv.bridgeJobs} × {inv.localKm} km aynı yaka + {inv.bridgeJobs} × {inv.crossKm} km Avrupa geçişli, standart, hafta içi gündüz. İndirim yalnız taşıma bedeline uygulanır; köprü, bekleme, ağır
+          paket ve uzak alış indirimsizdir.
+        </p>
+        <div className="mt-4 flex flex-wrap gap-2">
+          {corporateRows(S).map((r) => (
+            <span key={r.label} className="rounded-full bg-neo-bg px-3 py-1.5 text-xs font-bold text-brand">
+              {r.label}: {r.value}
+            </span>
+          ))}
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+export default async function KurumsalPage() {
+  const settings = await getPricingSettings();
+  return (
+    <div className="mx-auto max-w-6xl overflow-x-clip px-4 pt-10 lg:pt-14">
+      <div className="grid items-start gap-10 lg:grid-cols-2 lg:gap-12">
         <div>
-          <div className="flex items-center justify-between gap-4">
-            <h1 className="text-3xl font-extrabold text-slate-900 sm:text-4xl">Kurumsal moto kurye</h1>
-            <Sticker name="hediye" priority className="w-16 shrink-0 rotate-6 sm:w-20" />
-          </div>
-          <p className="mt-3 text-lg text-slate-600">
-            Hukuk büroları, muhasebe ofisleri, ajanslar ve şirketler için düzenli ve acil evrak/paket teslimatı. Başvurunuzu bırakın, en kısa sürede sizi arayalım.
-          </p>
+          <PageHero
+            title="Kurumsal moto kurye"
+            sticker="bina"
+            lead="Hukuk büroları, muhasebe ofisleri, ajanslar ve şirketler için düzenli ve acil evrak/paket teslimatı. Başvurunuzu bırakın, en kısa sürede sizi arayalım."
+          >
+            <a
+              href="#basvuru"
+              className="mt-6 flex min-h-14 items-center justify-center gap-2 rounded-full bg-accent px-7 text-lg font-extrabold text-brand hover:bg-accent-dark lg:hidden"
+            >
+              Başvuru formuna in <span aria-hidden="true">↓</span>
+            </a>
+          </PageHero>
+
           <div className="mt-8 grid gap-4 sm:grid-cols-2">
-            {BENEFITS.map((b) => (
-              <div key={b.title} className="rounded-2xl border border-slate-200 p-4">
-                <div className="font-bold text-slate-900">{b.title}</div>
+            {benefits(settings).map((b) => (
+              <Card key={b.title} className="p-5">
+                <h2 className="font-black tracking-tight text-brand">{b.title}</h2>
                 <p className="mt-1 text-sm text-slate-600">{b.text}</p>
-              </div>
+              </Card>
             ))}
           </div>
-          <p className="mt-6 text-sm text-slate-600">
+
+          <section className="mt-12" aria-labelledby="surec">
+            <h2 id="surec" className="text-2xl font-black tracking-[-0.03em]">
+              Nasıl başlarız?
+            </h2>
+            <ol className="mt-4 grid gap-3">
+              {STEPS.map((s, i) => (
+                <li key={s.title} className="flex items-start gap-4 rounded-3xl bg-white/70 p-4">
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-accent font-black text-brand">{i + 1}</span>
+                  <span>
+                    <span className="block font-black text-brand">{s.title}</span>
+                    <span className="block text-sm text-slate-600">{s.text}</span>
+                  </span>
+                </li>
+              ))}
+            </ol>
+          </section>
+
+          <section className="mt-12" aria-labelledby="fatura">
+            <h2 id="fatura" className="mb-5 text-2xl font-black tracking-[-0.03em]">
+              Ay sonunda tek fatura
+            </h2>
+            <InvoiceMock settings={settings} />
+          </section>
+
+          <p className="mt-8 text-sm text-slate-600">
             Yazılım ekibiniz mi var?{" "}
             <Link href="/api-belgeleri" className="font-semibold text-brand underline">
               API belgelerine göz atın
@@ -48,8 +139,9 @@ export default function KurumsalPage() {
             .
           </p>
         </div>
-        <div>
-          <h2 className="mb-3 text-xl font-bold text-slate-900">Kurumsal hesap başvurusu</h2>
+
+        <div id="basvuru" className="scroll-mt-24 lg:sticky lg:top-24">
+          <h2 className="mb-3 text-2xl font-black tracking-[-0.03em]">Kurumsal hesap başvurusu</h2>
           <LeadForm kind="kurumsal" sourcePage="/kurumsal" />
         </div>
       </div>

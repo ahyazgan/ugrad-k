@@ -8,7 +8,7 @@ import * as Location from "expo-location";
 import * as TaskManager from "expo-task-manager";
 import { Platform } from "react-native";
 import { BRAND } from "@yazgan/shared";
-import { api } from "./api";
+import { outbox } from "./outbox";
 
 export const LOCATION_TASK = "yazgan-kurye-konum";
 const INTERVAL_MS = 30_000;
@@ -22,16 +22,20 @@ export const setActiveOrderForLocation = (id: string | null) => {
 
 async function send(loc: Location.LocationObject) {
   try {
-    await api.pushLocation(
+    // Bağlantı yoksa nokta telefonda bekler (dakikada bir), sonra kaydedildiği saatle gider
+    await outbox.run([
       {
-        lat: loc.coords.latitude,
-        lng: loc.coords.longitude,
-        accuracy: loc.coords.accuracy,
-        heading: loc.coords.heading,
-        speed: loc.coords.speed,
+        kind: "location",
+        orderId: activeOrderId,
+        loc: {
+          lat: loc.coords.latitude,
+          lng: loc.coords.longitude,
+          accuracy: loc.coords.accuracy,
+          heading: loc.coords.heading,
+          speed: loc.coords.speed,
+        },
       },
-      activeOrderId,
-    );
+    ]);
   } catch (e) {
     console.warn("Konum gönderilemedi", e);
   }
@@ -69,7 +73,7 @@ export async function startTracking(): Promise<{ mode: TrackingMode; message?: s
             foregroundService: {
               notificationTitle: `${BRAND.name} — vardiya açık`,
               notificationBody: "Konumunuz yalnızca vardiya süresince paylaşılıyor.",
-              notificationColor: "#0F3D6E",
+              notificationColor: BRAND.neo.ink,
             },
           });
         }
@@ -109,10 +113,44 @@ export async function stopTracking() {
 export async function currentPosition() {
   try {
     const p = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-    return { lat: p.coords.latitude, lng: p.coords.longitude };
+    return { lat: p.coords.latitude, lng: p.coords.longitude, accuracy: p.coords.accuracy ?? null };
   } catch {
     return null;
   }
+}
+
+/**
+ * Müşteri "Konumumu kullan": anlık konum + (iOS/Android'de) adres. Web'de ters geokodlama yoktur;
+ * `exact: false` döner ve ekran adres tarifini zorunlu kılar. İzin verilmezse hata fırlatır.
+ */
+export async function myPlace(): Promise<{ address: string; lat: number; lng: number; district: string | null; exact: boolean }> {
+  const perm = await Location.requestForegroundPermissionsAsync();
+  if (perm.status !== "granted") throw new Error("Konum izni verilmedi. Adresi arayarak seçebilirsiniz.");
+  const p = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
+  const lat = p.coords.latitude;
+  const lng = p.coords.longitude;
+  let address: string | null = null;
+  let district: string | null = null;
+  if (Platform.OS !== "web") {
+    try {
+      const [g] = await Location.reverseGeocodeAsync({ latitude: lat, longitude: lng });
+      if (g) {
+        // Türkiye'de ilçe çoğunlukla subregion alanında gelir
+        district = g.subregion ?? g.district ?? null;
+        const street = [g.street ?? g.name, g.streetNumber ? `No: ${g.streetNumber}` : null].filter(Boolean).join(" ");
+        address = g.formattedAddress ?? ([street, district && g.region ? `${district}/${g.region}` : district].filter(Boolean).join(", ") || null);
+      }
+    } catch {
+      // Ters geokodlama başarısız: koordinatla devam
+    }
+  }
+  return {
+    address: address ?? `Konumum (${lat.toFixed(5)}, ${lng.toFixed(5)})`,
+    lat,
+    lng,
+    district,
+    exact: !!address,
+  };
 }
 
 /** İzin istemeden son bilinen konum (vardiyada izin zaten verilmiştir); yoksa null */

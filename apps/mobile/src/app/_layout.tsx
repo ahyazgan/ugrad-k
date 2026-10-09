@@ -63,15 +63,18 @@ export default function RootLayout() {
               <Stack.Screen name="index" options={{ headerShown: false }} />
               <Stack.Screen name="giris" options={{ title: "Giriş", headerShown: false }} />
               <Stack.Screen name="dogrula" options={{ title: "Doğrulama", headerTitle: "" }} />
-              <Stack.Screen name="kvkk" options={{ title: "Kişisel Veriler", headerBackVisible: false }} />
+              {/* KVKK: büyük başlık ekranın içinde; geri dönüş yok */}
+              <Stack.Screen name="kvkk" options={{ title: "Kişisel Veriler", headerShown: false }} />
               <Stack.Screen name="(musteri)" options={{ headerShown: false }} />
-              <Stack.Screen name="adres" options={{ title: "Adres seç", presentation: "modal" }} />
+              <Stack.Screen name="adres" options={{ title: "Adres seç", headerTitle: "", presentation: "modal" }} />
               <Stack.Screen name="ozet" options={{ title: "Fiyat ve onay" }} />
               <Stack.Screen name="siparis/[id]" options={{ title: "Sipariş" }} />
               <Stack.Screen name="odeme" options={{ title: "Ödeme" }} />
               <Stack.Screen name="(kurye)" options={{ headerShown: false }} />
               <Stack.Screen name="is/[id]" options={{ title: "İş detayı" }} />
               <Stack.Screen name="teslim/[id]" options={{ title: "Teslim et", headerTitle: "" }} />
+              <Stack.Screen name="sos" options={{ title: "Acil durum" }} />
+              <Stack.Screen name="mesajlar/[id]" options={{ title: "Mesajlar" }} />
             </Stack>
           </OrderDraftProvider>
         </SessionProvider>

@@ -44,7 +44,7 @@ export function TileMap({ markers, height = 220, route = true }: { markers: MapM
       testID="tile-map"
       accessibilityLabel="Harita"
       onLayout={(e) => setWidth(Math.round(e.nativeEvent.layout.width))}
-      style={{ height, borderRadius: radii.field, overflow: "hidden", backgroundColor: "#E8ECEF" }}
+      style={{ height, borderRadius: radii.field, overflow: "hidden", backgroundColor: colors.mapBg }}
     >
       {view
         ? visibleTiles(view, TILE_URL).map((t) => (
@@ -93,6 +93,7 @@ export function TileMap({ markers, height = 220, route = true }: { markers: MapM
           position: "absolute",
           right: 0,
           bottom: 0,
+          ...font("medium"),
           fontSize: 10,
           color: colors.muted,
           backgroundColor: "rgba(255,255,255,0.85)",

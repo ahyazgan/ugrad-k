@@ -489,6 +489,22 @@ verify_jwt = false
 [functions.webhook-dispatch]
 verify_jwt = false
 
+# Canlıya hazırlık denetimi (yönetici JWT'si)
+[functions.readiness]
+verify_jwt = true
+
+# Geri kazanma mesajı (günlük cron, x-notify-secret)
+[functions.winback]
+verify_jwt = false
+
+# Acil durum (kurye JWT'si)
+[functions.sos]
+verify_jwt = true
+
+# Kurye hakedişi (cron x-notify-secret veya yönetici JWT'si, fonksiyon içinde)
+[functions.courier-earnings]
+verify_jwt = false
+
 # Postmark Inbound (Basic Auth parolası = EMAIL_INBOUND_SECRET)
 [functions.email-inbound]
 verify_jwt = false

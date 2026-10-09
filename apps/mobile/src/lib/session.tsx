@@ -52,6 +52,18 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   return <Ctx.Provider value={{ ...state, refresh }}>{children}</Ctx.Provider>;
 }
 
+/**
+ * Oturum durumuna göre gidilecek ekran. Açılış ekranı ve sekme grupları aynı kuralı kullanır.
+ * Gruplar (`(musteri)`, `(kurye)`) URL'ye segment eklemediği için `/` bir grubun kendi ana sekmesine de
+ * çözülebilir; bu yüzden gruplardan `/`'a değil, doğrudan buradaki hedefe yönlendirilir (aksi hâlde
+ * çıkışta sonsuz yönlendirme döngüsü oluşur).
+ */
+export function entryRoute(s: Pick<SessionState, "session" | "consented" | "profile">) {
+  if (!s.session) return "/giris" as const;
+  if (!s.consented) return "/kvkk" as const;
+  return s.profile?.role === "kurye" ? ("/(kurye)" as const) : ("/(musteri)" as const);
+}
+
 export function useSession() {
   const v = useContext(Ctx);
   if (!v) throw new Error("SessionProvider eksik");

@@ -1,11 +1,17 @@
+import Ionicons from "@expo/vector-icons/Ionicons";
 import { router, useLocalSearchParams } from "expo-router";
-import { useState } from "react";
-import { Pressable, Text, TextInput, View } from "react-native";
+import { useEffect, useState } from "react";
+import { Pressable, TextInput, View } from "react-native";
 import { BigTitle, HandTag } from "@/components/Neo";
 import { Sticker } from "@/components/Sticker";
-import { Button, ErrorBox, Muted, Screen, colors, font } from "@/components/ui";
+import { Button, ErrorBox, Muted, Screen, Txt, colors, font, radii } from "@/components/ui";
 import { api, ApiError } from "@/lib/api";
 import { useSession } from "@/lib/session";
+
+/** Yeni kod istemeden önce beklenecek süre (sn); SMS sağlayıcısını gereksiz tekrarlardan korur */
+const RESEND_AFTER_S = 60;
+
+const mmss = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 
 export default function Dogrula() {
   const { phone = "" } = useLocalSearchParams<{ phone: string }>();
@@ -14,6 +20,15 @@ export default function Dogrula() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
+  const [left, setLeft] = useState(RESEND_AFTER_S);
+  const [resending, setResending] = useState(false);
+
+  // Geri sayım: "Kodu tekrar gönder (0:42)"
+  useEffect(() => {
+    if (left <= 0) return;
+    const t = setTimeout(() => setLeft((s) => s - 1), 1000);
+    return () => clearTimeout(t);
+  }, [left]);
 
   async function submit() {
     setError(null);
@@ -33,21 +48,37 @@ export default function Dogrula() {
 
   async function resend() {
     setError(null);
+    setInfo(null);
+    setResending(true);
     try {
       await api.sendOtp(phone);
-      setInfo("Yeni kod gönderildi");
+      setInfo("Yeni kod yolda!");
+      setLeft(RESEND_AFTER_S);
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "Kod gönderilemedi");
+    } finally {
+      setResending(false);
     }
   }
+
+  function changeNumber() {
+    if (router.canGoBack()) router.back();
+    else router.replace("/giris");
+  }
+
+  const waiting = left > 0;
 
   return (
     <Screen>
       <View style={{ marginTop: 4 }}>
         <BigTitle size={64}>{"Kodu\ngir."}</BigTitle>
-        <Sticker name="kronometre" size={72} rotation={10} style={{ position: "absolute", right: 24, top: -8 }} />
+        {info ? (
+          <HandTag rotate={-8} style={{ position: "absolute", right: 8, bottom: 10 }}>
+            {info}
+          </HandTag>
+        ) : null}
       </View>
-      <Muted>{phone} numarasına SMS ile gönderdiğimiz 6 haneli kodu gir.</Muted>
+      <Muted>{phone} numarasına SMS ile gönderdiğimiz 6 haneli kodu girin.</Muted>
       <TextInput
         accessibilityLabel="Doğrulama kodu"
         placeholder="••••••"
@@ -74,11 +105,49 @@ export default function Dogrula() {
         }}
       />
       <ErrorBox message={error} />
-      {info ? <HandTag rotate={-4}>{info}</HandTag> : null}
-      <Pressable accessibilityRole="button" onPress={resend} style={{ minHeight: 44, justifyContent: "center", alignSelf: "flex-start" }}>
-        <Text style={{ ...font("extrabold"), fontSize: 14, color: colors.ink, textDecorationLine: "underline" }}>Kodu tekrar gönder</Text>
-      </Pressable>
       <Button title="Doğrula ve başla" onPress={submit} loading={loading} disabled={code.length !== 6} testID="verify" />
+
+      {/* Kod gelmediyse: geri sayımlı tekrar gönder + numara değiştir */}
+      <View style={{ backgroundColor: colors.surface, borderRadius: radii.card, padding: 16, flexDirection: "row", alignItems: "center", gap: 14 }}>
+        <Sticker name="kronometre" size={44} rotation={10} />
+        <View style={{ flex: 1, gap: 4 }}>
+          <Txt weight="extrabold" size={15}>
+            Kod gelmedi mi?
+          </Txt>
+          <Pressable
+            testID="otp-resend"
+            accessibilityRole="button"
+            accessibilityState={{ disabled: waiting || resending }}
+            disabled={waiting || resending}
+            onPress={resend}
+            hitSlop={8}
+            style={{ alignSelf: "flex-start", minHeight: 28, justifyContent: "center" }}
+          >
+            <Txt
+              weight="extrabold"
+              size={14}
+              color={waiting ? colors.muted : colors.ink}
+              style={{ textDecorationLine: waiting ? "none" : "underline", fontVariant: ["tabular-nums"] }}
+            >
+              {waiting ? `Kodu tekrar gönder (${mmss(left)})` : resending ? "Gönderiliyor…" : "Kodu tekrar gönder"}
+            </Txt>
+          </Pressable>
+        </View>
+      </View>
+      <Pressable testID="otp-change-number" accessibilityRole="button" onPress={changeNumber} hitSlop={8} style={{ alignSelf: "center", minHeight: 44, justifyContent: "center" }}>
+        <Txt size={14} color={colors.mutedDark}>
+          Numara yanlış mı?{" "}
+          <Txt weight="extrabold" size={14} style={{ textDecorationLine: "underline" }}>
+            Değiştir
+          </Txt>
+        </Txt>
+      </Pressable>
+      <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6 }}>
+        <Ionicons name="lock-closed" size={14} color={colors.muted} />
+        <Txt size={13} color={colors.muted}>
+          Numaran kuryeyle paylaşılmaz.
+        </Txt>
+      </View>
     </Screen>
   );
 }

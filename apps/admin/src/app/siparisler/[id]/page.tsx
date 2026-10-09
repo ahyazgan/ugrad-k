@@ -1,19 +1,24 @@
 "use client";
 
 import {
+  FAILED_DELIVERY_REASONS,
   INELIGIBILITY_LABELS,
+  OFFER_RESPONSE_LABELS,
   ORDER_STATUS_LABELS,
   ORDER_TRANSITIONS,
   formatTL,
+  istanbulTime,
   rankCouriers,
+  type FailedDeliveryReason,
   type OrderStatus,
 } from "@yazgan/shared";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
+import { OrderMessages } from "@/components/OrderMessages";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Button, Card, ErrorText, Input, PageHeader, Select } from "@/components/ui";
-import { fmtDateTime } from "@/lib/dates";
+import { fmtDateTime, fmtTime } from "@/lib/dates";
 import { repo } from "@/lib/repo";
 import { useLoad } from "@/lib/use-load";
 
@@ -27,12 +32,13 @@ const PAYMENT_STATUS: Record<string, string> = {
 };
 
 // Yöneticinin elle yapabileceği geçişler (kurye atama ayrı işlem)
-const MANUAL: OrderStatus[] = ["onaylandi", "alindi", "yolda", "teslim_edildi", "sorunlu", "iptal"];
+// Göndericiye iade başlatma (geri_donuyor) ayrı işlemdir: neden ister ve iade ücretini ekler
+const MANUAL: OrderStatus[] = ["onaylandi", "alindi", "yolda", "teslim_edildi", "sorunlu", "iptal", "geri_teslim"];
 
 function Info({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</div>
+      <div className="text-xs font-semibold uppercase tracking-wide text-muted">{label}</div>
       <div className="mt-0.5 text-sm text-slate-900">{children || "—"}</div>
     </div>
   );
@@ -41,8 +47,8 @@ function Info({ label, children }: { label: string; children: React.ReactNode })
 export default function SiparisDetayPage() {
   const { id } = useParams<{ id: string }>();
   const { data, error, reload } = useLoad(async () => {
-    const [order, couriers, ops] = await Promise.all([repo.getOrder(id), repo.listCouriers(), repo.getOpsSettings()]);
-    return { order, couriers: couriers.filter((c) => c.active), ops };
+    const [order, couriers, ops, pricing] = await Promise.all([repo.getOrder(id), repo.listCouriers(), repo.getOpsSettings(), repo.getPricing()]);
+    return { order, couriers: couriers.filter((c) => c.active), ops, returnLegDiscountPct: pricing.settings.returnLegDiscountPct };
   }, [id]);
   useEffect(() => repo.subscribeOrders(reload), [reload]);
 
@@ -52,6 +58,9 @@ export default function SiparisDetayPage() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [podUrl, setPodUrl] = useState<string | null>(null);
   const [signatureUrl, setSignatureUrl] = useState<string | null>(null);
+  const [failReason, setFailReason] = useState<FailedDeliveryReason>("alici_yok");
+  const [failedPhotoUrl, setFailedPhotoUrl] = useState<string | null>(null);
+  const [returnPhotoUrl, setReturnPhotoUrl] = useState<string | null>(null);
 
   const order = data?.order;
 
@@ -59,6 +68,10 @@ export default function SiparisDetayPage() {
     if (order?.podPhotoPath) repo.podUrl(order.podPhotoPath).then(setPodUrl);
     if (order?.podSignaturePath) repo.podUrl(order.podSignaturePath).then(setSignatureUrl);
   }, [order?.podPhotoPath, order?.podSignaturePath]);
+  useEffect(() => {
+    if (order?.failedPhotoPath) repo.podUrl(order.failedPhotoPath).then(setFailedPhotoUrl);
+    if (order?.returnPodPhotoPath) repo.podUrl(order.returnPodPhotoPath).then(setReturnPhotoUrl);
+  }, [order?.failedPhotoPath, order?.returnPodPhotoPath]);
 
   async function act(fn: () => Promise<void>) {
     setBusy(true);
@@ -75,7 +88,7 @@ export default function SiparisDetayPage() {
   }
 
   if (error) return <ErrorText>{error}</ErrorText>;
-  if (!order) return <p className="text-slate-500">Yükleniyor…</p>;
+  if (!order) return <p className="text-muted">Yükleniyor…</p>;
 
   const allowed = ORDER_TRANSITIONS[order.status].filter((s) => MANUAL.includes(s));
   // Vardiyadaki kuryeler, otomatik atamayla aynı algoritmaya göre sıralı
@@ -91,7 +104,15 @@ export default function SiparisDetayPage() {
     },
     data!.couriers
       .filter((c) => c.isOnShift)
-      .map((c) => ({ id: c.id, name: c.fullName, lat: c.lastLat, lng: c.lastLng, locationAt: c.lastLocationAt, activeOrders: c.activeOrderCount })),
+      .map((c) => ({
+        id: c.id,
+        name: c.fullName,
+        lat: c.lastLat,
+        lng: c.lastLng,
+        locationAt: c.lastLocationAt,
+        activeOrders: c.activeOrderCount,
+        onBreak: c.onBreak,
+      })),
     {
       maxActiveOrdersPerCourier: data!.ops.maxActiveOrdersPerCourier,
       maxPickupDistanceKm: data!.ops.maxPickupDistanceKm,
@@ -107,20 +128,32 @@ export default function SiparisDetayPage() {
     <>
       <PageHeader
         title={`${order.orderNo}${order.urgent ? " · ACİL" : order.serviceLevel === "ekonomi" ? " · EKONOMİ" : ""}`}
-        subtitle={`Oluşturma: ${fmtDateTime(order.createdAt)}`}
+        subtitle={`Oluşturma: ${fmtDateTime(order.createdAt)}${
+          order.slaDueAt
+            ? ` · Acil teslim taahhüdü: ${istanbulTime(order.slaDueAt)}${
+                order.slaMissed ? " (kaçırıldı: müşteriye acil ek ücreti kadar telafi kredisi yazıldı)" : order.deliveredAt ? " (karşılandı)" : ""
+              }`
+            : ""
+        }`}
         actions={
           <Link href="/siparisler" className="text-sm text-brand underline">
             ← Siparişler
           </Link>
         }
       />
-      <div className="grid gap-6 xl:grid-cols-3">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-6 xl:grid-cols-3">
         <div className="space-y-6 xl:col-span-2">
           <Card title="Durum" actions={<StatusBadge status={order.status} />}>
             <div className="space-y-4">
               {awaitingPayment && order.status !== "iptal" ? (
                 <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900">
                   Kartla ödeme bekleniyor — ödeme tamamlanınca kurye atanabilir.
+                </p>
+              ) : null}
+              {order.offerExpiresAt ? (
+                <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900" data-testid="offer-pending">
+                  {order.courierName} için iş teklifi bekliyor (son yanıt {fmtTime(order.offerExpiresAt)}). Kabul etmezse iş sıradaki
+                  kuryeye geçer; isterseniz aşağıdan doğrudan atayabilirsiniz.
                 </p>
               ) : null}
               {canAssign ? (
@@ -160,8 +193,32 @@ export default function SiparisDetayPage() {
                   </div>
                 </div>
               ) : (
-                <p className="text-sm text-slate-500">Bu sipariş son durumda.</p>
+                <p className="text-sm text-muted">Bu sipariş son durumda.</p>
               )}
+              {order.status === "yolda" || order.status === "sorunlu" ? (
+                <div className="flex flex-wrap items-end gap-2 border-t border-slate-100 pt-3">
+                  <div className="min-w-48">
+                    <Select label="Teslim edilemedi" value={failReason} onChange={(e) => setFailReason(e.target.value as FailedDeliveryReason)}>
+                      {Object.entries(FAILED_DELIVERY_REASONS).map(([k, v]) => (
+                        <option key={k} value={k}>
+                          {v}
+                        </option>
+                      ))}
+                    </Select>
+                  </div>
+                  <Button
+                    variant="secondary"
+                    disabled={busy}
+                    data-testid="start-return"
+                    onClick={() => act(() => repo.reportFailedDelivery(order.id, failReason, note))}
+                  >
+                    Göndericiye iade başlat
+                  </Button>
+                  <span className="text-xs text-muted">
+                    %{data.returnLegDiscountPct} indirimli dönüş ayağı ücreti eklenir; müşteriye bildirilir.
+                  </span>
+                </div>
+              ) : null}
               <ErrorText>{actionError}</ErrorText>
             </div>
           </Card>
@@ -170,11 +227,11 @@ export default function SiparisDetayPage() {
             <div className="grid gap-4 sm:grid-cols-2">
               <Info label={`Alış (${order.pickupSide ?? "?"})`}>
                 {order.pickupAddress}
-                {order.pickupDetails ? <div className="text-slate-500">{order.pickupDetails}</div> : null}
+                {order.pickupDetails ? <div className="text-muted">{order.pickupDetails}</div> : null}
               </Info>
               <Info label={`Teslim (${order.dropoffSide ?? "?"})`}>
                 {order.dropoffAddress}
-                {order.dropoffDetails ? <div className="text-slate-500">{order.dropoffDetails}</div> : null}
+                {order.dropoffDetails ? <div className="text-muted">{order.dropoffDetails}</div> : null}
               </Info>
               <Info label="Teslim eden">
                 {order.pickupContactName} {order.pickupContactPhone}
@@ -185,14 +242,63 @@ export default function SiparisDetayPage() {
               <Info label="Paket">
                 {order.packageDescription}
                 {order.weightKg ? ` · ${order.weightKg} kg` : ""}
+                {order.declaredValueKurus ? ` · beyan ${formatTL(order.declaredValueKurus)}` : ""}
               </Info>
+              {order.deliveryCodeRequired ? (
+                <Info label="Teslim kodu">
+                  <span data-testid="admin-delivery-code">{order.deliveryCode ?? "—"}</span>
+                  {order.deliveryCodeFailedAttempts ? (
+                    <span className="ml-2 text-red-700">{order.deliveryCodeFailedAttempts} yanlış deneme</span>
+                  ) : null}
+                  <span className="block text-xs text-muted">Alıcıya SMS ile gider; kurye kodu almadan teslim edemez (yönetici kodsuz kapatabilir).</span>
+                </Info>
+              ) : null}
               <Info label="Müşteri notu">{order.customerNote}</Info>
               <Info label="Mesafe">{(order.distanceMeters / 1000).toFixed(1)} km{order.roundTrip ? " · gidiş-dönüş" : ""}</Info>
               <Info label="Planlı alış">{order.scheduledPickupAt ? fmtDateTime(order.scheduledPickupAt) : "Hemen"}</Info>
+              {order.arrivedPickupAt || order.waitingMinutes ? (
+                <Info label="Alışa varış">
+                  <span data-testid="arrival-pickup">
+                    {order.arrivedPickupAt ? fmtTime(order.arrivedPickupAt) : "bildirilmedi"} · bekleme {order.waitingMinutes} dk
+                    {order.waitingSource ? ` (${order.waitingSource === "olcum" ? "varıştan ölçüldü" : "kuryenin girdiği"})` : ""}
+                  </span>
+                </Info>
+              ) : null}
+              {order.arrivedDropoffAt ? <Info label="Teslime varış">{fmtTime(order.arrivedDropoffAt)}</Info> : null}
               {order.cancelReason ? <Info label="İptal nedeni">{order.cancelReason}</Info> : null}
               {order.problemNote ? <Info label="Sorun">{order.problemNote}</Info> : null}
             </div>
           </Card>
+
+          {order.failedAt ? (
+            <Card title="Teslim edilemedi">
+              <div className="grid gap-4 sm:grid-cols-2" data-testid="failed-delivery">
+                <Info label="Neden">{order.failedReason ? FAILED_DELIVERY_REASONS[order.failedReason] : "—"}</Info>
+                <Info label="Zaman">{fmtDateTime(order.failedAt)}</Info>
+                <Info label="Kurye notu">{order.failedNote}</Info>
+                <Info label="Alıcıyı arama">{order.failedCallAttempts != null ? `${order.failedCallAttempts} kez` : "—"}</Info>
+                <Info label="Adres fotoğrafı">
+                  {failedPhotoUrl ? (
+                    <a className="text-brand underline" href={failedPhotoUrl} target="_blank" rel="noreferrer">
+                      Görüntüle
+                    </a>
+                  ) : order.failedPhotoPath ? (
+                    "Yüklendi"
+                  ) : (
+                    "Yok"
+                  )}
+                </Info>
+                <Info label="Göndericiye iade">
+                  {order.returnedAt ? `${fmtDateTime(order.returnedAt)}${order.returnReceiverName ? ` · teslim alan: ${order.returnReceiverName}` : ""}` : "Yolda"}
+                  {returnPhotoUrl ? (
+                    <a className="ml-2 text-brand underline" href={returnPhotoUrl} target="_blank" rel="noreferrer">
+                      Kanıt
+                    </a>
+                  ) : null}
+                </Info>
+              </div>
+            </Card>
+          ) : null}
 
           {order.status === "teslim_edildi" ? (
             <Card title="Teslim kanıtı">
@@ -234,11 +340,21 @@ export default function SiparisDetayPage() {
               <Info label="Telefon">{order.customerPhone}</Info>
               <Info label="Ödeme">
                 {PAYMENT_METHOD[order.paymentMethod]} · {PAYMENT_STATUS[order.paymentStatus] ?? order.paymentStatus}
-                {order.paidKurus != null ? <div className="text-slate-500">Ödenen: {formatTL(order.paidKurus)}</div> : null}
+                {order.paidKurus != null ? <div className="text-muted">Ödenen: {formatTL(order.paidKurus)}</div> : null}
                 {order.paidKurus != null && order.totalKurus > order.paidKurus ? (
                   <div className="font-semibold text-amber-700">Ek tahsilat: {formatTL(order.totalKurus - order.paidKurus)}</div>
                 ) : null}
                 {order.paymentError ? <div className="text-red-700">{order.paymentError}</div> : null}
+                {order.cashCollection ? (
+                  <div className={order.cashCollection === "alinmadi" ? "font-semibold text-red-700" : "text-muted"}>
+                    Teslimde: {order.cashCollection === "nakit" ? "nakit alındı (kuryede)" : order.cashCollection === "iban" ? "müşteri IBAN'a gönderdiğini bildirdi" : "ödeme alınamadı"}
+                  </div>
+                ) : null}
+                {order.paymentMethod === "nakit" && order.status === "teslim_edildi" && order.paymentStatus !== "odendi" ? (
+                  <Button variant="secondary" className="mt-1" onClick={() => act(() => repo.markOrderPaid(order.id))}>
+                    Ödeme alındı
+                  </Button>
+                ) : null}
                 {order.paymentStatus === "iade_bekliyor" ? (
                   <div className="text-red-700">iyzico panelinden iade yapılmalı (ödeme no: {order.paymentRef})</div>
                 ) : null}
@@ -268,15 +384,35 @@ export default function SiparisDetayPage() {
               </div>
             </dl>
           </Card>
+          {order.offers.length ? (
+            <Card title="Kurye teklifleri">
+              <ol className="space-y-2 text-sm" data-testid="offers">
+                {order.offers.map((o, i) => (
+                  <li key={i} className="flex justify-between gap-3">
+                    <span>
+                      {o.courierName ?? "Kurye"}
+                      <span className="block text-xs text-muted">
+                        {o.response ? OFFER_RESPONSE_LABELS[o.response] : "Yanıt bekleniyor"}
+                        {o.reason ? ` · ${o.reason}` : ""}
+                        {o.respondedAt ? ` · ${Math.max(0, Math.round((new Date(o.respondedAt).getTime() - new Date(o.offeredAt).getTime()) / 1000))} sn` : ""}
+                      </span>
+                    </span>
+                    <span className="whitespace-nowrap text-muted">{fmtDateTime(o.offeredAt)}</span>
+                  </li>
+                ))}
+              </ol>
+            </Card>
+          ) : null}
+          {order.courierId ? <OrderMessages orderId={order.id} /> : null}
           <Card title="Geçmiş">
             <ol className="space-y-2 text-sm">
               {order.history.map((h, i) => (
                 <li key={i} className="flex justify-between gap-3">
                   <span>
                     {ORDER_STATUS_LABELS[h.toStatus]}
-                    {h.note ? <span className="block text-xs text-slate-500">{h.note}</span> : null}
+                    {h.note ? <span className="block text-xs text-muted">{h.note}</span> : null}
                   </span>
-                  <span className="whitespace-nowrap text-slate-500">{fmtDateTime(h.at)}</span>
+                  <span className="whitespace-nowrap text-muted">{fmtDateTime(h.at)}</span>
                 </li>
               ))}
             </ol>

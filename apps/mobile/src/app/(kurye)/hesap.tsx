@@ -1,4 +1,7 @@
-import { router } from "expo-router";
+import type { Compliance } from "@yazgan/shared";
+import { useFocusEffect } from "expo-router";
+import { useCallback, useState } from "react";
+import { complianceFor, DocumentList } from "@/components/CourierDocs";
 import { DeleteAccount } from "@/components/DeleteAccount";
 import { View } from "react-native";
 import { BigTitle } from "@/components/Neo";
@@ -11,6 +14,12 @@ import { useSession } from "@/lib/session";
 
 export default function KuryeHesap() {
   const { profile } = useSession();
+  const [compliance, setCompliance] = useState<Compliance | null>(null);
+  useFocusEffect(
+    useCallback(() => {
+      api.courierDocuments().then((d) => setCompliance(complianceFor(d)), () => undefined);
+    }, []),
+  );
   return (
     <Screen safeTop>
       <BigTitle size={52}>Hesabım.</BigTitle>
@@ -22,13 +31,13 @@ export default function KuryeHesap() {
         </View>
         <Sticker name="kask" size={76} rotation={-8} />
       </Card>
+      {compliance ? <DocumentList c={compliance} /> : null}
       <Button
         title="Çıkış yap"
         variant="secondary"
         onPress={async () => {
           await stopTracking();
-          await api.signOut();
-          router.replace("/giris");
+          await api.signOut(); // sekme düzeni oturum düşünce giriş ekranına yönlendirir
         }}
       />
       <DeleteAccount />

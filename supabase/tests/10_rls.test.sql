@@ -24,6 +24,10 @@ end $$;
 update public.profiles set role = 'admin' where id = :admin;
 update public.profiles set role = 'kurye' where id in (:kurye, :kurye2);
 insert into public.couriers (id, plate) values (:kurye, '34 ABC 01'), (:kurye2, '34 ABC 02');
+-- Mehmet'in zorunlu belgeleri tam (vardiya için); Veli'ninki 9A testinde
+insert into public.courier_documents (courier_id, kind, expires_at) values
+  (:kurye, 'ehliyet', '2035-01-01'), (:kurye, 'kurye_faaliyet_belgesi', '2030-01-01'),
+  (:kurye, 'ruhsat', null), (:kurye, 'trafik_sigortasi', '2030-01-01');
 
 insert into public.orders (
   id, customer_id, pickup_address, pickup_lat, pickup_lng, dropoff_address, dropoff_lat, dropoff_lng,

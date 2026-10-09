@@ -3,6 +3,7 @@
 import {
   calculatePrice,
   DEFAULT_COST_MODEL,
+  DEFAULT_PRICING_SETTINGS,
   estimateJobCost,
   formatTL,
   indexPricingSettings,
@@ -16,7 +17,15 @@ import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Button, Card, ErrorText, Input, PageHeader, Table, Td } from "@/components/ui";
 import { fmtDateTime } from "@/lib/dates";
 import { repo } from "@/lib/repo";
-import { formatKmTiers, parseCap, parseKmTiers } from "@/lib/pricing-form";
+import {
+  describeCorporateTiers,
+  describeKmTiers,
+  formatCorporateTiers,
+  formatKmTiers,
+  parseCap,
+  parseCorporateTiers,
+  parseKmTiers,
+} from "@/lib/pricing-form";
 import { useLoad } from "@/lib/use-load";
 
 type Kind = "tl" | "pct" | "int" | "kg" | "hour" | "coord";
@@ -44,6 +53,9 @@ const FIELDS: Field[] = [
   { key: "freePickupRadiusKm", label: "Ücretsiz alış yarıçapı (km)", kind: "kg", hint: "Merkeze tahmini yol mesafesi; dışında uzak alış ücreti" },
   { key: "remotePickupPerKmKurus", label: "Uzak alış km ücreti", kind: "tl" },
   { key: "remotePickupMaxKurus", label: "Uzak alış ücreti en fazla", kind: "tl" },
+  { key: "freeCoverageKurus", label: "Ücretsiz güvence (değer beyanı olmadan)", kind: "tl" },
+  { key: "insuranceRatePct", label: "Değer beyanı sigorta oranı", kind: "pct", hint: "Beyanın ücretsiz güvenceyi aşan kısmına" },
+  { key: "insuranceMinKurus", label: "En düşük sigorta ücreti", kind: "tl" },
   { key: "serviceCenterLat", label: "Merkez enlem", kind: "coord" },
   { key: "serviceCenterLng", label: "Merkez boylam", kind: "coord" },
   { key: "vatPct", label: "KDV", kind: "pct" },
@@ -55,10 +67,10 @@ const COST_FIELDS: Array<{ key: keyof CostModel; label: string; kind: "tl" | "pc
   { key: "urgentBonusPct", label: "Acil işte kurye primi", kind: "pct" },
   { key: "offHoursBonusPct", label: "Gece/Pazar/tatil kurye primi", kind: "pct" },
   { key: "economyJobPayPct", label: "Ekonomide iş başı ödeme oranı", kind: "pct" },
+  { key: "waitingSharePct", label: "Bekleme ücretinden kurye payı", kind: "pct" },
   { key: "overheadPerJobKurus", label: "İş başı genel gider", kind: "tl" },
   { key: "cardFeePct", label: "Kart komisyonu", kind: "pct" },
 ];
-const COST_STORAGE = "fiyatlar.maliyet.v1";
 
 const toInput = (v: number, kind: Kind) => (kind === "tl" ? (v / 100).toString().replace(".", ",") : String(v));
 const fromInput = (s: string, kind: Kind) => {
@@ -90,6 +102,15 @@ const SCENARIOS: Array<{ label: string; input: PriceInput }> = [
   { label: "Tuzla'dan alış, 8 km", input: { distanceMeters: 8_000, pickupPoint: { lat: 40.816, lng: 29.3 }, pickupAt: DAY } },
 ];
 
+/**
+ * "İlk tarife": flat per-km fee (the shared default `perKmKurus`, used when there are no km tiers)
+ * and no surcharge cap. Kept in one place so the button label and its action cannot drift apart.
+ */
+const INITIAL_TARIFF_PER_KM_KURUS = DEFAULT_PRICING_SETTINGS.perKmKurus;
+
+/** Preview margins below this are highlighted (same value in the note under the table) */
+const LOW_MARGIN_PCT = 20;
+
 /** Senaryo hesaplanamazsa (ör. ekonomi saat dışı) null */
 const tryPrice = (input: PriceInput, s: PricingSettings) => {
   try {
@@ -99,15 +120,6 @@ const tryPrice = (input: PriceInput, s: PricingSettings) => {
   }
 };
 
-function loadCostModel(): CostModel {
-  try {
-    const raw = typeof window === "undefined" ? null : window.localStorage.getItem(COST_STORAGE);
-    return raw ? { ...DEFAULT_COST_MODEL, ...(JSON.parse(raw) as Partial<CostModel>) } : DEFAULT_COST_MODEL;
-  } catch {
-    return DEFAULT_COST_MODEL;
-  }
-}
-
 export default function FiyatlarPage() {
   const { data, error, reload } = useLoad(() => repo.getPricing());
   const [values, setValues] = useState<Record<string, string>>({});
@@ -115,10 +127,13 @@ export default function FiyatlarPage() {
   const [kmTiers, setKmTiers] = useState("");
   const [cap, setCap] = useState("");
   const [maxWeight, setMaxWeight] = useState("");
+  const [maxDeclared, setMaxDeclared] = useState("");
   const [indexPct, setIndexPct] = useState("");
   const [indexMsg, setIndexMsg] = useState<string | null>(null);
+  const costLoad = useLoad(() => repo.getCostModel());
   const [cost, setCost] = useState<CostModel>(DEFAULT_COST_MODEL);
   const [costText, setCostText] = useState<Record<string, string>>({});
+  const [costMsg, setCostMsg] = useState<string | null>(null);
   const [saveMsg, setSaveMsg] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [holiday, setHoliday] = useState<Holiday>({ date: "", name: "", halfDay: false });
@@ -126,28 +141,34 @@ export default function FiyatlarPage() {
   useEffect(() => {
     if (!data) return;
     setValues(Object.fromEntries(FIELDS.map((f) => [f.key, toInput(data.settings[f.key] as number, f.kind)])));
-    setTiers(data.settings.corporateTiers.map((t) => `${t.minDeliveries}:${t.discountPct}`).join(", "));
+    setTiers(formatCorporateTiers(data.settings.corporateTiers));
     setKmTiers(formatKmTiers(data.settings.kmTiers));
     setCap(data.settings.maxSurchargePct == null ? "" : String(data.settings.maxSurchargePct));
     setMaxWeight(data.settings.maxWeightKg == null ? "" : String(data.settings.maxWeightKg));
+    setMaxDeclared(data.settings.maxDeclaredValueKurus == null ? "" : String(data.settings.maxDeclaredValueKurus / 100));
   }, [data]);
 
   useEffect(() => {
-    const m = loadCostModel();
+    const m = costLoad.data;
+    if (!m) return;
     setCost(m);
     setCostText(Object.fromEntries(COST_FIELDS.map((f) => [f.key, toInput(m[f.key], f.kind)])));
-  }, []);
+  }, [costLoad.data]);
 
   function setCostField(key: keyof CostModel, kind: "tl" | "pct", text: string) {
     setCostText((t) => ({ ...t, [key]: text }));
+    setCostMsg(null);
     const v = fromInput(text, kind);
-    if (v == null) return;
-    const next = { ...cost, [key]: v };
-    setCost(next);
+    if (v != null) setCost((c) => ({ ...c, [key]: v }));
+  }
+  const costInvalid = COST_FIELDS.some((f) => fromInput(costText[f.key] ?? "", f.kind) == null);
+
+  async function saveCost() {
     try {
-      window.localStorage.setItem(COST_STORAGE, JSON.stringify(next));
-    } catch {
-      // depolama kapalıysa yalnız bu oturumda geçerli
+      await repo.saveCostModel(cost);
+      setCostMsg("Kaydedildi. Bundan sonraki teslimatların hakedişi bu modelle hesaplanır.");
+    } catch (e) {
+      setCostMsg(e instanceof Error ? e.message : "Kaydedilemedi");
     }
   }
 
@@ -176,13 +197,9 @@ export default function FiyatlarPage() {
       if (v == null) errors.push(f.label);
       else (s[f.key] as number) = v;
     }
-    const parsed = tiers
-      .split(",")
-      .map((x) => x.trim())
-      .filter(Boolean)
-      .map((x) => x.split(":").map((n) => Number(n.trim())));
-    if (parsed.some((p) => p.length !== 2 || p.some((n) => !Number.isFinite(n) || n < 0))) errors.push("Kurumsal kademeler");
-    else s.corporateTiers = parsed.map(([minDeliveries, discountPct]) => ({ minDeliveries: minDeliveries!, discountPct: discountPct! }));
+    const ct = parseCorporateTiers(tiers);
+    if (ct === null) errors.push("Kurumsal kademeler");
+    else s.corporateTiers = ct;
     const kt = parseKmTiers(kmTiers);
     if (kt === null) errors.push("Km kademeleri");
     else s.kmTiers = kt;
@@ -192,10 +209,13 @@ export default function FiyatlarPage() {
     const w = parseCap(maxWeight);
     if (w === undefined || w === 0) errors.push("Ağırlık sınırı");
     else s.maxWeightKg = w;
+    const md = parseCap(maxDeclared.replace(/\./g, ""));
+    if (md === undefined || md === 0) errors.push("En yüksek değer beyanı");
+    else s.maxDeclaredValueKurus = md == null ? null : Math.round(md * 100);
     if (s.economyCutoffHour <= s.nightEndHour) errors.push("Ekonomi son alış saati");
     if (s.waitingBlockMinutes <= 0) errors.push("Bekleme dilimi");
     return { settings: s, errors };
-  }, [data, values, tiers, kmTiers, cap, maxWeight]);
+  }, [data, values, tiers, kmTiers, cap, maxWeight, maxDeclared]);
 
   async function save(e: FormEvent) {
     e.preventDefault();
@@ -218,6 +238,24 @@ export default function FiyatlarPage() {
     await reload();
   }
 
+  // Live plain-language reading of what is typed (no fixed example numbers)
+  const kmTiersParsed = parseKmTiers(kmTiers);
+  const kmTiersHint =
+    kmTiersParsed === null
+      ? "Biçim: toplam km'ye kadar:TL/km, son kademe *:TL/km (virgülle ayrılır)."
+      : kmTiersParsed.length
+        ? `Açılıştan sonra ${describeKmTiers(kmTiersParsed)}. Boş bırakılırsa sabit km ücreti kullanılır.`
+        : "Boş: sabit km ücreti (yukarıdaki “Ek km ücreti”) kullanılır.";
+  const capitalizeTr = (t: string) => t.charAt(0).toLocaleUpperCase("tr-TR") + t.slice(1);
+  const corporateParsed = parseCorporateTiers(tiers);
+  const corporateHint =
+    corporateParsed === null
+      ? "Biçim: aylık teslimat:indirim%, virgülle ayrılır."
+      : corporateParsed.length
+        ? `${capitalizeTr(describeCorporateTiers(corporateParsed))} indirim (ay sonu faturada, taşıma bedeline).`
+        : "Boş: kurumsal kademe indirimi yok.";
+  const halfDayHour = `${String(data?.settings.halfDayStartHour ?? DEFAULT_PRICING_SETTINGS.halfDayStartHour).padStart(2, "0")}:00`;
+
   const upcoming = (data?.holidays ?? []).filter((h) => h.date >= new Date().toISOString().slice(0, 10));
 
   return (
@@ -227,7 +265,7 @@ export default function FiyatlarPage() {
         subtitle={`Tüm tutarlar KDV hariç. Son güncelleme: ${fmtDateTime(data?.updatedAt ?? null)}`}
       />
       <ErrorText>{error}</ErrorText>
-      <div className="grid gap-6 xl:grid-cols-5">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-6 xl:grid-cols-5">
         <Card title="Tarife" className="xl:col-span-3">
           <form onSubmit={save} className="space-y-4">
             <div className="grid gap-3 sm:grid-cols-2">
@@ -239,38 +277,40 @@ export default function FiyatlarPage() {
                     inputMode="decimal"
                     onChange={(e) => setValues((v) => ({ ...v, [f.key]: e.target.value }))}
                   />
-                  {f.hint ? <p className="mt-1 text-xs text-slate-500">{f.hint}</p> : null}
+                  {f.hint ? <p className="mt-1 text-xs text-muted">{f.hint}</p> : null}
                 </div>
               ))}
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
               <div>
                 <Input label="Km kademeleri (toplam km'ye kadar : TL/km)" value={kmTiers} onChange={(e) => setKmTiers(e.target.value)} />
-                <p className="mt-1 text-xs text-slate-500">
-                  Örn. 10:25, *:18 → açılıştan sonra 10 km&apos;ye kadar 25 TL, üstü 18 TL. Boş bırakılırsa sabit km ücreti kullanılır.
-                </p>
+                <p className="mt-1 text-xs text-muted">{kmTiersHint}</p>
               </div>
               <div>
                 <Input label="Acil + gece toplam ek ücret tavanı (%)" value={cap} inputMode="decimal" onChange={(e) => setCap(e.target.value)} />
-                <p className="mt-1 text-xs text-slate-500">Örn. 75. Boş bırakılırsa tavan yok (acil + gece/Pazar/tatil toplanır).</p>
+                <p className="mt-1 text-xs text-muted">Acil ile gece/Pazar/tatil eki toplanır; toplam bu yüzdeyi aşamaz. Boş bırakılırsa tavan yok.</p>
               </div>
               <div>
                 <Input label="Motosiklet ağırlık sınırı (kg)" value={maxWeight} inputMode="decimal" onChange={(e) => setMaxWeight(e.target.value)} />
-                <p className="mt-1 text-xs text-slate-500">Üzerindeki gönderi kabul edilmez. Boş bırakılırsa sınır yok.</p>
+                <p className="mt-1 text-xs text-muted">Üzerindeki gönderi kabul edilmez. Boş bırakılırsa sınır yok.</p>
+              </div>
+              <div>
+                <Input label="En yüksek değer beyanı (TL)" value={maxDeclared} inputMode="decimal" onChange={(e) => setMaxDeclared(e.target.value)} />
+                <p className="mt-1 text-xs text-muted">Daha değerli gönderi kabul edilmez (sigortacınızın teminat sınırı). Boş = sınırsız.</p>
               </div>
             </div>
             <div>
               <Input label="Kurumsal kademeler (teslimat:indirim%)" value={tiers} onChange={(e) => setTiers(e.target.value)} />
-              <p className="mt-1 text-xs text-slate-500">Örn. 20:15, 50:25 → ayda 20+ teslimatta %15, 50+ teslimatta %25</p>
+              <p className="mt-1 text-xs text-muted">{corporateHint}</p>
             </div>
-            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+            <div className="rounded-lg border border-line bg-canvas p-3">
               <div className="flex flex-wrap items-end gap-2">
                 <Input label="Endeks / enflasyon güncellemesi (%)" value={indexPct} inputMode="decimal" onChange={(e) => setIndexPct(e.target.value)} />
                 <Button type="button" variant="secondary" onClick={applyIndex} disabled={!indexPct.trim() || !draft || !!draft.errors.length}>
                   Para alanlarına uygula
                 </Button>
               </div>
-              <p className="mt-1 text-xs text-slate-500">
+              <p className="mt-1 text-xs text-muted">
                 Önerilen: 3 ayda bir TÜFE oranı kadar. Açılış, km kademeleri, bekleme, ağır paket ve uzak alış ücretleri artar; köprü (resmi tarife) ve yüzdeler değişmez.
               </p>
               {indexMsg ? <p className="mt-1 text-xs text-brand">{indexMsg}</p> : null}
@@ -286,13 +326,13 @@ export default function FiyatlarPage() {
                 type="button"
                 variant="secondary"
                 onClick={() => {
-                  // İlk tarife: sabit 30 TL/km, ek ücret tavanı yok (kaydetmeden önce önizlemede görünür)
+                  // İlk tarife: sabit km ücreti, ek ücret tavanı yok (kaydetmeden önce önizlemede görünür)
                   setKmTiers("");
                   setCap("");
-                  setValues((v) => ({ ...v, perKmKurus: "30" }));
+                  setValues((v) => ({ ...v, perKmKurus: toInput(INITIAL_TARIFF_PER_KM_KURUS, "tl") }));
                 }}
               >
-                İlk tarifeyi yükle (30 TL/km, tavansız)
+                İlk tarifeyi yükle ({toInput(INITIAL_TARIFF_PER_KM_KURUS, "tl")} TL/km, tavansız)
               </Button>
             </div>
           </form>
@@ -300,7 +340,7 @@ export default function FiyatlarPage() {
 
         <div className="space-y-6 xl:col-span-2">
           <Card title="Önizleme ve marj (kaydetmeden önce)">
-            <Table head={["Senaryo", "Mevcut", "Yeni", "Maliyet", "Marj"]}>
+            <Table head={["Senaryo", "Mevcut", "Yeni", "Maliyet", "Marj"]} num={[1, 2, 3, 4]} empty="Önizleme senaryosu yok.">
               {SCENARIOS.map((sc) => {
                 const cur = data ? tryPrice(sc.input, data.settings) : null;
                 const nextSettings = draft && !draft.errors.length ? draft.settings : null;
@@ -309,24 +349,24 @@ export default function FiyatlarPage() {
                 return (
                   <tr key={sc.label}>
                     <Td>{sc.label}</Td>
-                    <Td className="whitespace-nowrap">{cur ? formatTL(cur.subtotalKurus) : "—"}</Td>
-                    <Td className={`whitespace-nowrap font-semibold ${next && cur && next.subtotalKurus !== cur.subtotalKurus ? "text-brand" : ""}`}>
+                    <Td num>{cur ? formatTL(cur.subtotalKurus) : "—"}</Td>
+                    <Td num className={`font-semibold ${next && cur && next.subtotalKurus !== cur.subtotalKurus ? "text-brand" : ""}`}>
                       {next ? formatTL(next.subtotalKurus) : "—"}
                     </Td>
-                    <Td className="whitespace-nowrap text-slate-600">{c ? formatTL(c.totalKurus) : "—"}</Td>
-                    <Td className={`whitespace-nowrap font-semibold ${c && c.marginPct < 20 ? "text-red-700" : "text-emerald-700"}`}>
+                    <Td className="whitespace-nowrap text-ink-soft">{c ? formatTL(c.totalKurus) : "—"}</Td>
+                    <Td num className={`font-semibold ${c && c.marginPct < LOW_MARGIN_PCT ? "text-red-700" : "text-emerald-700"}`}>
                       {c ? `%${c.marginPct.toLocaleString("tr-TR")}` : "—"}
                     </Td>
                   </tr>
                 );
               })}
             </Table>
-            <p className="mt-2 text-xs text-slate-500">
-              KDV hariç. Maliyet aşağıdaki kurye ödeme modeliyle tahmindir; %20 altı marj kırmızı. Kart komisyonu dahil değildir.
+            <p className="mt-2 text-xs text-muted">
+              KDV hariç. Maliyet aşağıdaki kurye ödeme modeliyle tahmindir; %{LOW_MARGIN_PCT} altı marj kırmızı. Kart komisyonu dahil değildir.
             </p>
           </Card>
 
-          <Card title="Maliyet modeli (yalnız tahmin için)">
+          <Card title="Kurye ödeme ve maliyet modeli">
             <div className="grid gap-3 sm:grid-cols-2">
               {COST_FIELDS.map((f) => (
                 <Input
@@ -338,9 +378,17 @@ export default function FiyatlarPage() {
                 />
               ))}
             </div>
-            <p className="mt-2 text-xs text-slate-500">
-              Esnaf kurye modeli (paket + km başı, yakıt kuryede). Bu tarayıcıda saklanır; fiyatları etkilemez.
+            <p className="mt-2 text-xs text-muted">
+              Esnaf kurye modeli (paket + km başı, yakıt kuryede; köprü geçişi kuryeye iade). Kurye hakedişi ve yukarıdaki marj bu
+              modelle hesaplanır; müşteri fiyatını etkilemez. Önizleme kaydetmeden günceller.
             </p>
+            <div className="mt-3 flex flex-wrap items-center gap-3">
+              <Button type="button" onClick={saveCost} disabled={costInvalid || !costLoad.data} data-testid="save-cost">
+                Ödeme modelini kaydet
+              </Button>
+              {costInvalid ? <ErrorText>Geçersiz değer var</ErrorText> : null}
+              {costMsg ? <span className="text-sm text-emerald-700">{costMsg}</span> : null}
+            </div>
           </Card>
 
           <Card title="Resmi tatiller">
@@ -359,8 +407,8 @@ export default function FiyatlarPage() {
               {upcoming.map((h) => (
                 <li key={h.date} className="flex items-center justify-between gap-2">
                   <span>
-                    <span className="font-mono text-slate-500">{h.date}</span> {h.name}
-                    {h.halfDay ? <span className="ml-1 text-xs text-amber-700">{"(13:00'ten itibaren)"}</span> : null}
+                    <span className="font-mono text-muted">{h.date}</span> {h.name}
+                    {h.halfDay ? <span className="ml-1 text-xs text-amber-700">({halfDayHour} ve sonrası)</span> : null}
                   </span>
                   <button className="text-xs text-red-700 underline" onClick={() => repo.deleteHoliday(h.date).then(reload)}>
                     Sil

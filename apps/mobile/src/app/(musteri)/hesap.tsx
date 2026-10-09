@@ -1,12 +1,12 @@
-import { router } from "expo-router";
-import { useState } from "react";
-import { View } from "react-native";
+import { useEffect, useState } from "react";
+import { Share, View } from "react-native";
 import { DeleteAccount } from "@/components/DeleteAccount";
 import { BigTitle } from "@/components/Neo";
 import { Sticker } from "@/components/Sticker";
 import { Button, Card, ErrorBox, Field, Muted, Screen, Title, colors } from "@/components/ui";
 import { api, ApiError } from "@/lib/api";
 import { COMPANY } from "@/lib/kvkk";
+import { corporateTiersText, usePricingSettings } from "@/lib/pricing-settings";
 import { useSession } from "@/lib/session";
 
 export default function Hesap() {
@@ -17,11 +17,16 @@ export default function Hesap() {
 
 function HesapForm() {
   const { profile, refresh } = useSession();
+  const corporateTiers = corporateTiersText(usePricingSettings());
   const [fullName, setFullName] = useState(profile?.fullName ?? "");
   const [email, setEmail] = useState(profile?.email ?? "");
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [referral, setReferral] = useState<string | null>(null);
+  useEffect(() => {
+    if (!profile?.corporateAccountId) api.myReferralCode().then(setReferral, () => undefined);
+  }, [profile?.corporateAccountId]);
 
   async function save() {
     setSaving(true);
@@ -50,11 +55,26 @@ function HesapForm() {
         {msg ? <Muted>{msg}</Muted> : null}
         <Button title="Kaydet" onPress={save} loading={saving} />
       </Card>
+      {referral ? (
+        <Card>
+          <Title>Davet kodunuz: {referral}</Title>
+          <Muted>
+            Arkadaşınız ilk siparişinde bu kodu girerse indirim kazanır; gönderisi teslim edilince size de kredi tanımlanır ve sonraki
+            siparişinizden düşülür.
+          </Muted>
+          <Button
+            title="Davet kodunu paylaş"
+            variant="secondary"
+            testID="share-referral"
+            onPress={() => Share.share({ message: `Kurye gönderilerinde ilk siparişine indirim: davet kodum ${referral}` })}
+          />
+        </Card>
+      ) : null}
       {profile?.corporateAccountId ? (
         <Card style={{ backgroundColor: colors.lime, flexDirection: "row", alignItems: "center" }}>
           <View style={{ flex: 1, gap: 6 }}>
             <Title>Kurumsal hesap</Title>
-            <Muted>Ayda 20+ teslimatta %15, 50+ teslimatta %25 indirim ay sonu faturanıza yansır.</Muted>
+            <Muted>{corporateTiers ? `${corporateTiers} indirim ay sonu faturanıza yansır.` : "Tüm teslimatlarınız ay sonunda tek faturada toplanır."}</Muted>
           </View>
           <Sticker name="hediye" size={72} rotation={8} />
         </Card>
@@ -71,8 +91,7 @@ function HesapForm() {
         title="Çıkış yap"
         variant="secondary"
         onPress={async () => {
-          await api.signOut();
-          router.replace("/giris");
+          await api.signOut(); // sekme düzeni oturum düşünce giriş ekranına yönlendirir
         }}
       />
       <DeleteAccount />

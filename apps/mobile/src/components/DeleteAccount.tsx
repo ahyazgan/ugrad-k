@@ -1,4 +1,3 @@
-import { router } from "expo-router";
 import { useState } from "react";
 import { Text } from "react-native";
 import { api, ApiError } from "@/lib/api";
@@ -32,8 +31,7 @@ export function DeleteAccount() {
           setError(null);
           try {
             await stopTracking();
-            await api.deleteAccount();
-            router.replace("/giris");
+            await api.deleteAccount(); // oturum düşer; sekme düzeni giriş ekranına yönlendirir
           } catch (e) {
             setError(e instanceof ApiError ? e.message : "Hesap silinemedi");
           } finally {

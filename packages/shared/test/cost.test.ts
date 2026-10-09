@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_COST_MODEL, estimateJobCost, indexPricingSettings, roundPrice } from "../cost.ts";
-import { calculatePrice, DEFAULT_PRICING_SETTINGS as S } from "../pricing.ts";
+import { courierBalance, courierEarning, DEFAULT_COST_MODEL, estimateJobCost, indexPricingSettings, roundPrice } from "../cost.ts";
+import { applyWaitingFee, calculatePrice, DEFAULT_PRICING_SETTINGS as S } from "../pricing.ts";
 
 const WED = new Date("2026-10-07T08:00:00Z"); // Çarşamba 11:00 İstanbul
 const NIGHT = new Date("2026-10-07T20:30:00Z"); // 23:30
@@ -36,6 +36,43 @@ describe("estimateJobCost", () => {
       const c = estimateJobCost(calculatePrice({ distanceMeters: m, serviceLevel: level, pickupAt: WED }, S));
       expect(c.marginPct).toBeGreaterThan(20);
     }
+  });
+});
+
+describe("courierEarning", () => {
+  it("iş + km + prim + bekleme payı + köprü iadesi", () => {
+    const q = applyWaitingFee(
+      calculatePrice({ distanceMeters: 12_000, serviceLevel: "acil", bridgeCrossings: 1, pickupAt: NIGHT }, S),
+      32,
+      S,
+    );
+    const e = courierEarning(q);
+    expect(e.km).toBe(12);
+    expect(e.jobKurus).toBe(15_000);
+    expect(e.kmKurus).toBe(14_400);
+    expect(e.bonusPct).toBe(60);
+    expect(e.bonusKurus).toBe(Math.round(29_400 * 0.6));
+    expect(e.waitingKurus).toBe(5_000); // 2 dilim × 50 TL'nin yarısı
+    expect(e.bridgeKurus).toBe(2_500);
+    expect(e.totalKurus).toBe(15_000 + 14_400 + 17_640 + 5_000 + 2_500);
+  });
+
+  it("uzak alış km'si ödenir; eski tekliflerde eksik meta varsayılanla", () => {
+    const far = calculatePrice({ distanceMeters: 8_000, pickupPoint: { lat: 40.816, lng: 29.3 }, pickupAt: WED }, S);
+    const extra = Math.ceil(far.meta.pickupFromCenterKm! - S.freePickupRadiusKm);
+    expect(courierEarning(far).km).toBe(8 + extra);
+    const legacy = { lines: [], meta: { distanceKm: 5, returnDistanceKm: null, nightOrHoliday: false, holidayName: null, surchargePct: 0 } };
+    expect(courierEarning(legacy).totalKurus).toBe(15_000 + 5 * 1_200);
+  });
+
+  it("bakiye: hakediş − elde tutulan nakit", () => {
+    expect(courierBalance([{ totalKurus: 21_000, cashCollectedKurus: 48_000 }, { totalKurus: 30_000, cashCollectedKurus: 0 }])).toEqual({
+      deliveries: 2,
+      earningsKurus: 51_000,
+      cashKurus: 48_000,
+      incentiveKurus: 0,
+      netKurus: 3_000,
+    });
   });
 });
 

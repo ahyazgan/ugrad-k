@@ -54,6 +54,13 @@ export function fakeDb(tables: Record<string, any>) {
         }
         return q;
       },
+      upsert: (row: Row | Row[]) => {
+        for (const r of Array.isArray(row) ? row : [row]) {
+          (inserted[table] ??= []).push(r);
+          (tables[table] ??= []).push(r);
+        }
+        return Promise.resolve({ data: null, error: null });
+      },
       in: (col: string, vals: unknown[]) => {
         rows = rows.filter((r) => vals.includes(r[col]));
         return q;
@@ -68,7 +75,15 @@ export function fakeDb(tables: Record<string, any>) {
               ? { data: rows[0], error: null }
               : { data: null, error: { message: "not found" } },
         ),
-      then: (resolve: (v: unknown) => void) => resolve({ data: rows, error: null }),
+      then: (resolve: (v: unknown) => void) => {
+        // update().in()/is() zinciri: yama await anında uygulanır
+        if (updatePatch) {
+          for (const r of rows) Object.assign(r, updatePatch);
+          (updated[table] ??= []).push(...rows);
+          return resolve({ data: null, error: null });
+        }
+        resolve({ data: rows, error: null });
+      },
     };
     return q;
   };

@@ -76,7 +76,7 @@ export default function Giris() {
       </View>
       <ErrorBox message={error} />
       <Button title="Kod gönder" onPress={submit} loading={loading} disabled={phone.length < 10} testID="send-otp" />
-      <Muted style={{ textAlign: "center" }}>Telefonuna SMS ile 6 haneli bir kod göndereceğiz.</Muted>
+      <Muted style={{ textAlign: "center" }}>Telefonunuza SMS ile 6 haneli bir kod göndereceğiz.</Muted>
       <View
         style={{
           marginTop: 12,
@@ -91,7 +91,7 @@ export default function Giris() {
         }}
       >
         <Text style={{ ...font("bold"), flex: 1, color: "#fff", fontSize: 14 }}>
-          Kurye misin? <Text style={{ ...font("black"), color: colors.lime }}>Buradan gir</Text>
+          Kurye misiniz? <Text style={{ ...font("black"), color: colors.lime }}>Buradan girin</Text>
         </Text>
         <View style={{ width: 44, height: 44, borderRadius: radii.pill, backgroundColor: colors.lime, alignItems: "center", justifyContent: "center" }}>
           <Ionicons name="bicycle" size={20} color={colors.ink} />

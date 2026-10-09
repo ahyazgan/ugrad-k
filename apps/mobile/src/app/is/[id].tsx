@@ -1,12 +1,19 @@
+import Ionicons from "@expo/vector-icons/Ionicons";
+import { formatTL } from "@yazgan/shared";
 import { router, useLocalSearchParams } from "expo-router";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type ComponentProps } from "react";
 import { Text, TextInput, View } from "react-native";
+import { FailedDeliveryForm } from "@/components/FailedDelivery";
+import { OfferCard } from "@/components/OfferCard";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Sticker, type StickerName } from "@/components/Sticker";
 import { TileMap, type MapMarker } from "@/components/TileMap";
-import { Button, Card, ErrorBox, Loading, Muted, Screen, Title, colors, styles, font } from "@/components/ui";
+import { Button, Card, ErrorBox, Loading, Muted, Screen, Title, Txt, colors, styles, font, radii } from "@/components/ui";
 import { api, ApiError, type OrderDetail } from "@/lib/api";
-import { lastKnownPosition, setActiveOrderForLocation } from "@/lib/location";
+import { OutboxBanner } from "@/components/OutboxBanner";
+import { formatTime } from "@/lib/format";
+import { outbox } from "@/lib/outbox";
+import { currentPosition, lastKnownPosition, setActiveOrderForLocation } from "@/lib/location";
 import { callPhone, openDirections } from "@/lib/navigation";
 
 function Stop({
@@ -51,6 +58,47 @@ function Stop({
   );
 }
 
+/** Adres kartlarının üstünde tek satır paket özeti: içerik · kg · değer · teslim kodu var/yok */
+function PackageStrip({ order }: { order: OrderDetail }) {
+  const value = order.declaredValueKurus ? `${(order.declaredValueKurus / 100).toLocaleString("tr-TR", { maximumFractionDigits: 0 })} TL` : "değer yok";
+  const facts: { key: string; icon?: ComponentProps<typeof Ionicons>["name"]; text: string; on?: boolean }[] = [
+    { key: "kg", text: order.weightKg ? `${order.weightKg.toLocaleString("tr-TR")} kg` : "kg yok" },
+    { key: "value", text: value },
+    { key: "code", icon: order.deliveryCodeRequired ? "key" : "key-outline", text: order.deliveryCodeRequired ? "kodlu" : "kodsuz", on: order.deliveryCodeRequired },
+  ];
+  const label = [
+    order.packageDescription || "Paket",
+    order.weightKg ? `${order.weightKg} kg` : "ağırlık belirtilmedi",
+    order.declaredValueKurus ? `${formatTL(order.declaredValueKurus)} değer` : "değer beyanı yok",
+    order.deliveryCodeRequired ? "teslim kodu var" : "teslim kodu yok",
+  ].join(", ");
+  return (
+    <View
+      testID="package-strip"
+      accessible
+      accessibilityLabel={`Paket: ${label}`}
+      style={{ backgroundColor: colors.ink, borderRadius: radii.pill, flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 18, minHeight: 48 }}
+    >
+      <Ionicons name="cube" size={16} color={colors.lime} />
+      {/* Açıklama sığmazsa kısalır; kg · değer · kod her zaman görünür */}
+      <Txt weight="extrabold" size={13} color="#fff" numberOfLines={1} style={{ flexShrink: 1 }}>
+        {order.packageDescription || "Paket"}
+      </Txt>
+      {facts.map((f) => (
+        <View key={f.key} style={{ flexDirection: "row", alignItems: "center", gap: 4, flexShrink: 0 }}>
+          <Txt size={13} color={colors.onInkMuted}>
+            ·
+          </Txt>
+          {f.icon ? <Ionicons name={f.icon} size={13} color={f.on ? colors.lime : colors.onInkMuted} /> : null}
+          <Txt weight={f.on ? "extrabold" : "semibold"} size={13} color={f.on ? "#fff" : colors.onInkMuted}>
+            {f.text}
+          </Txt>
+        </View>
+      ))}
+    </View>
+  );
+}
+
 /** Alış → teslim güzergâhı ve kuryenin kendi konumu */
 function JobMap({ order }: { order: OrderDetail }) {
   const [me, setMe] = useState<{ lat: number; lng: number } | null>(null);
@@ -87,7 +135,15 @@ export default function IsDetay() {
   const [busy, setBusy] = useState(false);
   const [waiting, setWaiting] = useState("0");
   const [noteFor, setNoteFor] = useState<"problem" | "release" | null>(null);
+  const [failing, setFailing] = useState(false);
   const [note, setNote] = useState("");
+  const [now, setNow] = useState(() => Date.now());
+
+  // Ölçülen bekleme süresi canlı güncellenir
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 30_000);
+    return () => clearInterval(t);
+  }, []);
 
   const load = useCallback(async () => {
     try {
@@ -102,21 +158,57 @@ export default function IsDetay() {
     return api.subscribeOrder(id, load);
   }, [id, load]);
 
+  const [queuedMsg, setQueuedMsg] = useState<string | null>(null);
+
   async function act(action: Parameters<typeof api.courierAction>[1]) {
+    if (!order) return;
     setBusy(true);
     setError(null);
+    setQueuedMsg(null);
     try {
-      await api.courierAction(id, action);
-      if (action.type === "on_the_way" || action.type === "pickup") setActiveOrderForLocation(id);
       if (action.type === "release") {
+        // İşi bırakmak sunucu kararı gerektirir (bağlantı şart)
+        await api.courierAction(id, action);
         router.back();
         return;
       }
+      // Paketi aldım / yola çıktım / sorun: bağlantı yoksa telefonda sıraya alınır
+      const base = { orderId: id, orderNo: order.orderNo };
+      const r = await outbox.run([
+        { kind: "action", ...base, action, fileStamp: Date.now() },
+        ...(action.type === "pickup" ? [{ kind: "reprice" as const, ...base }] : []),
+      ]);
+      if (action.type === "on_the_way" || action.type === "pickup") setActiveOrderForLocation(id);
       setNoteFor(null);
       setNote("");
-      await load();
+      if (r === "queued") {
+        // Ekran akmaya devam etsin: durum yerelde ilerler, sunucuya sonra gider
+        const next: Partial<Record<typeof action.type, OrderDetail["status"]>> = { pickup: "alindi", on_the_way: "yolda", problem: "sorunlu" };
+        setOrder({ ...order, status: next[action.type] ?? order.status });
+        setQueuedMsg("Bağlantı yok: işlem kaydedildi, bağlantı gelince yapıldığı saatle gönderilecek.");
+      } else await load();
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : "İşlem başarısız");
+      setError(e instanceof ApiError || e instanceof Error ? e.message : "İşlem başarısız");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function arrive(stop: "alis" | "teslim") {
+    if (!order) return;
+    setBusy(true);
+    setError(null);
+    setQueuedMsg(null);
+    try {
+      const r = await outbox.run([{ kind: "arrive", orderId: id, orderNo: order.orderNo, stop, loc: await currentPosition() }]);
+      setNow(Date.now());
+      if (r === "queued") {
+        const at = new Date().toISOString();
+        setOrder({ ...order, ...(stop === "alis" ? { arrivedPickupAt: at } : { arrivedDropoffAt: at }) });
+        setQueuedMsg("Bağlantı yok: varış kaydedildi, bağlantı gelince gönderilecek.");
+      } else await load();
+    } catch (e) {
+      setError(e instanceof ApiError || e instanceof Error ? e.message : "Varış bildirilemedi");
     } finally {
       setBusy(false);
     }
@@ -124,6 +216,7 @@ export default function IsDetay() {
 
   if (!order) return error ? <Screen><ErrorBox message={error} /></Screen> : <Loading />;
   const s = order.status;
+  const offerPending = !!order.offerExpiresAt;
   const waitingNum = Math.max(0, parseInt(waiting || "0", 10) || 0);
 
   return (
@@ -136,7 +229,6 @@ export default function IsDetay() {
           </Title>
           <StatusBadge status={s} />
         </View>
-        {order.packageDescription ? <Text style={styles.body}>📦 {order.packageDescription}{order.weightKg ? ` · ${order.weightKg} kg` : ""}</Text> : null}
         {order.customerNote ? <Text style={{ ...font("extrabold"), color: colors.ink }}>Not: {order.customerNote}</Text> : null}
         {order.roundTrip ? <Text style={{ ...font("extrabold") }}>↩ Gidiş-dönüş: teslimden sonra alış adresine geri dönülecek</Text> : null}
         {order.paymentMethod === "nakit" ? (
@@ -146,8 +238,17 @@ export default function IsDetay() {
         ) : null}
       </Card>
 
-      {s !== "teslim_edildi" && s !== "iptal" ? <JobMap order={order} /> : null}
+      {s !== "teslim_edildi" && s !== "iptal" && s !== "geri_teslim" ? <JobMap order={order} /> : null}
+      {!offerPending && ["kuryeye_atandi", "alindi", "yolda", "sorunlu", "geri_donuyor"].includes(s) ? (
+        <Button
+          title="Müşteriye yaz"
+          variant="secondary"
+          onPress={() => router.push({ pathname: "/mesajlar/[id]", params: { id, role: "kurye" } })}
+          testID="open-chat"
+        />
+      ) : null}
 
+      <PackageStrip order={order} />
       <Stop
         sticker="kutu"
         title="1 · ALIŞ"
@@ -170,17 +271,75 @@ export default function IsDetay() {
       />
 
       <ErrorBox message={error} />
+      {queuedMsg ? <Muted style={{ color: colors.warn }}>{queuedMsg}</Muted> : null}
+      <OutboxBanner onSent={load} />
 
-      {s === "kuryeye_atandi" ? (
+      {offerPending ? (
+        <OfferCard
+          job={{ ...order, offerExpiresAt: order.offerExpiresAt! }}
+          me={null}
+          onDone={(m) => {
+            if (m) setError(m);
+            api.getOrder(id).then((o) => (o.offerExpiresAt || o.status !== "kuryeye_atandi" ? router.back() : setOrder(o)), () => router.back());
+          }}
+        />
+      ) : null}
+
+      {s === "kuryeye_atandi" && !offerPending ? (
         <Card>
-          <Text style={{ ...font("bold") }}>Alışta bekleme süresi (dakika)</Text>
-          <Muted>İlk 15 dakika ücretsiz; sonrası müşteriye yansıtılır.</Muted>
-          <TextInput style={styles.input} keyboardType="number-pad" value={waiting} onChangeText={setWaiting} testID="waiting" />
+          {order.arrivedPickupAt ? (
+            <>
+              <Text style={{ ...font("bold") }}>Alış adresine vardınız · {formatTime(order.arrivedPickupAt)}</Text>
+              <Text testID="waiting-measured" style={{ fontSize: 16, ...font("extrabold") }}>
+                Bekleme: {Math.max(0, Math.floor((now - new Date(order.arrivedPickupAt).getTime()) / 60_000))} dk
+              </Text>
+              <Muted>Süre otomatik ölçülür. İlk 15 dakika ücretsiz; sonrası müşteriye yansıtılır.</Muted>
+            </>
+          ) : (
+            <>
+              <Button title="Alış adresine vardım" variant="secondary" onPress={() => arrive("alis")} loading={busy} testID="arrive-pickup" />
+              <Muted>Adrese yaklaşınca otomatik işaretlenir; gönderene &quot;kurye kapıda&quot; mesajı gider ve bekleme süresi ölçülür.</Muted>
+              <Text style={{ ...font("bold") }}>Alışta bekleme süresi (dakika)</Text>
+              <TextInput style={styles.input} keyboardType="number-pad" value={waiting} onChangeText={setWaiting} testID="waiting" />
+            </>
+          )}
           <Button title="Paketi aldım" onPress={() => act({ type: "pickup", waitingMinutes: waitingNum })} loading={busy} testID="pickup" />
         </Card>
       ) : null}
       {s === "alindi" ? <Button title="Yola çıktım" onPress={() => act({ type: "on_the_way" })} loading={busy} testID="on-the-way" /> : null}
-      {s === "yolda" || s === "sorunlu" ? (
+      {(s === "yolda" || s === "sorunlu") && !order.arrivedDropoffAt ? (
+        <Button title="Teslim adresine vardım" variant="secondary" onPress={() => arrive("teslim")} loading={busy} testID="arrive-dropoff" />
+      ) : null}
+      {(s === "yolda" || s === "sorunlu") && order.arrivedDropoffAt ? (
+        <Muted>Teslim adresine vardınız · {formatTime(order.arrivedDropoffAt)} (alıcıya &quot;kurye kapıda&quot; mesajı gitti)</Muted>
+      ) : null}
+      {s === "geri_donuyor" ? (
+        <Card style={{ gap: 8, backgroundColor: colors.returnLight }}>
+          <Text style={{ ...font("extrabold"), fontSize: 16 }}>Paketi göndericiye geri götürün</Text>
+          <Muted>Alış adresine dönün ve paketi göndericiye teslim edin (fotoğraf veya imza).</Muted>
+          <Button title="Yol tarifi (alış)" variant="secondary" onPress={() => openDirections(order.pickupLat, order.pickupLng, order.pickupAddress)} />
+          <Button
+            title="Göndericiye teslim et"
+            onPress={() => router.push({ pathname: "/teslim/[id]", params: { id, mode: "iade" } })}
+            testID="return-deliver"
+          />
+        </Card>
+      ) : null}
+      {(s === "yolda" || s === "sorunlu") && failing ? (
+        <FailedDeliveryForm
+          order={order}
+          now={now}
+          onCancel={() => setFailing(false)}
+          onDone={(queued) => {
+            setFailing(false);
+            if (queued) {
+              setOrder({ ...order, status: "geri_donuyor", failedAt: new Date().toISOString() });
+              setQueuedMsg("Bağlantı yok: teslim edilemedi kaydı ve fotoğraf telefonda bekliyor, bağlantı gelince gönderilecek.");
+            } else load();
+          }}
+        />
+      ) : null}
+      {(s === "yolda" || s === "sorunlu") && !failing ? (
         <Button
           title="Teslim et"
           onPress={() => router.push({ pathname: "/teslim/[id]", params: { id } })}
@@ -189,7 +348,10 @@ export default function IsDetay() {
         />
       ) : null}
 
-      {["kuryeye_atandi", "alindi", "yolda"].includes(s) && !noteFor ? (
+      {(s === "yolda" || s === "sorunlu") && !failing && !noteFor ? (
+        <Button title="Teslim edilemedi" variant="secondary" onPress={() => setFailing(true)} testID="failed-open" />
+      ) : null}
+      {["kuryeye_atandi", "alindi", "yolda"].includes(s) && !noteFor && !offerPending && !failing ? (
         <View style={{ flexDirection: "row", gap: 8 }}>
           <View style={{ flex: 1 }}>
             <Button title="Sorun bildir" variant="secondary" onPress={() => setNoteFor("problem")} />

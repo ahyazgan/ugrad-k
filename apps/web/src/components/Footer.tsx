@@ -6,7 +6,7 @@ import { displayPhone, phoneLink, whatsappLink } from "@/lib/site";
 export function Footer() {
   const wa = whatsappLink();
   return (
-    <footer className="mt-20 bg-brand-dark text-white/80">
+    <footer className="bg-brand-dark text-white/80">
       <div className="mx-auto grid max-w-6xl gap-8 px-4 py-12 sm:grid-cols-2 lg:grid-cols-4">
         <div>
           <div className="text-lg font-extrabold text-white">{BRAND.name}</div>

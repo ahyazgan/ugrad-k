@@ -4,7 +4,9 @@ import { BRAND } from "@yazgan/shared";
 import type { ReactNode } from "react";
 import { ActivityIndicator, Pressable, Text, View, type StyleProp, type ViewStyle } from "react-native";
 import Svg, { Path } from "react-native-svg";
+import { Sticker, type StickerName } from "./Sticker";
 import { colors, font, radii, shadow, type } from "./theme";
+import { Button } from "./ui";
 
 /** Marka yazısı + limon ok + slogan. Ad BRAND'den gelir (marka adı kodda sabit yazılmaz). */
 export function Wordmark({ size = 46, tagline = true }: { size?: number; tagline?: boolean }) {
@@ -196,6 +198,68 @@ export function RouteStop({ label, address, details }: { label: string; address:
       <Text style={type.label}>{label}</Text>
       <Text style={{ ...font("bold"), fontSize: 15, color: colors.ink }}>{address}</Text>
       {details ? <Text style={{ ...font("semibold"), fontSize: 13, color: colors.muted }}>{details}</Text> : null}
+    </View>
+  );
+}
+
+export type EmptyAction = {
+  label: string;
+  onPress: () => void;
+  testID?: string;
+  /** Ekranda başka limon ana eylem varsa "dark" veya "secondary" seçin (ekran başına ≤1 limon) */
+  variant?: "primary" | "dark" | "secondary";
+};
+
+/**
+ * Boş durum: çıkartma (88–104 px, ±8°) + kısa başlık (≤5 kelime) + tek satır açıklama + tek eylem.
+ * Tek satırlık soluk "henüz yok" metinlerinin yerine kullanılır.
+ */
+export function EmptyState({
+  sticker,
+  stickerSize = 96,
+  rotation = -6,
+  title,
+  body,
+  action,
+  surface = true,
+  testID,
+  children,
+}: {
+  sticker: StickerName;
+  stickerSize?: number;
+  rotation?: number;
+  title: string;
+  body?: string;
+  action?: EmptyAction;
+  /** Beyaz kart zemini (bir kartın içindeyse false) */
+  surface?: boolean;
+  testID?: string;
+  /** Eylemin yerine/altında özel içerik (ör. hazır cevap çipleri) */
+  children?: ReactNode;
+}) {
+  const size = Math.max(88, Math.min(104, stickerSize));
+  const turn = Math.max(-8, Math.min(8, rotation));
+  return (
+    <View
+      testID={testID}
+      style={[
+        { alignItems: "center", gap: 8, paddingHorizontal: 18, paddingTop: 22, paddingBottom: 20 },
+        surface ? { backgroundColor: colors.surface, borderRadius: radii.card } : null,
+      ]}
+    >
+      <Sticker name={sticker} size={size} rotation={turn} style={{ marginBottom: 4 }} />
+      <Text accessibilityRole="header" style={{ ...type.h2, textAlign: "center" }}>
+        {title}
+      </Text>
+      {body ? (
+        <Text style={{ ...font("semibold"), fontSize: 15, lineHeight: 21, color: colors.muted, textAlign: "center", maxWidth: 320 }}>{body}</Text>
+      ) : null}
+      {action ? (
+        <View style={{ alignSelf: "center", minWidth: 220, marginTop: 8 }}>
+          <Button title={action.label} onPress={action.onPress} testID={action.testID} variant={action.variant ?? "primary"} />
+        </View>
+      ) : null}
+      {children}
     </View>
   );
 }

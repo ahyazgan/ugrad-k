@@ -1,6 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { createClient, FunctionsHttpError, type SupabaseClient } from "@supabase/supabase-js";
-import type { OrderStatus } from "@yazgan/shared";
+import { courierBalance, performanceStatsFromRow, pricingSettingsFromRow, type OrderStatus, type PricingSettingsRow } from "@yazgan/shared";
 import { Platform } from "react-native";
 import {
   ApiError,
@@ -43,6 +43,10 @@ const toSummary = (r: Row): OrderSummary => ({
   totalKurus: r.total_kurus,
   urgent: r.urgent,
   createdAt: r.created_at,
+  offerExpiresAt: r.offer_expires_at && !r.offer_accepted_at && r.status === "kuryeye_atandi" ? r.offer_expires_at : null,
+  ...(r.pickup_lat != null ? { pickupPoint: { lat: r.pickup_lat, lng: r.pickup_lng } } : {}),
+  ...(r.dropoff_lat != null ? { dropoffPoint: { lat: r.dropoff_lat, lng: r.dropoff_lng } } : {}),
+  slaDueAt: r.sla_due_at ?? null,
 });
 
 export function createSupabaseApi(url: string, anonKey: string): Api & { client: SupabaseClient } {
@@ -61,6 +65,15 @@ export function createSupabaseApi(url: string, anonKey: string): Api & { client:
     if (!id) throw new ApiError("Oturum bulunamadı, lütfen tekrar giriş yapın", undefined, 401);
     return id;
   };
+
+  /** Teslim kanıtı / adres fotoğrafını özel "pod" deposuna yükler (aynı adla tekrar yüklenebilir) */
+  async function uploadPod(orderId: string, name: string, uri: string) {
+    const path = `${orderId}/${name}`;
+    const body = await (await fetch(uri)).arrayBuffer();
+    const { error } = await client.storage.from("pod").upload(path, body, { contentType: "image/jpeg", upsert: true });
+    if (error) throw new ApiError(`Fotoğraf yüklenemedi: ${error.message}`);
+    return path;
+  }
 
   async function invoke<T>(name: string, body: object): Promise<T> {
     const { data, error } = await client.functions.invoke(name, { body: body as Record<string, unknown> });
@@ -157,6 +170,12 @@ export function createSupabaseApi(url: string, anonKey: string): Api & { client:
       return (await invoke<{ place: any }>("places", { placeId, sessionToken })).place;
     },
 
+    async getPricingSettings() {
+      // pricing_settings is world-readable (RLS: select using true); single row id = 1
+      const { data, error } = await client.from("pricing_settings").select("*").eq("id", 1).single();
+      fail(error, "Fiyat ayarları okunamadı");
+      return pricingSettingsFromRow(data as PricingSettingsRow);
+    },
     quote: (input) => invoke<QuoteResponse>("quote", input),
     async createOrder(input) {
       const r = await invoke<{ order: Row }>("create-order", input);
@@ -165,7 +184,8 @@ export function createSupabaseApi(url: string, anonKey: string): Api & { client:
     async listOrders() {
       const { data, error } = await client
         .from("orders")
-        .select("id, order_no, status, pickup_address, dropoff_address, total_kurus, urgent, created_at")
+        // Konumlar: "Son adresler" listesi geçmiş siparişlerden tek dokunuşla adres seçtirir
+        .select("id, order_no, status, pickup_address, dropoff_address, total_kurus, urgent, created_at, pickup_lat, pickup_lng, dropoff_lat, dropoff_lng")
         .eq("customer_id", await uid())
         .order("created_at", { ascending: false })
         .limit(100);
@@ -177,7 +197,7 @@ export function createSupabaseApi(url: string, anonKey: string): Api & { client:
         // Kurye bilgisi RLS gereği yalnızca aktif teslimat sırasında döner
         client
           .from("orders")
-          .select("*, courier:couriers(plate, profile:profiles(full_name, phone)), invoice:invoices(pdf_url), rating:order_ratings(score)")
+          .select("*, courier:couriers(plate, profile:profiles(full_name, phone)), invoice:invoices(pdf_url), rating:order_ratings(score), secret:order_secrets(delivery_code)")
           .eq("id", id)
           .single(),
         client.from("order_status_history").select("to_status, created_at, note").eq("order_id", id).order("created_at"),
@@ -191,6 +211,10 @@ export function createSupabaseApi(url: string, anonKey: string): Api & { client:
         dropoffLat: r!.dropoff_lat,
         dropoffLng: r!.dropoff_lng,
         waitingMinutes: r!.waiting_minutes ?? 0,
+        arrivedPickupAt: r!.arrived_pickup_at ?? null,
+        arrivedDropoffAt: r!.arrived_dropoff_at ?? null,
+        failedReason: r!.failed_reason ?? null,
+        failedAt: r!.failed_at ?? null,
         pickupDetails: r!.pickup_details,
         dropoffDetails: r!.dropoff_details,
         pickupContactName: r!.pickup_contact_name,
@@ -203,6 +227,13 @@ export function createSupabaseApi(url: string, anonKey: string): Api & { client:
         weightKg: r!.weight_kg == null ? null : Number(r!.weight_kg),
         scheduledPickupAt: r!.scheduled_pickup_at,
         priceQuote: r!.price_quote,
+        durationSeconds: r!.duration_seconds ?? null,
+        declaredValueKurus: r!.declared_value_kurus ?? null,
+        deliveryCodeRequired: !!r!.delivery_code_required,
+        // RLS: yalnız müşteri görür, kuryeye boş döner
+        deliveryCode: (Array.isArray(r!.secret) ? r!.secret[0] : r!.secret)?.delivery_code ?? null,
+        slaDueAt: r!.sla_due_at ?? null,
+        slaMissed: r!.sla_missed ?? null,
         paymentMethod: r!.payment_method,
         paymentStatus: r!.payment_status,
         paidKurus: r!.paid_kurus ?? null,
@@ -279,19 +310,29 @@ export function createSupabaseApi(url: string, anonKey: string): Api & { client:
 
     // ───────── Kurye
     async getOpenShift() {
-      const { data, error } = await client
-        .from("courier_shifts")
-        .select("id, started_at")
-        .eq("courier_id", await uid())
-        .is("ended_at", null)
-        .maybeSingle();
-      fail(error, "Vardiya okunamadı");
-      return data ? ({ id: data.id, startedAt: data.started_at } satisfies Shift) : null;
+      const id = await uid();
+      const [s, b] = await Promise.all([
+        client.from("courier_shifts").select("id, started_at").eq("courier_id", id).is("ended_at", null).maybeSingle(),
+        client.from("courier_breaks").select("started_at, auto").eq("courier_id", id).is("ended_at", null).maybeSingle(),
+      ]);
+      fail(s.error, "Vardiya okunamadı");
+      const data = s.data;
+      return data
+        ? ({ id: data.id, startedAt: data.started_at, break: b.data ? { startedAt: b.data.started_at, auto: !!b.data.auto } : null } satisfies Shift)
+        : null;
     },
     async startShift(at) {
       const { data, error } = await client.rpc("start_shift", { p_lat: at?.lat ?? null, p_lng: at?.lng ?? null });
       if (error) throw new ApiError(error.message);
-      return { id: data.id, startedAt: data.started_at };
+      return { id: data.id, startedAt: data.started_at, break: null };
+    },
+    async startBreak() {
+      const { error } = await client.rpc("start_break");
+      if (error) throw new ApiError(error.message);
+    },
+    async endBreak() {
+      const { error } = await client.rpc("end_break");
+      if (error) throw new ApiError(error.message);
     },
     async endShift(at) {
       const { error } = await client.rpc("end_shift", { p_lat: at?.lat ?? null, p_lng: at?.lng ?? null });
@@ -301,55 +342,76 @@ export function createSupabaseApi(url: string, anonKey: string): Api & { client:
       const todayStart = new Date(Date.now() + 3 * 3600_000).toISOString().slice(0, 10) + "T00:00:00+03:00";
       const { data, error } = await client
         .from("orders")
-        .select("id, order_no, status, pickup_address, dropoff_address, total_kurus, urgent, created_at")
+        .select(
+          "id, order_no, status, pickup_address, dropoff_address, total_kurus, urgent, created_at, offer_expires_at, offer_accepted_at, pickup_lat, pickup_lng, dropoff_lat, dropoff_lng, sla_due_at",
+        )
         .eq("courier_id", await uid())
-        .or(`status.in.(kuryeye_atandi,alindi,yolda,sorunlu),delivered_at.gte.${new Date(todayStart).toISOString()}`)
+        .or(`status.in.(kuryeye_atandi,alindi,yolda,sorunlu,geri_donuyor),completed_at.gte.${new Date(todayStart).toISOString()}`)
         .order("created_at", { ascending: true });
       fail(error, "İşler okunamadı");
       return (data ?? []).map(toSummary);
     },
-    async courierAction(orderId, action) {
+    async respondOffer(orderId, accept, opts = {}) {
+      const { data, error } = await client.rpc("respond_offer", {
+        p_order_id: orderId,
+        p_accept: accept,
+        p_reason: opts.reason ?? null,
+        p_timeout: !!opts.timeout,
+      });
+      if (error) throw new ApiError(error.message);
+      return data as { ok: boolean; message: string | null };
+    },
+    async courierAction(orderId, action, opts = {}) {
       const rpc = async (p: Record<string, unknown>) => {
-        const { error } = await client.rpc("set_order_status", { p_order_id: orderId, ...p });
+        const { error } = await client.rpc("set_order_status", { p_order_id: orderId, p_occurred_at: opts.occurredAt ?? null, ...p });
         if (error) throw new ApiError(error.message);
       };
       switch (action.type) {
         case "pickup":
-          await rpc({ p_status: "alindi", p_waiting_minutes: action.waitingMinutes });
-          // Bekleme ücreti sunucuda pricing.ts ile teklife eklenir
-          if (action.waitingMinutes > 0) await invoke("reprice-order", { orderId });
-          return;
+          // Bekleme sunucuda varıştan ölçülür (yoksa girilen süre); ücret repriceOrder ile işlenir
+          return rpc({ p_status: "alindi", p_waiting_minutes: action.waitingMinutes });
         case "on_the_way":
           return rpc({ p_status: "yolda" });
         case "problem":
           return rpc({ p_status: "sorunlu", p_note: action.note });
         case "release":
           return rpc({ p_status: "onaylandi", p_note: action.note });
-        case "deliver": {
-          const stamp = Date.now();
-          let photoPath: string | null = null;
+        case "deliver":
+        case "return_deliver": {
+          const stamp = opts.fileStamp ?? Date.now();
+          const photoPath = action.pod.photoUri ? await uploadPod(orderId, `foto-${stamp}.jpg`, action.pod.photoUri) : null;
           let signaturePath: string | null = null;
-          if (action.pod.photoUri) {
-            photoPath = `${orderId}/foto-${stamp}.jpg`;
-            const body = await (await fetch(action.pod.photoUri)).arrayBuffer();
-            const { error } = await client.storage.from("pod").upload(photoPath, body, { contentType: "image/jpeg" });
-            if (error) throw new ApiError(`Fotoğraf yüklenemedi: ${error.message}`);
-          }
           if (action.pod.signatureSvg) {
             signaturePath = `${orderId}/imza-${stamp}.svg`;
             const { error } = await client.storage
               .from("pod")
-              .upload(signaturePath, action.pod.signatureSvg, { contentType: "image/svg+xml" });
+              .upload(signaturePath, action.pod.signatureSvg, { contentType: "image/svg+xml", upsert: true });
             if (error) throw new ApiError(`İmza yüklenemedi: ${error.message}`);
           }
           return rpc({
-            p_status: "teslim_edildi",
+            p_status: action.type === "deliver" ? "teslim_edildi" : "geri_teslim",
             p_pod_photo_path: photoPath,
             p_pod_signature_path: signaturePath,
             p_pod_receiver_name: action.pod.receiverName,
+            p_cash_collection: action.pod.cashCollection ?? null,
           });
         }
       }
+    },
+    async reportFailedDelivery(orderId, input, opts = {}) {
+      const photoPath = await uploadPod(orderId, `teslim-edilemedi-${opts.fileStamp ?? Date.now()}.jpg`, input.photoUri);
+      const { error } = await client.rpc("report_failed_delivery", {
+        p_order_id: orderId,
+        p_reason: input.reason,
+        p_note: input.note.trim() || null,
+        p_photo_path: photoPath,
+        p_call_attempts: input.callAttempts,
+        p_occurred_at: opts.occurredAt ?? null,
+      });
+      if (error) throw new ApiError(error.message);
+    },
+    async repriceOrder(orderId) {
+      await invoke("reprice-order", { orderId });
     },
     async pushLocation(loc, orderId) {
       const { error } = await client.from("courier_locations").insert({
@@ -360,8 +422,199 @@ export function createSupabaseApi(url: string, anonKey: string): Api & { client:
         accuracy_m: loc.accuracy ?? null,
         heading: loc.heading ?? null,
         speed_mps: loc.speed ?? null,
+        ...(loc.recordedAt ? { recorded_at: loc.recordedAt } : {}),
       });
       if (error) throw new ApiError(error.message);
+    },
+    async raiseSos({ kind, note, at }) {
+      const r = await invoke<{ id: string }>("sos", { kind, note: note ?? null, lat: at?.lat ?? null, lng: at?.lng ?? null, accuracy: at?.accuracy ?? null });
+      return { id: r.id };
+    },
+    async myOpenIncident() {
+      const { data, error } = await client
+        .from("courier_incidents")
+        .select("id, kind, created_at, acknowledged_at")
+        .eq("courier_id", await uid())
+        .is("resolved_at", null)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      fail(error, "Acil durum kaydı okunamadı");
+      return data ? { id: data.id, kind: data.kind, createdAt: data.created_at, acknowledgedAt: data.acknowledged_at } : null;
+    },
+    async markArrived(orderId, stop, at, occurredAt) {
+      const { data, error } = await client.rpc("mark_arrived", {
+        p_order_id: orderId,
+        p_stop: stop,
+        p_lat: at?.lat ?? null,
+        p_lng: at?.lng ?? null,
+        p_at: occurredAt ?? null,
+      });
+      if (error) throw new ApiError(error.message);
+      return { arrivedAt: (data as { arrived_at: string }).arrived_at };
+    },
+    async myPerformance() {
+      const { data, error } = await client.rpc("courier_performance_stats", { p_days: 30, p_courier_id: await uid() });
+      if (error) throw new ApiError(error.message);
+      const r = ((data ?? []) as Row[])[0];
+      return r ? performanceStatsFromRow(r) : null;
+    },
+    async demandStats() {
+      const { data, error } = await client.rpc("demand_stats", { p_days: 56 });
+      if (error) throw new ApiError(error.message);
+      const d = (data ?? {}) as { weeks?: number | string; rows?: Row[] };
+      return {
+        weeks: Number(d.weeks ?? 1),
+        rows: (d.rows ?? []).map((r) => ({ weekday: r.weekday, hour: r.hour, lat: Number(r.lat), lng: Number(r.lng), orders: r.orders, district: r.district ?? null })),
+      };
+    },
+    async myIncentives() {
+      const { data, error } = await client.rpc("my_incentive_progress");
+      if (error) throw new ApiError(error.message);
+      return ((data ?? []) as Row[]).map((r) => ({
+        id: r.incentive_id,
+        title: r.title,
+        kind: r.kind,
+        period: r.period,
+        tiers: (r.tiers ?? []) as { target: number; rewardKurus: number }[],
+        bonusPct: r.bonus_pct == null ? null : Number(r.bonus_pct),
+        weekdays: r.weekdays ?? null,
+        startHour: r.start_hour,
+        endHour: r.end_hour,
+        startsOn: r.period_start,
+        endsOn: null,
+        periodStart: r.period_start,
+        periodEnd: r.period_end,
+        jobs: r.jobs,
+        earningKurus: r.earning_kurus,
+      }));
+    },
+    async courierEarnings() {
+      const id = await uid();
+      const [e, p, c, a] = await Promise.all([
+        client
+          .from("courier_earnings")
+          .select("order_id, delivered_at, km, total_kurus, cash_collected_kurus, order:orders(order_no)")
+          .eq("courier_id", id)
+          .is("payout_id", null)
+          .order("delivered_at", { ascending: false })
+          .limit(500),
+        client.from("courier_payouts").select("*").eq("courier_id", id).is("cancelled_at", null).order("created_at", { ascending: false }).limit(10),
+        client.from("cost_settings").select("courier_per_job_kurus, courier_per_km_kurus").eq("id", 1).maybeSingle(),
+        client
+          .from("courier_incentive_awards")
+          .select("id, period_start, period_end, amount_kurus, detail, incentive:courier_incentives(title)")
+          .eq("courier_id", id)
+          .is("payout_id", null)
+          .order("period_start", { ascending: false })
+          .limit(100),
+      ]);
+      fail(e.error, "Kazanç okunamadı");
+      fail(p.error, "Hesaplaşmalar okunamadı");
+      fail(a.error, "Primler okunamadı");
+      const incentives = (a.data ?? []).map((r: Row) => ({
+        id: r.id,
+        // Kampanya pasifleştirilmiş olabilir (kurye yalnız etkin kampanyaları okur)
+        title: r.incentive?.title ?? "Hedef primi",
+        periodStart: r.period_start,
+        periodEnd: r.period_end,
+        amountKurus: r.amount_kurus,
+        detail: r.detail,
+      }));
+      const items = (e.data ?? []).map((r: Row) => ({
+        orderId: r.order_id,
+        orderNo: r.order?.order_no ?? "",
+        deliveredAt: r.delivered_at,
+        km: Number(r.km),
+        totalKurus: r.total_kurus,
+        cashCollectedKurus: r.cash_collected_kurus,
+      }));
+      return {
+        unpaid: courierBalance(items, incentives.reduce((t, i) => t + i.amountKurus, 0)),
+        items,
+        incentives,
+        payouts: (p.data ?? []).map((r: Row) => ({
+          id: r.id,
+          createdAt: r.created_at,
+          deliveryCount: r.delivery_count,
+          incentiveKurus: r.incentive_kurus ?? 0,
+          netKurus: r.net_kurus,
+          note: r.note,
+        })),
+        rates: c.data ? { perJobKurus: c.data.courier_per_job_kurus, perKmKurus: c.data.courier_per_km_kurus } : null,
+      };
+    },
+    async verifyDeliveryCode(orderId, code) {
+      const { data, error } = await client.rpc("verify_delivery_code", { p_order_id: orderId, p_code: code });
+      if (error) throw new ApiError(error.message);
+      return data as { ok: boolean; remaining: number };
+    },
+    async myReferralCode() {
+      const { data, error } = await client.rpc("my_referral_code");
+      if (error) throw new ApiError(error.message);
+      return data as string;
+    },
+    async courierDocuments() {
+      const { data, error } = await client.from("courier_documents").select("kind, doc_number, expires_at").eq("courier_id", await uid());
+      fail(error, "Belgeler okunamadı");
+      return (data ?? []).map((r: Row) => ({ kind: r.kind, number: r.doc_number, expiresAt: r.expires_at }));
+    },
+    async listShiftSlots(fromDay, days) {
+      const { data, error } = await client.rpc("shift_slots", { p_from: fromDay, p_days: days });
+      if (error) throw new ApiError(error.message);
+      return ((data ?? []) as Row[]).map((r) => ({
+        templateId: r.template_id,
+        day: r.day,
+        startsAt: r.starts_at,
+        endsAt: r.ends_at,
+        required: r.required,
+        booked: r.booked,
+        mine: !!r.mine,
+        bookingId: r.booking_id ?? null,
+      }));
+    },
+    async bookShift(templateId, day) {
+      const { error } = await client.rpc("book_shift", { p_template_id: templateId, p_day: day });
+      if (error) throw new ApiError(error.message);
+    },
+    async cancelShiftBooking(bookingId) {
+      const { data, error } = await client.rpc("cancel_shift_booking", { p_booking_id: bookingId });
+      if (error) throw new ApiError(error.message);
+      return { lateCancel: !!(data as Row).late_cancel };
+    },
+    async listMessages(orderId) {
+      const me = await uid();
+      const { data, error } = await client
+        .from("order_messages")
+        .select("id, sender_id, sender_role, body, created_at, read_at")
+        .eq("order_id", orderId)
+        .order("created_at", { ascending: true })
+        .limit(500);
+      fail(error, "Mesajlar okunamadı");
+      return (data ?? []).map((r: Row) => ({
+        id: String(r.id),
+        senderRole: r.sender_role,
+        body: r.body,
+        createdAt: r.created_at,
+        mine: r.sender_id === me,
+        readAt: r.read_at,
+      }));
+    },
+    async sendMessage(orderId, body) {
+      const { error } = await client.rpc("send_order_message", { p_order_id: orderId, p_body: body });
+      if (error) throw new ApiError(error.message);
+    },
+    async markMessagesRead(orderId) {
+      await client.rpc("mark_messages_read", { p_order_id: orderId });
+    },
+    subscribeMessages(orderId, onChange) {
+      const channel = client
+        .channel(`messages-${orderId}`)
+        .on("postgres_changes", { event: "*", schema: "public", table: "order_messages", filter: `order_id=eq.${orderId}` }, onChange)
+        .subscribe();
+      return () => {
+        client.removeChannel(channel);
+      };
     },
     subscribeCourierJobs(onChange) {
       let channel: ReturnType<typeof client.channel> | null = null;

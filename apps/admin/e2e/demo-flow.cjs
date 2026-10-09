@@ -28,7 +28,15 @@ fs.mkdirSync(out, { recursive: true });
   await page.getByRole("button", { name: "Giriş yap" }).click();
   await page.getByRole("heading", { name: "Genel bakış" }).waitFor();
   await page.getByText("İşlem bekleyen siparişler").waitFor();
+  // Acil durum bandı: açık alarm her sayfada; gördüm → kapat (not zorunlu)
+  await page.getByTestId("sos-banner").getByText(/ACİL DURUM — Mehmet Kaya/).waitFor();
   await shot("01-genel-bakis");
+  await page.getByTestId("sos-ack-inc-open").click();
+  await page.getByTestId("sos-banner").getByText("görüldü").waitFor();
+  await page.getByTestId("sos-close-inc-open").click();
+  await page.getByTestId("sos-resolution").fill("Kurye arandı, lastik değişti; vardiyaya döndü");
+  await page.getByRole("button", { name: "Kaydet ve kapat" }).click();
+  await page.getByTestId("sos-banner").waitFor({ state: "detached" });
 
   // Beklemedeki siparişi aç, kurye ata, alındı → yolda → teslim
   await page.getByRole("link", { name: /^YK-\d+$/ }).first().click();
@@ -49,6 +57,19 @@ fs.mkdirSync(out, { recursive: true });
   await page.getByRole("button", { name: "Filtrele" }).click();
   await page.getByText(/\d+ sipariş/).waitFor();
   await shot("03-siparisler");
+  // Teslim edilmiş siparişte alışa varış ve ölçülen bekleme
+  await page.locator("tr", { hasText: "Teslim edildi" }).nth(2).getByRole("link", { name: /^YK-\d+$/ }).click();
+  await page.getByTestId("arrival-pickup").getByText(/varıştan ölçüldü/).waitFor();
+  await nav("Siparişler");
+  await page.getByRole("button", { name: "Tümü" }).click();
+  await page.getByRole("button", { name: "Filtrele" }).click();
+  // Teslim edilemeyip göndericiye iade edilmiş sipariş: neden, arama, iade
+  await page.locator("tr", { hasText: "Göndericiye iade edildi" }).first().getByRole("link", { name: /^YK-\d+$/ }).click();
+  await page.getByTestId("failed-delivery").getByText("Alıcıya ulaşılamadı").waitFor();
+  await page.getByTestId("failed-delivery").getByText("3 kez").waitFor();
+  await page.getByText(/Teslim edilemedi – göndericiye iade/).waitFor();
+  await shot("03a-iade");
+  await nav("Siparişler");
 
   // ───── Telefon siparişi: kayıtlı müşteri, son adresten seçim
   await page.getByRole("link", { name: "+ Telefon siparişi" }).click();
@@ -62,12 +83,16 @@ fs.mkdirSync(out, { recursive: true });
   await t("dropoff-suggestion-0").click();
   await t("dropoff-details").fill("Kanyon B Blok");
   await t("opt-level").selectOption("acil");
+  await t("declared-value").fill("25000");
+  await t("opt-deliveryCode").check();
   await t("total").waitFor();
   console.log("TELEFON FIYAT", await t("total").innerText());
   await shot("03b-telefon-siparisi");
   await t("submit").click();
   await page.getByText("Telefon siparişi", { exact: true }).waitFor(); // geçmiş notu
   await page.getByText("Kanyon B Blok").waitFor();
+  await page.getByTestId("admin-delivery-code").filter({ hasText: /^\d{4}$/ }).waitFor();
+  await page.getByText(/beyan 25\.000,00 TL/).waitFor();
 
   // Yeni müşteri: sözlü KVKK onayı olmadan gönderilemez
   await nav("Siparişler");
@@ -88,11 +113,33 @@ fs.mkdirSync(out, { recursive: true });
   await page.getByText("Deniz Yeni").first().waitFor();
 
   await nav("Kuryeler");
+  // Performans: puan ve kademe, bileşenler
+  await page.getByTestId("perf-kur-1").getByText("Altın").waitFor();
+  await page.getByTestId("perf-kur-1").locator("summary").click();
+  await page.getByTestId("perf-kur-1").getByText(/Teklif kabul: %\d+/).waitFor();
+  // Acil durum kayıtları: kapatılan alarm ve çözüm notu
+  await page.getByTestId("incident-inc-open").getByText(/lastik değişti/).waitFor();
+  // Yeni kurye formu çekmecede açılır (sayfa sütununu işgal etmez)
+  await page.getByRole("button", { name: "+ Kurye", exact: true }).click();
+  await page.getByTestId("courier-drawer").waitFor();
   await page.getByLabel("Ad Soyad").fill("Can Test");
   await page.getByLabel("Cep telefonu").fill("05551234567");
   await page.getByLabel("Plaka").fill("34 TST 99");
   await page.getByRole("button", { name: "Kurye ekle" }).click();
+  await page.getByTestId("courier-drawer").waitFor({ state: "detached" });
   await page.getByText("Can Test").waitFor();
+  // Belgeler: Mehmet'in sigortası yaklaşıyor, Emre'nin kurye faaliyet belgesi eksik
+  await page.getByTestId("docs-kur-1").getByText("1 belge yaklaşıyor").waitFor();
+  await page.getByTestId("docs-kur-2").getByText("1 belge eksik").waitFor();
+  await page.getByTestId("docs-kur-2").click();
+  await page.getByText("Emre Şahin: belgeler").waitFor();
+  await page.getByText(/Vardiyaya giremez ve otomatik iş almaz: Kurye faaliyet belgesi/).waitFor();
+  const kfb = page.getByTestId("doc-kurye_faaliyet_belgesi");
+  await kfb.getByLabel("Belge no").fill("KFB-2026-555");
+  await kfb.getByTestId("expires-kurye_faaliyet_belgesi").fill("2028-05-15");
+  await kfb.getByTestId("save-kurye_faaliyet_belgesi").click();
+  await page.getByTestId("docs-kur-2").getByText("Tamam").waitFor();
+  await page.getByText("Zorunlu belgeler tamam.").waitFor();
   await shot("04-kuryeler");
 
   // ───── Başvurular: web sitesinden gelen müşteri ve kurye başvuruları
@@ -108,10 +155,92 @@ fs.mkdirSync(out, { recursive: true });
   await nav("Kuryeler");
   await page.getByText("Okan Yıldız").waitFor();
 
+  // Kurye hakedişi ve tahsilat
+  await nav("Hakediş ve tahsilat");
+  await page.getByRole("heading", { name: "Kurye hakedişi" }).waitFor();
+  await page.getByTestId("balance-kur-1").waitFor();
+  await page.getByTestId("run-earnings").click();
+  await page.getByTestId("hakedis-msg").filter({ hasText: "hakedişi yazıldı" }).waitFor();
+  const receivable = page.locator('[data-testid^="receivable-"]').first();
+  await receivable.waitFor();
+  await shot("04c-hakedis");
+  await receivable.getByRole("button", { name: "Ödeme alındı" }).click();
+  await page.getByTestId("hakedis-msg").filter({ hasText: "ödendi olarak işaretlendi" }).waitFor();
+  console.log("HAKEDIS", (await page.getByTestId("balance-kur-1").innerText()).replace(/\s+/g, " "));
+  await page.getByTestId("payout-kur-1").click();
+  await page.getByPlaceholder("Not (ör. havale, nakit)").fill("Havale");
+  await page.getByTestId("confirm-payout").click();
+  // Mehmet'in dünkü hedef primi hesaplaşmaya girer
+  await page.getByTestId("hakedis-msg").filter({ hasText: "100,00 TL prim hesaplaşıldı" }).waitFor();
+  await page.getByTestId("balance-kur-1").waitFor({ state: "detached" });
+  await page.getByText("Havale").first().waitFor();
+
+  // Kurye primleri: kural denetimi, yeni yüzde kampanyası, hesaplaşılan prim
+  await nav("Kurye primleri");
+  await page.getByTestId("incentive-award").filter({ hasText: "Hesaplaşıldı" }).first().waitFor();
+  await page.getByTestId("incentive-title").fill("Ters kademe");
+  await page.getByTestId("tier-target-0").fill("10");
+  await page.getByTestId("tier-reward-0").fill("200");
+  await page.getByTestId("tier-target-1").fill("5");
+  await page.getByTestId("tier-reward-1").fill("300");
+  await page.getByTestId("create-incentive").click();
+  await page.getByText("Kademeler artan sırada olmalı").waitFor();
+  await page.getByTestId("incentive-title").fill("Hafta sonu akşam");
+  await page.getByTestId("incentive-kind").selectOption("yuzde");
+  await page.getByTestId("incentive-pct").fill("20");
+  for (const d of [1, 2, 3, 4, 5]) await page.getByTestId(`incentive-day-${d}`).click();
+  await page.getByLabel("Başlangıç saati").selectOption("16");
+  await page.getByTestId("create-incentive").click();
+  await page.getByTestId("incentive-msg").waitFor();
+  const newRow = page.locator('[data-testid^="incentive-inc-"]').filter({ hasText: "Hafta sonu akşam" });
+  await newRow.filter({ hasText: "Cmt, Paz 16:00–24:00" }).filter({ hasText: "+%20" }).waitFor();
+  await shot("04d-primler");
+  await newRow.getByRole("button", { name: "Durdur" }).click();
+  await newRow.getByText("Kapalı").waitFor();
+
+  // Talep yoğunluğu: ısı tablosu → gün/saat süzme, sıcak bölgeler haritada, vardiya önerisini uygula
+  await nav("Talep yoğunluğu");
+  await page.getByTestId("demand-matrix").waitFor();
+  await page.getByTestId("hotspot-row").first().waitFor();
+  const busy = await page.evaluate(() => {
+    const cells = [...document.querySelectorAll('[data-testid^="demand-cell-"]')];
+    const hit = cells.find((c) => c.style.background && !/241, 245, 249|f1f5f9/i.test(c.style.background));
+    return hit ? hit.getAttribute("data-testid") : null;
+  });
+  if (!busy) throw new Error("ısı tablosunda dolu hücre yok");
+  await page.getByTestId(busy).click();
+  await page.getByTestId("demand-hover").filter({ hasText: /haftada ort\. [\d,]+ sipariş/ }).waitFor();
+  await page.getByTestId("hotspot-row").first().waitFor();
+  await page.waitForFunction(() => document.querySelectorAll('[data-pin^="hot-"]').length > 0);
+  console.log("YOGUNLUK", busy, (await page.getByTestId("hotspot-row").first().innerText()).replace(/\s+/g, " "));
+  await shot("04e-yogunluk");
+  // Son dilim (Pazar akşamı): sonraki vardiya planı adımının kullandığı ilk dilime dokunmasın
+  const applyBtn = page.locator('[data-testid^="apply-"]').last();
+  await applyBtn.click();
+  await page.getByTestId("demand-msg").filter({ hasText: "gereken kurye" }).waitFor();
+  await page.getByTestId("demand-clear").click();
+
+  // Vardiya planı: haftalık doluluk, kurye atama
+  await nav("Vardiya planı");
+  await page.getByTestId("plan-summary").getByText(/kurye-dilim eksik|tüm dilimler dolu/).waitFor();
+  await page.getByTestId("next-week").click();
+  const before = await page.getByTestId("plan-summary").innerText();
+  const addBtn = page.locator('[data-testid^="add-"]').first();
+  await addBtn.click();
+  await page.getByTestId("add-courier").selectOption({ label: "Emre Şahin" });
+  await page.waitForFunction((b) => document.querySelector('[data-testid="plan-summary"]')?.textContent !== b, before);
+  console.log("VARDIYA", before, "→", await page.getByTestId("plan-summary").innerText());
+  await shot("04c-vardiya-plani");
+
   await nav("Çalışma saatleri (BTK)");
   await page.getByRole("heading", { name: "Kurye çalışma saatleri" }).waitFor();
   await page.getByLabel("Başlangıç").fill("2026-01-01");
   await page.getByText("Devam ediyor").first().waitFor();
+  // Molalar BTK raporunda net çalışmadan düşülür
+  const net = await page.getByTestId("net-hours").first().innerText();
+  console.log("BTK NET", net);
+  if (!/^\d+ sa \d+ dk$/.test(net)) throw new Error("net çalışma süresi yok: " + net);
+  await page.getByText("Mola", { exact: true }).first().waitFor();
   await shot("05-vardiyalar");
 
   await nav("Kurumsal & fatura");
@@ -127,6 +256,7 @@ fs.mkdirSync(out, { recursive: true });
     const prev = m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, "0")}`;
     await page.getByLabel("Ay").fill(prev);
   }
+  const invoiceMonth = await page.getByLabel("Ay").inputValue();
   await page.getByRole("button", { name: "Faturayı oluştur" }).click();
   await page.getByText("Fatura kuyruğa alındı").waitFor();
   await shot("06-kurumsal");
@@ -145,13 +275,15 @@ fs.mkdirSync(out, { recursive: true });
   await page.getByText("Webhook kaydedildi").waitFor();
   await shot("06a-kurumsal-api");
   await nav("Faturalar");
-  await page.getByText(/^Aylık \d{4}-\d{2}$/).waitFor();
+  // Demo verisinde geçen ayın başka bir kurumsal faturası da var: yeni oluşturulanı hesap + ayla bul
+  await page.locator("tr", { hasText: "Beykoz Hukuk Bürosu" }).filter({ hasText: `Aylık ${invoiceMonth}` }).first().waitFor();
   await shot("06b-faturalar");
 
   await nav("Asistan konuşmaları");
-  await page.getByText("Temsilci bekliyor").waitFor();
-  await page.getByRole("button", { name: "Yazışma" }).first().click();
-  await page.getByText("köşesi ezilmiş", { exact: false }).waitFor();
+  // İki bölmeli görünüm: solda liste (temsilci bekleyen üstte), sağda seçili yazışma
+  await page.getByText("Temsilci bekliyor").first().waitFor();
+  await page.getByTestId("conv-conv-1").click();
+  await page.getByTestId("conversation").getByText("köşesi ezilmiş", { exact: false }).waitFor();
   await shot("06c-asistan");
 
   // ───── Otomasyon: şimdi dağıt → bekleyen siparişler onaylanır, vardiyadaki kuryeye atanır
@@ -161,11 +293,28 @@ fs.mkdirSync(out, { recursive: true });
   console.log("DAGITIM", res);
   if (!/\d+ sipariş kuryeye atandı/.test(res) || /^0 sipariş onaylandı · 0 sipariş kuryeye/.test(res)) throw new Error("dağıtım bir şey yapmadı: " + res);
   await page.getByTestId("system-health").getByText("Fatura kesimi").waitFor();
+  // Canlıya hazırlık: demo'da servisler sahte → eksik; ayrıntılarda kurye hakedişi görevi adıyla
+  if (!/eksik/.test(await page.getByTestId("readiness-summary").innerText())) throw new Error("hazırlık özeti eksik göstermedi");
+  await page.getByTestId("readiness-toggle").click();
+  await page.getByTestId("ready-job:courier-earnings").getByText("Kurye hakedişi").waitFor();
+  await page.getByTestId("ready-cost").getByText("§23", { exact: false }).waitFor();
+  // İş teklifi: otomatik atanan sipariş kuryeye teklif olarak gider, detayda teklif kaydı görünür
+  await page.getByTestId("dispatch-result").locator("..").getByRole("link", { name: "Sipariş" }).first().click();
+  // Demo verisinde vardiyada birden çok uygun kurye var: teklif en yakın olana gider
+  await page.getByTestId("offers").getByText(/Mehmet Kaya|Zeynep Arslan|Serkan Aydın/).first().waitFor();
+  await page.getByTestId("offers").getByText(/Yanıt bekleniyor|Kabul etti/).waitFor();
+  // Yazışma: yönetici destek olarak yazar
+  await page.getByTestId("admin-chat-input").fill("Merhaba, alıcı 14:00'ten sonra ofiste");
+  await page.getByRole("button", { name: "Gönder" }).click();
+  await page.getByTestId("order-messages").getByText("Merhaba, alıcı 14:00'ten sonra ofiste").waitFor();
+  await shot("06d1-teklif");
   await shot("06d-otomasyon");
 
   // ───── Canlı harita: kurye ve sipariş işaretleri, açılır kutu, odaklama
   await nav("Canlı harita");
   await page.locator('[data-pin="kurye:kur-1"]').waitFor();
+  // Kuryenin sıradaki durağı (durak sırası hesabı)
+  await page.getByTestId("next-stop-kur-1").getByText(/^Sıradaki: (Alış|Teslim) · YK-\d+/).waitFor();
   const pinCount = await page.locator("[data-pin]").count();
   console.log("HARITA isaret:", pinCount, "karo:", tiles.count);
   if (pinCount < 4 || !tiles.count) throw new Error("harita eksik çizildi");
@@ -199,6 +348,18 @@ fs.mkdirSync(out, { recursive: true });
   await page.getByRole("button", { name: "Son 7 gün" }).click();
   await totals.waitFor();
 
+  // Kampanyalar: yeni kod ve geri kazanma ayarı
+  await nav("Kampanyalar");
+  await page.getByTestId("promo-HOSGELDIN").waitFor();
+  await page.getByLabel("Kod", { exact: true }).fill("bahar20");
+  await page.getByTestId("promo-value").fill("10");
+  await page.getByTestId("create-promo").click();
+  await page.getByTestId("promo-BAHAR20").waitFor();
+  await page.getByTestId("winback-enabled").check();
+  await page.getByRole("button", { name: "Kaydet", exact: true }).click();
+  await page.getByText("Kaydedildi").waitFor();
+  await shot("07b-kampanyalar");
+
   await nav("Fiyatlar");
   const kmTiers = page.getByLabel("Km kademeleri (toplam km'ye kadar : TL/km)");
   await kmTiers.waitFor();
@@ -216,6 +377,10 @@ fs.mkdirSync(out, { recursive: true });
   if ((await page.getByLabel(/^Açılış ücreti/).inputValue()) !== "385") throw new Error("endeks açılışa uygulanmadı");
   if ((await kmTiers.inputValue()) !== "10:24, *:17.5") throw new Error("endeks kademelere uygulanmadı: " + (await kmTiers.inputValue()));
   if ((await page.getByLabel(/^Köprü geçiş ücreti/).inputValue()) !== "25") throw new Error("köprü endekslenmemeli");
+  // Kurye ödeme modeli kaydedilir
+  await page.getByLabel(/^Kuryeye iş başı/).fill("160");
+  await page.getByTestId("save-cost").click();
+  await page.getByText("Bundan sonraki teslimatların hakedişi").waitFor();
   console.log("MARJ", (await page.locator("table").first().innerText()).replace(/\n/g, " | ").slice(0, 600));
   // Geçersiz kademe kaydı engellenir
   await kmTiers.fill("abc");
@@ -229,7 +394,15 @@ fs.mkdirSync(out, { recursive: true });
   await stubTiles(pubCtx);
   const pub = await pubCtx.newPage();
   pub.on("pageerror", (e) => errors.push(e.message));
+  // Acil siparişin taahhüdü detayda
+  await nav("Siparişler");
+  await page.getByRole("button", { name: "Tümü" }).click();
+  await page.getByRole("button", { name: "Filtrele" }).click();
+  await page.getByRole("link", { name: "YK-1001", exact: true }).click();
+  await page.getByText(/Acil teslim taahhüdü: \d{2}:\d{2}/).waitFor();
   await pub.goto(base + "/takip/demo0000000000000000000000000000");
+  await pub.getByTestId("eta").waitFor();
+  await pub.getByText(/Acil teslim taahhüdü: \d{2}:\d{2}/).waitFor();
   await pub.getByText("Gönderi takibi · YK-1001").waitFor();
   await pub.getByText("Kuryemiz Mehmet gönderinizi getiriyor.").waitFor();
   await pub.locator('[data-pin="kurye"]').waitFor();

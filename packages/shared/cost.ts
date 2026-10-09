@@ -1,7 +1,8 @@
 /**
- * Birim maliyet ve marj tahmini (panel → Fiyatlar → senaryo tablosu).
+ * Kurye hakedişi, birim maliyet ve marj (panel → Fiyatlar ve Hakediş, kurye uygulaması → Kazancım).
  * Varsayılanlar docs/fiyat-arastirmasi.md §3 ve §8'deki esnaf kurye modelinden gelir:
- * kurye paket başı + km başı ücret alır, yakıt ve motor kuryede. Değerler öneridir, piyasa verisi değildir.
+ * kurye paket başı + km başı ücret alır, yakıt ve motor kuryede. Değerler `cost_settings` tablosunda,
+ * panelden değiştirilir. Hakediş ve marj tahmini aynı fonksiyonu (courierEarning) kullanır.
  */
 import { DEFAULT_PRICING_SETTINGS, type PriceQuote, type PricingSettings } from "./pricing.ts";
 
@@ -16,6 +17,8 @@ export interface CostModel {
   offHoursBonusPct: number;
   /** Ekonomi işler rotada birleştiği için iş başı ödemenin uygulanan oranı (%) */
   economyJobPayPct: number;
+  /** Bekleme ücretinden kuryeye verilen pay (%) */
+  waitingSharePct: number;
   /** İş başı genel gider: yazılım, SMS/WhatsApp, harita API, sigorta, muhasebe payı */
   overheadPerJobKurus: number;
   /** Kartla ödemede sanal POS komisyonu (KDV dahil tutara %) */
@@ -28,6 +31,7 @@ export const DEFAULT_COST_MODEL: CostModel = {
   urgentBonusPct: 30,
   offHoursBonusPct: 30,
   economyJobPayPct: 60,
+  waitingSharePct: 50,
   overheadPerJobKurus: 3_000,
   cardFeePct: 2.5,
 };
@@ -47,21 +51,56 @@ export interface JobCost {
 
 const pct = (amount: number, p: number) => Math.round((amount * p) / 100);
 
+export interface CourierEarning {
+  /** Ödenen km: gidiş + dönüş ayağı + uzak alışta merkezden fazlası */
+  km: number;
+  jobKurus: number;
+  kmKurus: number;
+  bonusPct: number;
+  bonusKurus: number;
+  waitingKurus: number;
+  /** Köprü geçişi kuryeye aynen iade edilir (kurye HGS ile öder) */
+  bridgeKurus: number;
+  totalKurus: number;
+}
+
+/** Bir teslimatın kurye hakedişi; siparişin kayıtlı teklifinden (price_quote) hesaplanır */
+export function courierEarning(
+  quote: Pick<PriceQuote, "lines" | "meta">,
+  model: CostModel = DEFAULT_COST_MODEL,
+  settings: Pick<PricingSettings, "freePickupRadiusKm"> = DEFAULT_PRICING_SETTINGS,
+): CourierEarning {
+  const meta = quote.meta;
+  const level = meta.serviceLevel ?? "standart";
+  const remoteKm = Math.max(0, Math.ceil((meta.pickupFromCenterKm ?? 0) - settings.freePickupRadiusKm));
+  const km = (meta.distanceKm ?? 0) + (meta.returnDistanceKm ?? 0) + remoteKm;
+  const jobKurus = level === "ekonomi" ? pct(model.courierPerJobKurus, model.economyJobPayPct) : model.courierPerJobKurus;
+  const kmKurus = km * model.courierPerKmKurus;
+  const bonusPct = (level === "acil" ? model.urgentBonusPct : 0) + (meta.nightOrHoliday ? model.offHoursBonusPct : 0);
+  const bonusKurus = pct(jobKurus + kmKurus, bonusPct);
+  const sum = (code: string) => quote.lines.filter((l) => l.code === code).reduce((s, l) => s + l.amountKurus, 0);
+  const waitingKurus = pct(sum("waiting"), model.waitingSharePct);
+  const bridgeKurus = sum("bridge");
+  return {
+    km,
+    jobKurus,
+    kmKurus,
+    bonusPct,
+    bonusKurus,
+    waitingKurus,
+    bridgeKurus,
+    totalKurus: jobKurus + kmKurus + bonusKurus + waitingKurus + bridgeKurus,
+  };
+}
+
 export function estimateJobCost(
   quote: PriceQuote,
   model: CostModel = DEFAULT_COST_MODEL,
   opts: { card?: boolean; settings?: Pick<PricingSettings, "freePickupRadiusKm"> } = {},
 ): JobCost {
-  const { meta } = quote;
-  const level = meta.serviceLevel ?? "standart";
-  const radius = (opts.settings ?? DEFAULT_PRICING_SETTINGS).freePickupRadiusKm;
-  const remoteKm = Math.max(0, Math.ceil((meta.pickupFromCenterKm ?? 0) - radius));
-  const km = meta.distanceKm + (meta.returnDistanceKm ?? 0) + remoteKm;
-  const jobPay = level === "ekonomi" ? pct(model.courierPerJobKurus, model.economyJobPayPct) : model.courierPerJobKurus;
-  const basePay = jobPay + km * model.courierPerKmKurus;
-  const bonusPct = (level === "acil" ? model.urgentBonusPct : 0) + (meta.nightOrHoliday ? model.offHoursBonusPct : 0);
-  const courierKurus = basePay + pct(basePay, bonusPct);
-  const passThroughKurus = quote.lines.filter((l) => l.code === "bridge").reduce((s, l) => s + l.amountKurus, 0);
+  const e = courierEarning(quote, model, opts.settings);
+  const courierKurus = e.totalKurus - e.bridgeKurus;
+  const passThroughKurus = e.bridgeKurus;
   const paymentFeeKurus = opts.card ? pct(quote.totalKurus, model.cardFeePct) : 0;
   const totalKurus = courierKurus + model.overheadPerJobKurus + passThroughKurus + paymentFeeKurus;
   const marginKurus = quote.subtotalKurus - totalKurus;
@@ -74,6 +113,25 @@ export function estimateJobCost(
     marginKurus,
     marginPct: quote.subtotalKurus ? Math.round((marginKurus / quote.subtotalKurus) * 1000) / 10 : 0,
   };
+}
+
+export interface CourierBalance {
+  /** Ödenmemiş hedef primleri */
+  incentiveKurus: number;
+  deliveries: number;
+  earningsKurus: number;
+  /** Kuryenin müşteriden nakit tahsil edip elinde tuttuğu tutar */
+  cashKurus: number;
+  /** Kuryeye ödenecek net (eksi ise kurye şirkete öder) */
+  netKurus: number;
+}
+
+/** Ödenmemiş hakediş satırlarından kurye bakiyesi: hakediş − elindeki nakit */
+export function courierBalance(rows: Array<{ totalKurus: number; cashCollectedKurus: number }>, incentiveKurus = 0): CourierBalance {
+  const earningsKurus = rows.reduce((s, r) => s + r.totalKurus, 0);
+  const cashKurus = rows.reduce((s, r) => s + r.cashCollectedKurus, 0);
+  // Hedef primleri hakedişe eklenir (courier_incentive_awards)
+  return { deliveries: rows.length, earningsKurus, cashKurus, incentiveKurus, netKurus: earningsKurus + incentiveKurus - cashKurus };
 }
 
 /** Para alanları (köprü hariç: resmi tarife) enflasyon/endeks oranıyla güncellenir */

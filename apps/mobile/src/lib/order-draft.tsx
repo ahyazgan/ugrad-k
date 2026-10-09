@@ -1,6 +1,38 @@
 import { createContext, useContext, useState, type ReactNode } from "react";
 import type { ServiceLevel } from "@yazgan/shared";
-import type { DraftPoint, OrderInput } from "./api";
+import type { DraftPoint, OrderDetail, OrderInput } from "./api";
+import { districtFromAddress } from "./recent";
+
+/**
+ * "Aynı rotayla tekrar gönder": geçmiş siparişin adreslerini (tarif ve kişilerle) taslağa taşır.
+ * Paket, hizmet seviyesi ve ödeme yeniden seçilir; fiyat her zaman yeniden hesaplanır.
+ */
+export function routeFromOrder(
+  o: Pick<
+    OrderDetail,
+    | "pickupAddress"
+    | "pickupLat"
+    | "pickupLng"
+    | "pickupDetails"
+    | "pickupContactName"
+    | "pickupContactPhone"
+    | "dropoffAddress"
+    | "dropoffLat"
+    | "dropoffLng"
+    | "dropoffDetails"
+    | "dropoffContactName"
+    | "dropoffContactPhone"
+  >,
+): Partial<Draft> {
+  return {
+    pickup: { address: o.pickupAddress, lat: o.pickupLat, lng: o.pickupLng, details: o.pickupDetails ?? undefined, district: districtFromAddress(o.pickupAddress) },
+    dropoff: { address: o.dropoffAddress, lat: o.dropoffLat, lng: o.dropoffLng, details: o.dropoffDetails ?? undefined, district: districtFromAddress(o.dropoffAddress) },
+    pickupContactName: o.pickupContactName ?? "",
+    pickupContactPhone: o.pickupContactPhone ?? "",
+    dropoffContactName: o.dropoffContactName ?? "",
+    dropoffContactPhone: o.dropoffContactPhone ?? "",
+  };
+}
 
 export interface Draft {
   pickup: DraftPoint | null;
@@ -9,6 +41,11 @@ export interface Draft {
   roundTrip: boolean;
   weightKg: string;
   largePackage: boolean;
+  /** TL, boşsa beyan yok */
+  declaredValue: string;
+  deliveryCode: boolean;
+  /** Kampanya veya davet kodu (özet ekranında) */
+  promoCode: string;
   packageDescription: string;
   customerNote: string;
   pickupContactName: string;
@@ -25,6 +62,9 @@ const EMPTY: Draft = {
   roundTrip: false,
   weightKg: "",
   largePackage: false,
+  declaredValue: "",
+  deliveryCode: false,
+  promoCode: "",
   packageDescription: "",
   customerNote: "",
   pickupContactName: "",
@@ -39,6 +79,7 @@ const EMPTY: Draft = {
 export function draftToInput(d: Draft): OrderInput | null {
   if (!d.pickup || !d.dropoff) return null;
   const weight = d.weightKg.replace(",", ".").trim();
+  const declared = d.declaredValue.replace(/\./g, "").replace(",", ".").trim();
   return {
     pickup: { ...d.pickup, contactName: d.pickupContactName || undefined, contactPhone: d.pickupContactPhone || undefined },
     dropoff: { ...d.dropoff, contactName: d.dropoffContactName || undefined, contactPhone: d.dropoffContactPhone || undefined },
@@ -46,6 +87,9 @@ export function draftToInput(d: Draft): OrderInput | null {
     roundTrip: d.roundTrip,
     weightKg: weight ? Number(weight) : null,
     largePackage: d.largePackage,
+    declaredValueKurus: declared ? Math.round(Number(declared) * 100) : null,
+    deliveryCode: d.deliveryCode,
+    promoCode: d.promoCode.trim() || undefined,
     packageDescription: d.packageDescription || undefined,
     customerNote: d.customerNote || undefined,
     scheduledPickupAt: null,

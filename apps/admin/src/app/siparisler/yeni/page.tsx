@@ -1,11 +1,24 @@
 "use client";
 
-import { AYDINLATMA_METNI, BRAND, formatTL, kvkkUrl, SERVICE_LEVEL_LABELS, SERVICE_LEVELS, type ServiceLevel } from "@yazgan/shared";
+import {
+  AYDINLATMA_METNI,
+  BRAND,
+  economyAvailableAt,
+  formatTL,
+  kvkkUrl,
+  SERVICE_LEVEL_LABELS,
+  SERVICE_LEVELS,
+  timeSurchargeAt,
+  type Holiday,
+  type PricingSettings,
+  type ServiceLevel,
+} from "@yazgan/shared";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
 import { AddressPicker, type PickedPoint } from "@/components/AddressPicker";
 import { Button, Card, ErrorText, Input, PageHeader, Select } from "@/components/ui";
+import { useLoad } from "@/lib/use-load";
 import { repo, type AdminQuote, type OrderRequestInput, type PhoneCustomer } from "@/lib/repo";
 
 const KVKK_SCRIPT =
@@ -15,15 +28,64 @@ const KVKK_SCRIPT =
 
 type Point = PickedPoint & { details?: string; contactName?: string; contactPhone?: string };
 
+const TIME_KIND: Record<"night" | "sunday" | "holiday", string> = { night: "Gece eki", sunday: "Pazar eki", holiday: "Resmi tatil eki" };
+
+/** Tariff at a glance before addresses are picked (same settings the quote uses) */
+function TariffSummary({ settings, holidays, slaMinutes }: { settings: PricingSettings; holidays: Holiday[]; slaMinutes?: number }) {
+  const now = new Date();
+  const t = timeSurchargeAt(now, settings, holidays);
+  const tiers = [...settings.kmTiers].sort((a, b) => (a.uptoKm ?? Infinity) - (b.uptoKm ?? Infinity));
+  const kmRows = tiers.length
+    ? tiers.map((k, i) => {
+        const from = i === 0 ? settings.includedKm : (tiers[i - 1]!.uptoKm ?? settings.includedKm);
+        const label = k.uptoKm == null ? `${from} km üstü` : `${from}–${k.uptoKm} km`;
+        return [label, `${formatTL(k.perKmKurus)} / km`] as const;
+      })
+    : [[`${settings.includedKm} km üstü`, `${formatTL(settings.perKmKurus)} / km`] as const];
+  const row = (k: string, v: string, strong = false) => (
+    <div key={k} className="flex justify-between gap-3">
+      <dt className="text-muted">{k}</dt>
+      <dd className={strong ? "font-semibold text-brand" : "tabular-nums"}>{v}</dd>
+    </div>
+  );
+  return (
+    <div className="space-y-3 text-sm" data-testid="tariff-summary">
+      <p className="text-muted">Adresleri seçince fiyat hesaplanır. Geçerli tarife (KDV hariç):</p>
+      <dl className="space-y-1.5">
+        {row(`Açılış (ilk ${settings.includedKm} km dahil)`, formatTL(settings.baseFeeKurus))}
+        {kmRows.map(([k, v]) => row(k, v))}
+        {row(slaMinutes ? `Acil (${slaMinutes} dk)` : "Acil", `+%${settings.urgentSurchargePct}`)}
+        {row("Ekonomi (gün içi)", economyAvailableAt(now, settings, holidays) ? `−%${settings.economyDiscountPct}` : "şu an kapalı")}
+        {settings.bridgeFeeKurus ? row("Köprü geçişi", formatTL(settings.bridgeFeeKurus)) : null}
+      </dl>
+      <div className="rounded-control bg-canvas px-3 py-2">
+        <div className="text-xs font-semibold uppercase tracking-wide text-muted">Şu an</div>
+        {t.kind ? (
+          <p className="mt-0.5 font-semibold text-brand">
+            {TIME_KIND[t.kind]} +%{t.pct}
+            {t.holidayName ? ` · ${t.holidayName}` : ""}
+          </p>
+        ) : (
+          <p className="mt-0.5 font-semibold text-brand">Zaman eki yok (gündüz tarifesi)</p>
+        )}
+        {settings.maxSurchargePct != null ? <p className="mt-0.5 text-xs text-muted">Acil + zaman eki toplamı en fazla %{settings.maxSurchargePct}</p> : null}
+      </div>
+    </div>
+  );
+}
+
 export default function TelefonSiparisiPage() {
   const router = useRouter();
+  const pricing = useLoad(() => repo.getPricing());
+  // Urgent delivery promise (minutes) lives in ops settings
+  const ops = useLoad(() => repo.getOpsSettings());
   const [phone, setPhone] = useState("");
   const [lookup, setLookup] = useState<{ phone: string; customer: PhoneCustomer | null } | null>(null);
   const [lookupError, setLookupError] = useState<string | null>(null);
   const [fullName, setFullName] = useState("");
   const [pickup, setPickup] = useState<Point | null>(null);
   const [dropoff, setDropoff] = useState<Point | null>(null);
-  const [opts, setOpts] = useState({ serviceLevel: "standart" as ServiceLevel, roundTrip: false, largePackage: false, weightKg: "", packageDescription: "", customerNote: "", scheduled: "" });
+  const [opts, setOpts] = useState({ declaredValue: "", deliveryCode: false, serviceLevel: "standart" as ServiceLevel, roundTrip: false, largePackage: false, weightKg: "", packageDescription: "", customerNote: "", scheduled: "" });
   const [payment, setPayment] = useState<"nakit" | "cari">("nakit");
   const [consent, setConsent] = useState(false);
   const [quote, setQuote] = useState<{ key: string; q?: AdminQuote; error?: string } | null>(null);
@@ -52,6 +114,8 @@ export default function TelefonSiparisiPage() {
           serviceLevel: opts.serviceLevel,
           roundTrip: opts.roundTrip,
           largePackage: opts.largePackage,
+          declaredValueKurus: opts.declaredValue.trim() ? Math.round(Number(opts.declaredValue.replace(/\./g, "").replace(",", ".")) * 100) || null : null,
+          deliveryCode: opts.deliveryCode,
           weightKg: opts.weightKg ? Number(opts.weightKg.replace(",", ".")) : null,
           packageDescription: opts.packageDescription || undefined,
           customerNote: opts.customerNote || undefined,
@@ -118,7 +182,7 @@ export default function TelefonSiparisiPage() {
           </Link>
         }
       />
-      <form onSubmit={submit} className="grid gap-6 xl:grid-cols-3">
+      <form onSubmit={submit} className="grid grid-cols-[minmax(0,1fr)] gap-6 xl:grid-cols-3">
         <div className="space-y-6 xl:col-span-2">
           <Card title="Müşteri">
             <div className="flex flex-wrap items-end gap-2">
@@ -146,7 +210,7 @@ export default function TelefonSiparisiPage() {
                 <Input label="Ad Soyad" value={fullName} onChange={(e) => setFullName(e.target.value)} data-testid="full-name" />
               </div>
             ) : (
-              <p className="mt-2 text-xs text-slate-500">Önce numarayla müşteriyi bulun.</p>
+              <p className="mt-2 text-xs text-muted">Önce numarayla müşteriyi bulun.</p>
             )}
           </Card>
 
@@ -163,6 +227,13 @@ export default function TelefonSiparisiPage() {
             <div className="grid gap-3 sm:grid-cols-2">
               <Input label="Ne gönderiliyor?" value={opts.packageDescription} onChange={(e) => setOpts({ ...opts, packageDescription: e.target.value })} />
               <Input label="Ağırlık (kg)" inputMode="decimal" value={opts.weightKg} onChange={(e) => setOpts({ ...opts, weightKg: e.target.value })} />
+              <Input
+                label="Gönderi değeri (TL, isteğe bağlı)"
+                inputMode="decimal"
+                value={opts.declaredValue}
+                onChange={(e) => setOpts({ ...opts, declaredValue: e.target.value })}
+                data-testid="declared-value"
+              />
               <Input label="Planlı alış (boşsa hemen)" type="datetime-local" value={opts.scheduled} onChange={(e) => setOpts({ ...opts, scheduled: e.target.value })} />
               <Input label="Kuryeye not" value={opts.customerNote} onChange={(e) => setOpts({ ...opts, customerNote: e.target.value })} />
               <Select
@@ -183,6 +254,7 @@ export default function TelefonSiparisiPage() {
                 [
                   ["roundTrip", "Gidiş-dönüş"],
                   ["largePackage", "Büyük paket"],
+                  ["deliveryCode", "Teslim kodu (alıcıya SMS)"],
                 ] as const
               ).map(([k, label]) => (
                 <label key={k} className="flex items-center gap-2">
@@ -194,23 +266,27 @@ export default function TelefonSiparisiPage() {
           </Card>
         </div>
 
-        <div className="space-y-6">
-          <Card title="Fiyat">
+        <div className="space-y-6 self-start xl:sticky xl:top-6">
+          <Card title={order ? "Fiyat" : "Fiyat ve tarife"}>
             {!order ? (
-              <p className="text-sm text-slate-500">Adresleri seçince fiyat hesaplanır.</p>
+              pricing.data ? (
+                <TariffSummary settings={pricing.data.settings} holidays={pricing.data.holidays} slaMinutes={ops.data?.urgentSlaMinutes} />
+              ) : (
+                <p className="text-sm text-muted">Adresleri seçince fiyat hesaplanır.</p>
+              )
             ) : current?.error ? (
               <ErrorText>{current.error}</ErrorText>
             ) : !current?.q ? (
-              <p className="text-sm text-slate-500">Hesaplanıyor…</p>
+              <p className="text-sm text-muted">Hesaplanıyor…</p>
             ) : (
               <dl className="space-y-1.5 text-sm" data-testid="quote">
-                <div className="text-xs text-slate-500">
+                <div className="text-xs text-muted">
                   {(current.q.distanceMeters / 1000).toFixed(1)} km · ~{Math.round(current.q.durationSeconds / 60)} dk
                   {current.q.bridgeCrossings ? " · köprü geçişi" : ""}
                 </div>
                 {current.q.quote.lines.map((l) => (
                   <div key={l.code} className="flex justify-between gap-3">
-                    <dt className="text-slate-600">{l.label}</dt>
+                    <dt className="text-ink-soft">{l.label}</dt>
                     <dd className="whitespace-nowrap">{formatTL(l.amountKurus)}</dd>
                   </div>
                 ))}

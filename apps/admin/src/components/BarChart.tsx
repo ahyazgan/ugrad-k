@@ -10,8 +10,9 @@ export interface Bar {
   title: string;
 }
 
-const BRAND = "#0f3d6e";
-const BRAND_HOVER = "#1d5c9c";
+// Neo: ink bars, violet on hover
+const BRAND = "#111114";
+const BRAND_HOVER = "#6d4aff";
 const GAP = 2;
 const RADIUS = 4;
 const PAD = { top: 12, right: 8, bottom: 24, left: 56 };
@@ -80,8 +81,8 @@ export function BarChart({
             const v = (max / ticks) * i;
             return (
               <g key={i}>
-                <line x1={PAD.left} x2={width - PAD.right} y1={y(v)} y2={y(v)} stroke={i ? "#eef2f6" : "#cbd5e1"} />
-                <text x={PAD.left - 8} y={y(v)} dy="0.32em" textAnchor="end" fontSize={11} fill="#64748b">
+                <line x1={PAD.left} x2={width - PAD.right} y1={y(v)} y2={y(v)} stroke={i ? "#efedf5" : "#d9d5e6"} />
+                <text x={PAD.left - 8} y={y(v)} dy="0.32em" textAnchor="end" fontSize={11} fill="#5a5870">
                   {axisFormat(v)}
                 </text>
               </g>
@@ -96,7 +97,7 @@ export function BarChart({
                   <path d={barPath(cx - barW / 2, top, barW, PAD.top + plotH - top)} fill={hover === i ? BRAND_HOVER : BRAND} />
                 ) : null}
                 {i % labelEvery === 0 ? (
-                  <text x={cx} y={height - 6} textAnchor="middle" fontSize={11} fill="#64748b">
+                  <text x={cx} y={height - 6} textAnchor="middle" fontSize={11} fill="#5a5870">
                     {d.label}
                   </text>
                 ) : null}
@@ -119,13 +120,13 @@ export function BarChart({
       {h && hover != null ? (
         <div
           role="tooltip"
-          className="pointer-events-none absolute z-10 -translate-x-1/2 -translate-y-full whitespace-nowrap rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs shadow-md"
+          className="pointer-events-none absolute z-10 -translate-x-1/2 -translate-y-full whitespace-nowrap rounded-control border border-line bg-white px-2.5 py-1.5 text-xs shadow-md"
           style={{
             left: Math.min(Math.max(PAD.left + band * hover + band / 2, 70), width - 70),
             top: Math.max(y(h.value) - 6, 40),
           }}
         >
-          <div className="text-slate-500">{h.title}</div>
+          <div className="text-muted">{h.title}</div>
           <div className="font-semibold text-slate-900">{format(h.value)}</div>
         </div>
       ) : null}
