@@ -324,7 +324,8 @@ export default function AdresSec() {
                 paddingVertical: 9,
               }}
             >
-              <Ionicons name={crossings ? "swap-horizontal" : "location"} size={16} color={crossings ? colors.lime : colors.ink} />
+              {/* Paid crossing: small bridge sticker (white die-cut edge reads on the ink pill); otherwise the plain pin icon */}
+              {crossings ? <Sticker name="kopru" size={26} /> : <Ionicons name="location" size={16} color={colors.ink} />}
               <Txt weight="bold" size={13} color={crossings ? "#fff" : colors.ink} style={{ flex: 1 }}>
                 {sideHint}
               </Txt>

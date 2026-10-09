@@ -72,7 +72,7 @@ export default function Kvkk() {
     <Screen safeTop>
       <View style={{ marginTop: 12 }}>
         <BigTitle size={44}>{"Verilerin\ngüvende."}</BigTitle>
-        <Sticker name="imza" size={56} rotation={8} style={{ position: "absolute", right: 10, top: -4 }} />
+        <Sticker name="kilit" size={48} rotation={6} style={{ position: "absolute", right: 10, top: -8 }} />
       </View>
       <Muted>Devam etmeden önce kişisel verilerinizi nasıl işlediğimizi okuyun.</Muted>
 

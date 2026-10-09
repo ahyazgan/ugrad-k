@@ -96,7 +96,7 @@ export default async function FiyatlarPage() {
               <SubGroup group={g.urgent} sticker="kronometre" tilt="-rotate-6" />
               <SubGroup group={g.time} sticker="simsek" tilt="rotate-12" />
               <SubGroup group={g.roundTrip} sticker="donus" />
-              <SubGroup group={g.road} />
+              <SubGroup group={g.road} sticker="kopru" tilt="-rotate-3" />
             </div>
           </Card>
 

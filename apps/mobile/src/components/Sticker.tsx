@@ -20,7 +20,13 @@ export type StickerName =
   | "kutu"
   | "simsek"
   | "kronometre"
-  | "donus";
+  | "donus"
+  | "cuzdan"
+  | "vardiya"
+  | "mesaj"
+  | "kilit"
+  | "harita"
+  | "kopru";
 
 /** Statik require eşlemesi (Metro paketleyicisi dinamik yol çözemez). `ratio` = yükseklik / genişlik. */
 const STICKERS: Record<StickerName, { source: ImageSourcePropType; ratio: number }> = {
@@ -41,6 +47,13 @@ const STICKERS: Record<StickerName, { source: ImageSourcePropType; ratio: number
   simsek: { source: require("../../assets/neo/simsek.png"), ratio: 226 / 157 },
   kronometre: { source: require("../../assets/neo/kronometre.png"), ratio: 141 / 112 },
   donus: { source: require("../../assets/neo/donus.png"), ratio: 172 / 129 },
+  // docs/gorsel-istemleri.md §2 (only the ones used in the app are bundled)
+  cuzdan: { source: require("../../assets/neo/cuzdan.png"), ratio: 400 / 372 },
+  vardiya: { source: require("../../assets/neo/vardiya.png"), ratio: 315 / 400 },
+  mesaj: { source: require("../../assets/neo/mesaj.png"), ratio: 340 / 400 },
+  kilit: { source: require("../../assets/neo/kilit.png"), ratio: 400 / 295 },
+  harita: { source: require("../../assets/neo/harita.png"), ratio: 297 / 400 },
+  kopru: { source: require("../../assets/neo/kopru.png"), ratio: 352 / 400 },
 };
 
 export type StickerProps = {

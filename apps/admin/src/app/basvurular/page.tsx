@@ -76,7 +76,7 @@ function Leads({ onChange }: { onChange: () => void }) {
             "Bu durumda başvuru yok."
           ) : (
             <EmptyState
-              sticker="bina"
+              sticker="pano"
               title="Henüz başvuru yok"
               description="Web sitesindeki kurumsal başvuru ve iletişim formlarından gelenler burada listelenir."
             />

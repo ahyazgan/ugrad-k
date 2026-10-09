@@ -77,7 +77,7 @@ export default function Kazancim() {
               Hesaplaşılmamış · {data.unpaid.deliveries} teslimat
             </Txt>
           </View>
-          <Sticker name="kart" size={72} rotation={6} style={{ marginTop: -6, marginRight: 2 }} />
+          <Sticker name="cuzdan" size={64} rotation={6} style={{ marginTop: -6, marginRight: 2 }} />
         </View>
         <View testID="earnings-headline">
           <BigTitle size={titleSize}>{amount}</BigTitle>

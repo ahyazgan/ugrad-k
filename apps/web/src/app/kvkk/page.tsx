@@ -8,7 +8,7 @@ export const metadata: Metadata = { title: "KVKK Aydınlatma Metni", alternates:
 export default function KvkkPage() {
   return (
     <article className="mx-auto max-w-3xl px-4 pt-10 lg:pt-14">
-      <PageHero title="KVKK Aydınlatma Metni" lead={<span className="text-base">Sürüm: {KVKK_VERSION}</span>} />
+      <PageHero title="KVKK Aydınlatma Metni" sticker="kilit" lead={<span className="text-base">Sürüm: {KVKK_VERSION}</span>} />
       <Card className="mt-8 p-6 sm:p-10">
         <div className="whitespace-pre-line leading-relaxed text-slate-700">{AYDINLATMA_METNI}</div>
         <h2 className="mt-10 scroll-mt-24 text-2xl font-black text-brand" id="basvuru">

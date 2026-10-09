@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { CoverageMap } from "@/components/CoverageMap";
 import { PageHero } from "@/components/PageHero";
-import { Sticker } from "@/components/Sticker";
+import { Scene, Sticker } from "@/components/Sticker";
 import { CARD } from "@/components/ui";
 import { DISTRICTS } from "@/lib/districts";
 import { bridgeRuleText, tl } from "@/lib/pricing-info";
@@ -25,7 +25,8 @@ export default async function BolgelerPage() {
   const avrupa = DISTRICTS.filter((d) => d.side === "avrupa");
   return (
     <div className="mx-auto max-w-6xl px-4 pt-10 lg:pt-14">
-      <div className="grid items-center gap-8 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-12">
+      {/* Hero: title + Bosphorus scene (decorative, 420 px column on desktop); the labelled schematic map follows */}
+      <div className="grid items-center gap-6 lg:grid-cols-[minmax(0,1fr)_420px] lg:gap-12">
         <PageHero
           title="Hizmet bölgeleri"
           lead={<>Merkezimiz Beykoz&apos;da. Anadolu yakasına öncelikli, Avrupa yakasına köprü geçiş ücretiyle hizmet veriyoruz.</>}
@@ -35,8 +36,14 @@ export default async function BolgelerPage() {
             <span className="rounded-full bg-white px-4 py-2">{avrupa.length} Avrupa yakası ilçesi</span>
           </div>
         </PageHero>
-        <CoverageMap />
+        <Scene
+          name="sahne-istanbul"
+          priority
+          sizes="(min-width: 1024px) 420px, min(360px, calc(100vw - 32px))"
+          className="mx-auto w-full max-w-[360px] lg:max-w-none"
+        />
       </div>
+      <CoverageMap className="mx-auto mt-10 max-w-4xl" />
 
       <section className="mt-14" aria-labelledby="anadolu">
         <h2 id="anadolu" className="text-2xl font-black tracking-[-0.03em]">
@@ -74,7 +81,7 @@ export default async function BolgelerPage() {
             </Link>
           ))}
           <div className="flex items-center gap-4 rounded-3xl bg-brand p-5 text-white">
-            <Sticker name="donus" className="w-12 shrink-0 -rotate-6" />
+            <Sticker name="kopru" className="w-12 shrink-0 -rotate-6" />
             <div>
               <div className="font-black">Köprü geçişi +{tl(settings.bridgeFeeKurus)}</div>
               <p className="mt-1 text-sm text-white/75">{bridgeRuleText(settings)} Fiyat özetinde ayrı satırda görünür.</p>
