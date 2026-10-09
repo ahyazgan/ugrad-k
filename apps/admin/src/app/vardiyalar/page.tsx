@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Button, Card, ErrorText, Input, PageHeader, Select, Stat, Table, Td } from "@/components/ui";
+import { Button, Card, EmptyState, ErrorText, Input, PageHeader, Select, Stat, Table, Td } from "@/components/ui";
 import { downloadCsv } from "@/lib/csv";
 import { fmtDateTime, hoursBetween, istDate } from "@/lib/dates";
 import { repo, type Shift } from "@/lib/repo";
@@ -93,7 +93,9 @@ export default function VardiyalarPage() {
       </div>
       <ErrorText>{error}</ErrorText>
       <Card title="Kurye bazında özet" className="mb-6">
-        <Table head={["Kurye", "Plaka", "Çalışılan gün", "Vardiya", "Toplam süre", "Mola", "Net çalışma"]} num={[2, 3, 4, 5, 6]} empty="Bu aralıkta vardiya kaydı yok. Tarih aralığını genişletin.">
+        <Table head={["Kurye", "Plaka", "Çalışılan gün", "Vardiya", "Toplam süre", "Mola", "Net çalışma"]} num={[2, 3, 4, 5, 6]}
+          empty={<EmptyState sticker="vardiya" title="Bu aralıkta vardiya kaydı yok." description="Tarih aralığını genişletin." />}
+        >
           {totals.map((t) => (
             <tr key={t.name}>
               <Td>{t.name}</Td>

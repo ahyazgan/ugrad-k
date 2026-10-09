@@ -237,7 +237,7 @@ export const Td = ({ children, className, num }: { children?: ReactNode; classNa
   <td className={cx("px-3 py-2.5 align-top text-slate-800", num && "whitespace-nowrap text-right tabular-nums", className)}>{children}</td>
 );
 
-export type Sticker = "motor" | "kutu" | "bina" | "zarf" | "fis" | "kask" | "pin" | "yildiz" | "telefon" | "pano" | "sohbet";
+export type Sticker = "motor" | "kutu" | "bina" | "zarf" | "fis" | "kask" | "pin" | "yildiz" | "telefon" | "pano" | "sohbet" | "cuzdan" | "vardiya" | "harita";
 
 /** Empty state: optional Neo sticker (max one per screen), title, explanation and next step */
 export function EmptyState({
