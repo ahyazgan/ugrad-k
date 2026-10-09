@@ -61,6 +61,8 @@ Ek: `iptal`, `sorunlu`; teslim edilemezse `yolda → geri_donuyor → geri_tesli
 - KVKK: konum/adres/telefon verisi için aydınlatma metni ve açık rıza ekranı zorunlu
 - Kurye çalışma saatleri kaydedilir (BTK bildirimi için rapor alınabilmeli)
 - Fiyat hesabı tek fonksiyonda; mobil, panel ve yapay zeka asistanı aynı fonksiyonu kullanır
+- Ekranda gösterilen tarife rakamları canlı `pricing_settings`'ten okunur (site `lib/pricing-settings.ts` ISR 1 sa, mobil `usePricingSettings()`); `DEFAULT_PRICING_SETTINGS` yalnız demo/yedek. Metne rakam yazılmaz, yardımcı fonksiyon eklenir (site `lib/pricing-info.ts`)
+- Mobil yönlendirme tek kural: `lib/session.tsx` → `entryRoute()`. Gruplardan `/`'a yönlendirilmez (grup ana sekmesine çözülür → sonsuz döngü); çıkış/hesap silmede `router.replace` yok, sekme düzeni yönlendirir
 - Değişiklik yapmadan önce planı kısaca anlat, onay al
   - **İstisna (2026-10-08):** Kullanıcı tüm fazları otomatik yürütme izni verdi. Claude fazları sırayla kendisi
     tamamlar, sorun çıkarsa çözer ve devam eder. API anahtarı / hesap gerektiren adımlar sahte (mock) sağlayıcıyla
@@ -92,6 +94,7 @@ Ek: `iptal`, `sorunlu`; teslim edilemezse `yolda → geri_donuyor → geri_tesli
 - Panel: Raporlar (`/raporlar`, `lib/reports.ts`, CSV `;` + ondalık virgül), Canlı harita (`/harita`, Leaflet + OSM; karo URL'si env ile değişir). E2E'de harita karoları `scripts/e2e-tile-stub.cjs` ile sahte PNG'den gelir
 - Kurulum ve canlıya alma: `docs/kurulum.md` (§28: panel → Otomasyon → Canlıya hazırlık, yedek, deneme ortamı); mağaza: `docs/magaza.md`
 - `pnpm test` (vitest), `pnpm test:functions` (Deno), `pnpm test:db` (yerel Postgres'te migration + RLS), `pnpm test:all`
+- `e2e:web` betikleri `scripts/e2e-run.cjs` ile sunucuyu başlatıp kapatır (Windows dahil; pnpm betikleri Windows'ta cmd.exe ile çalışır, `&`/`kill` kullanma). Önce build/`export:web` gerekir
 - Google'ın eski Distance Matrix/Places API'leri yeni projelerde açılamıyor → **Routes API** ve **Places API (New)** kullanılıyor
 
 ## Yol haritası

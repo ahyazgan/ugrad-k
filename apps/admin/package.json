@@ -9,7 +9,7 @@
     "lint": "eslint",
     "typecheck": "next typegen && tsc --noEmit",
     "test": "vitest run",
-    "e2e:web": "next start -p 3100 & SERVER=$!; sleep 3; node e2e/demo-flow.cjs e2e/shots; CODE=$?; kill $SERVER; exit $CODE"
+    "e2e:web": "node ../../scripts/e2e-run.cjs 3100 e2e/demo-flow.cjs e2e/shots -- next start -p 3100"
   },
   "dependencies": {
     "@fontsource-variable/archivo": "^5.3.0",

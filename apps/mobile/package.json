@@ -11,7 +11,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "export:web": "expo export --platform web",
-    "e2e:web": "node e2e/serve.cjs \"$PWD/dist\" 8099 & SERVER=$!; node e2e/demo-flow.cjs e2e/shots; CODE=$?; kill $SERVER; exit $CODE",
+    "e2e:web": "node ../../scripts/e2e-run.cjs 8099 e2e/demo-flow.cjs e2e/shots -- node e2e/serve.cjs dist 8099",
     "lint": "eslint src",
     "build:dev": "eas build --profile development",
     "build:preview": "eas build --profile preview",
