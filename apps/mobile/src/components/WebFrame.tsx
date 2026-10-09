@@ -9,7 +9,7 @@ import { Platform, ScrollView, Text, View, useWindowDimensions, type ViewStyle }
 import { APP_COLUMN_MAX_WIDTH, useWebFrameMode } from "@/lib/layout";
 import { useSession } from "@/lib/session";
 import { InkChip, Wordmark } from "./Neo";
-import { Sticker } from "./Sticker";
+import { Sticker, type StickerName } from "./Sticker";
 import { colors, font, radii, type } from "./theme";
 
 /** Backdrop outside the column: a slightly deeper lilac with a faint dot grid (web-only CSS). */
@@ -64,7 +64,8 @@ export function WebFrame({ children }: { children: ReactNode }) {
 }
 
 type IconName = ComponentProps<typeof Ionicons>["name"];
-type Feature = { icon: IconName; title: string; body: string };
+/** Each feature is illustrated with the Neo 3D sticker that carries its meaning (same mapping as the website). */
+type Feature = { sticker: StickerName; title: string; body: string };
 
 /** Real product features only (no invented numbers or testimonials). */
 const CUSTOMER = {
@@ -74,10 +75,10 @@ const CUSTOMER = {
   pin: { left: 2.2, top: 0.82 },
   lead: `${BRAND.slogan}. Siparişini buradan ver, kuryeni buradan izle.`,
   features: [
-    { icon: "pricetag", title: "Anında fiyat", body: "Adresi gir, fiyatı hemen gör." },
-    { icon: "navigate", title: "Canlı takip", body: "Kuryeni haritada izle." },
-    { icon: "camera", title: "Teslim kanıtı", body: "Fotoğraf ve imzayla teslim." },
-    { icon: "receipt", title: "E-arşiv fatura", body: "Teslimden sonra otomatik." },
+    { sticker: "fis", title: "Anında fiyat", body: "Adresi gir, fiyatı hemen gör." },
+    { sticker: "pin", title: "Canlı takip", body: "Kuryeni haritada izle." },
+    { sticker: "kamera", title: "Teslim kanıtı", body: "Fotoğraf ve imzayla teslim." },
+    { sticker: "zarf", title: "E-arşiv fatura", body: "Teslimden sonra otomatik." },
   ] as Feature[],
   links: [
     { label: "Fiyatlar", href: `${BRAND.siteUrl}/fiyatlar` },
@@ -91,10 +92,10 @@ const COURIER = {
   pin: { left: 1.55, top: -0.12 },
   lead: "Vardiyan, iş tekliflerin ve kazancın tek uygulamada.",
   features: [
-    { icon: "flash", title: "İş teklifleri", body: "Kabul et ya da nedenini seç." },
-    { icon: "git-branch", title: "Durak sırası", body: "Alış ve teslim sırası hazır." },
-    { icon: "camera", title: "Teslim kanıtı", body: "Fotoğraf, imza, teslim kodu." },
-    { icon: "wallet", title: "Kazanç ve vardiya", body: "Hepsi tek ekranda." },
+    { sticker: "simsek", title: "İş teklifleri", body: "Kabul et ya da nedenini seç." },
+    { sticker: "donus", title: "Durak sırası", body: "Alış ve teslim sırası hazır." },
+    { sticker: "kamera", title: "Teslim kanıtı", body: "Fotoğraf, imza, teslim kodu." },
+    { sticker: "kart", title: "Kazanç ve vardiya", body: "Hepsi tek ekranda." },
   ] as Feature[],
   links: [{ label: "İletişim", href: `${BRAND.siteUrl}/iletisim` }],
 };
@@ -140,11 +141,9 @@ function BrandPanel({ width }: { width: number }) {
 
         <View style={{ flexDirection: "row", flexWrap: "wrap", rowGap: compact ? 12 : 16, columnGap: 12 }}>
           {c.features.map((f) => (
-            <View key={f.title} style={{ width: (width - 12) / 2, flexDirection: "row", gap: 10, alignItems: "flex-start" }}>
-              <View
-                style={{ width: 38, height: 38, borderRadius: radii.pill, backgroundColor: colors.surface, alignItems: "center", justifyContent: "center" }}
-              >
-                <Ionicons name={f.icon} size={18} color={colors.ink} />
+            <View key={f.title} style={{ width: (width - 12) / 2, flexDirection: "row", gap: 10, alignItems: "center" }}>
+              <View style={{ width: 52, height: 52, alignItems: "center", justifyContent: "center" }}>
+                <Sticker name={f.sticker} size={compact ? 42 : 48} />
               </View>
               <View style={{ flex: 1, gap: 1 }}>
                 <Text style={{ ...font("black"), fontSize: 15, letterSpacing: -0.3, color: colors.ink }}>{f.title}</Text>
@@ -176,9 +175,7 @@ function DownloadCard() {
   return (
     <View style={{ backgroundColor: colors.surface, borderRadius: radii.card, padding: 18, gap: 14 }}>
       <View style={{ flexDirection: "row", alignItems: "center", gap: 14 }}>
-        <View style={{ width: 46, height: 46, borderRadius: radii.pill, backgroundColor: colors.ink, alignItems: "center", justifyContent: "center" }}>
-          <Ionicons name="phone-portrait-outline" size={20} color={colors.lime} />
-        </View>
+        <Sticker name="telefon" size={58} rotation={-6} />
         <View style={{ flex: 1, gap: 2 }}>
           <Text role="heading" aria-level={3} style={type.h3}>
             Uygulamayı telefona indir
