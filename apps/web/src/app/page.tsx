@@ -2,7 +2,6 @@ import { BRAND, type PricingSettings } from "@yazgan/shared";
 import Link from "next/link";
 import { FaqAccordion } from "@/components/FaqAccordion";
 import { PriceCalculator } from "@/components/PriceCalculator";
-import { ServiceIcon, type ServiceIconName } from "@/components/ServiceIcon";
 import { Sticker, type StickerName } from "@/components/Sticker";
 import { Card, HandNote, SampleStamp } from "@/components/ui";
 import { DISTRICTS } from "@/lib/districts";
@@ -21,15 +20,15 @@ const STEPS: { n: string; title: string; text: string; sticker: StickerName }[] 
   { n: "4", sticker: "imza", title: "Teslim kanıtı", text: "Teslimatta fotoğraf ve imza alınır, faturanız otomatik kesilir." },
 ];
 
-/** Service grid: plain ink line icons (no tilted 3D stickers) to keep the B2B section sober. */
-function services(s: PricingSettings): { title: string; text: string; icon: ServiceIconName }[] {
+/** Service grid: one 3D sticker per service, all upright and the same size so the B2B section stays calm. */
+function services(s: PricingSettings): { title: string; text: string; sticker: StickerName }[] {
   return [
-    { icon: "envelope", title: "Acil evrak", text: "Sözleşme, vekâletname, ihale dosyası: 60 dakika içinde teslim hedefiyle, başka iş yapılmadan doğrudan." },
-    { icon: "courthouse", title: "Adliye ve resmi kurum", text: "Anadolu ve İstanbul adliyelerine, icra dairelerine, noterlere dosya ve dilekçe teslimi." },
-    { icon: "roundTrip", title: "Gidiş-dönüş imza", text: `Belgeyi götürür, imzalatır, geri getiririz. Dönüş ayağı ${returnLegPhrase(s)}.` },
-    { icon: "calendar", title: "Planlı gönderi", text: "Yarın sabah için şimdiden sipariş verin; kurye alış saatinden önce yola çıkar." },
-    { icon: "box", title: "Numune ve küçük paket", text: "Yedek parça, numune, ilaç dışı sağlık malzemesi ve küçük paketler." },
-    { icon: "briefcase", title: "Kurumsal hesap", text: "Aylık hacme göre indirim, tek fatura, ekip için ortak hesap ve API entegrasyonu." },
+    { sticker: "evrak", title: "Acil evrak", text: "Sözleşme, vekâletname, ihale dosyası: 60 dakika içinde teslim hedefiyle, başka iş yapılmadan doğrudan." },
+    { sticker: "adliye", title: "Adliye ve resmi kurum", text: "Anadolu ve İstanbul adliyelerine, icra dairelerine, noterlere dosya ve dilekçe teslimi." },
+    { sticker: "imza-donus", title: "Gidiş-dönüş imza", text: `Belgeyi götürür, imzalatır, geri getiririz. Dönüş ayağı ${returnLegPhrase(s)}.` },
+    { sticker: "takvim", title: "Planlı gönderi", text: "Yarın sabah için şimdiden sipariş verin; kurye alış saatinden önce yola çıkar." },
+    { sticker: "numune", title: "Numune ve küçük paket", text: "Yedek parça, numune, ilaç dışı sağlık malzemesi ve küçük paketler." },
+    { sticker: "canta", title: "Kurumsal hesap", text: "Aylık hacme göre indirim, tek fatura, ekip için ortak hesap ve API entegrasyonu." },
   ];
 }
 
@@ -179,9 +178,9 @@ export default async function Home() {
         <h2 className="text-3xl font-black">Ne taşıyoruz?</h2>
         <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {services(settings).map((s) => (
-            <Card key={s.title} className="flex items-start gap-4 p-5">
-              <span aria-hidden="true" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-neo-bg text-brand">
-                <ServiceIcon name={s.icon} className="h-6 w-6" />
+            <Card key={s.title} className="flex items-center gap-4 p-5">
+              <span className="flex h-20 w-20 shrink-0 items-center justify-center">
+                <Sticker name={s.sticker} className="max-h-20 w-20 object-contain" />
               </span>
               <div>
                 <h3 className="text-lg font-black tracking-tight">{s.title}</h3>

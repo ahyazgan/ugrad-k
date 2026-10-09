@@ -19,6 +19,13 @@ const STICKERS = {
   simsek: [157, 226],
   kronometre: [112, 141],
   donus: [129, 172],
+  // Hizmet çıkartmaları (yalnız sitede; docs/gorsel-istemleri.md §1)
+  evrak: [363, 400],
+  adliye: [400, 369],
+  "imza-donus": [400, 400],
+  takvim: [400, 352],
+  numune: [400, 391],
+  canta: [400, 381],
 } as const;
 
 export type StickerName = keyof typeof STICKERS;
