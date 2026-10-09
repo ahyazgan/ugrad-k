@@ -47,8 +47,8 @@ function Info({ label, children }: { label: string; children: React.ReactNode })
 export default function SiparisDetayPage() {
   const { id } = useParams<{ id: string }>();
   const { data, error, reload } = useLoad(async () => {
-    const [order, couriers, ops] = await Promise.all([repo.getOrder(id), repo.listCouriers(), repo.getOpsSettings()]);
-    return { order, couriers: couriers.filter((c) => c.active), ops };
+    const [order, couriers, ops, pricing] = await Promise.all([repo.getOrder(id), repo.listCouriers(), repo.getOpsSettings(), repo.getPricing()]);
+    return { order, couriers: couriers.filter((c) => c.active), ops, returnLegDiscountPct: pricing.settings.returnLegDiscountPct };
   }, [id]);
   useEffect(() => repo.subscribeOrders(reload), [reload]);
 
@@ -141,7 +141,7 @@ export default function SiparisDetayPage() {
           </Link>
         }
       />
-      <div className="grid gap-6 xl:grid-cols-3">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-6 xl:grid-cols-3">
         <div className="space-y-6 xl:col-span-2">
           <Card title="Durum" actions={<StatusBadge status={order.status} />}>
             <div className="space-y-4">
@@ -214,7 +214,9 @@ export default function SiparisDetayPage() {
                   >
                     Göndericiye iade başlat
                   </Button>
-                  <span className="text-xs text-muted">Dönüş ayağı ücreti (gidişin %50&apos;si) eklenir; müşteriye bildirilir.</span>
+                  <span className="text-xs text-muted">
+                    %{data.returnLegDiscountPct} indirimli dönüş ayağı ücreti eklenir; müşteriye bildirilir.
+                  </span>
                 </div>
               ) : null}
               <ErrorText>{actionError}</ErrorText>

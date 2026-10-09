@@ -62,7 +62,7 @@ export default function HaritaPage() {
     <>
       <PageHeader title="Canlı harita" subtitle="Vardiyadaki kuryeler ve açık siparişler. 15 saniyede bir ve her sipariş değişiminde yenilenir." />
       <ErrorText>{error}</ErrorText>
-      <div className="grid gap-4 xl:grid-cols-[1fr_320px]">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
         <div className="space-y-2">
           <MapLegend />
           <div className="overflow-hidden rounded-card border border-line bg-white">

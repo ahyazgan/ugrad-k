@@ -200,7 +200,7 @@ export default function Dashboard() {
         />
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-12">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-6 xl:grid-cols-12">
         <div className="xl:col-span-7">
           <Card
             className="h-full"

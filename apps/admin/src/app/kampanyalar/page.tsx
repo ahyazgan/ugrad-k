@@ -54,7 +54,7 @@ export default function KampanyalarPage() {
         subtitle="Kampanya kodları, davet ödülü ve geri kazanma mesajları. İndirim taşıma bedeline uygulanır (köprü, bekleme, sigorta hariç); kod sunucuda doğrulanır."
       />
       <ErrorText>{error}</ErrorText>
-      <div className="grid gap-6 xl:grid-cols-3">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-6 xl:grid-cols-3">
         <div className="space-y-6 xl:col-span-2">
           <Card title="Kodlar">
             <Table head={["Kod", "İndirim", "Koşullar", "Kullanım", "Durum", ""]} empty="Henüz kampanya yok. Sağdaki formdan ilk indirim kodunu oluşturun.">
@@ -158,7 +158,7 @@ function GrowthSettings({ initial, onSaved }: { initial: OpsSettings; onSaved: (
 
   return (
     <Card title="Davet ve geri kazanma">
-      <form onSubmit={save} className="grid gap-4 md:grid-cols-2">
+      <form onSubmit={save} className="grid grid-cols-[minmax(0,1fr)] gap-4 md:grid-cols-2">
         <div>
           <Input label="Davet ödülü (TL)" inputMode="decimal" value={form.referral} onChange={(e) => setForm({ ...form, referral: e.target.value })} />
           <p className="mt-1 text-xs text-muted">

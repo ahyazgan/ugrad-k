@@ -755,6 +755,41 @@ async function seed(): Promise<State> {
       createdAt: new Date(monthStart + 25 * 3_600_000).toISOString(),
     });
   }
+
+  // Assistant transcripts quote prices the same way the real assistant does: the shared
+  // quote/price function with the default tariff and mock route distances, at the time of the chat.
+  const assistantQuote = async (from: string, to: string, level: ServiceLevel, at: string) => {
+    const q = await buildQuote(
+      {
+        pickup: place(from),
+        dropoff: place(to),
+        serviceLevel: level,
+        urgent: level === "acil",
+        roundTrip: false,
+        weightKg: null,
+        largePackage: false,
+        declaredValueKurus: null,
+        deliveryCode: false,
+        scheduledPickupAt: null,
+        paymentMethod: "kart",
+      },
+      { maps, settings: DEFAULT_PRICING_SETTINGS, holidays: [], now: new Date(at) },
+    );
+    return formatTL(q.quote.totalKurus);
+  };
+  // Demo courier goal: the title is derived from the tiers so the two cannot drift apart
+  const goalTiers = [
+    { target: 8, rewardKurus: 10_000 },
+    { target: 12, rewardKurus: 25_000 },
+  ];
+  const goalTitle = `Günlük hedef: ${goalTiers.map((t) => `${t.target} iş ${(t.rewardKurus / 100).toLocaleString("tr-TR")} TL`).join(", ")}`;
+  const conv2At = hoursAgo(1);
+  const conv3At = hoursAgo(3.5);
+  const [beykozLeventUrgent, kadikoyUskudar] = await Promise.all([
+    assistantQuote("mock-beykoz", "mock-levent", "acil", conv2At),
+    assistantQuote("mock-kadikoy", "mock-uskudar", "standart", conv3At),
+  ]);
+
   return {
     signedIn: false,
     incidents,
@@ -996,13 +1031,10 @@ async function seed(): Promise<State> {
     incentives: [
       {
         id: "inc-1",
-        title: "Günlük hedef: 8 iş 100 TL, 12 iş 250 TL",
+        title: goalTitle,
         kind: "hedef",
         period: "gunluk",
-        tiers: [
-          { target: 8, rewardKurus: 10_000 },
-          { target: 12, rewardKurus: 25_000 },
-        ],
+        tiers: goalTiers,
         bonusPct: null,
         weekdays: null,
         startHour: 0,
@@ -1018,13 +1050,13 @@ async function seed(): Promise<State> {
       {
         id: "awd-1",
         incentiveId: "inc-1",
-        incentiveTitle: "Günlük hedef: 8 iş 100 TL, 12 iş 250 TL",
+        incentiveTitle: goalTitle,
         courierId: "kur-1",
         courierName: "Mehmet Kaya",
         periodStart: istanbulDay(new Date(Date.now() - 86_400_000)),
         periodEnd: istanbulDay(new Date(Date.now() - 86_400_000)),
         achieved: 9,
-        amountKurus: 10_000,
+        amountKurus: goalTiers[0]!.rewardKurus,
         detail: "9 iş",
         payoutId: null,
         createdAt: hoursAgo(2),
@@ -1059,10 +1091,10 @@ async function seed(): Promise<State> {
         externalId: "905321112233",
         status: "active",
         handoffReason: null,
-        lastMessageAt: hoursAgo(1),
+        lastMessageAt: conv2At,
         transcript: [
           { role: "user", text: "Beykoz'dan Levent'e acil gönderi ne kadar?" },
-          { role: "assistant", text: "Beykoz → Levent acil teslimat KDV dahil 1.146,00 TL. Sipariş oluşturalım mı?" },
+          { role: "assistant", text: `Beykoz → Levent acil teslimat KDV dahil ${beykozLeventUrgent}. Sipariş oluşturalım mı?` },
         ],
       },
       {
@@ -1071,10 +1103,10 @@ async function seed(): Promise<State> {
         externalId: "+905308080808",
         status: "closed",
         handoffReason: null,
-        lastMessageAt: hoursAgo(3.5),
+        lastMessageAt: conv3At,
         transcript: [
           { role: "user", text: "Kadıköy'den Üsküdar'a bir zarf göndermek istiyorum." },
-          { role: "assistant", text: "Kadıköy → Üsküdar standart teslimat KDV dahil 420,00 TL. Kartla mı ödemek istersiniz?" },
+          { role: "assistant", text: `Kadıköy → Üsküdar standart teslimat KDV dahil ${kadikoyUskudar}. Kartla mı ödemek istersiniz?` },
           { role: "user", text: "Evet, kartla." },
           { role: "assistant", text: "Ödeme bağlantısını SMS ile gönderdim. Ödeme gelince kuryemiz yola çıkacak." },
         ],
@@ -1432,6 +1464,15 @@ export function createDemoRepo(): AdminRepo {
       });
     },
 
+    async navCounts() {
+      const s = await get();
+      return {
+        unassigned: s.orders.filter((o) => o.status === "beklemede" || o.status === "onaylandi").length,
+        newApplications: s.leads.filter((l) => l.status === "yeni").length + s.applications.filter((a) => a.status === "yeni").length,
+        handoff: s.conversations.filter((c) => c.status === "handoff").length,
+        failedInvoices: s.invoices.filter((i) => i.status === "failed").length,
+      };
+    },
     async listInvoices() {
       return clone((await get()).invoices);
     },

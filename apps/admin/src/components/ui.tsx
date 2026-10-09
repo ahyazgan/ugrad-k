@@ -300,9 +300,13 @@ export function Chip({
   );
 }
 
+const FOCUSABLE =
+  'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
 /**
  * Side drawer for forms (keeps page columns free). Escape / backdrop closes it,
- * focus moves into the panel on open and returns to the opener on close.
+ * focus moves into the panel on open, Tab / Shift+Tab stay inside the panel
+ * while it is open, and focus returns to the opener on close.
  */
 export function Drawer({
   open,
@@ -328,19 +332,54 @@ export function Drawer({
 
   useEffect(() => {
     if (!open) return;
-    const opener = document.activeElement as HTMLElement | null;
+    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const first = panel.current?.querySelector<HTMLElement>("input, select, textarea, button:not([data-drawer-close])");
-    first?.focus();
+    (first ?? panel.current)?.focus();
+
+    const focusables = () =>
+      Array.from(panel.current?.querySelectorAll<HTMLElement>(FOCUSABLE) ?? []).filter((el) => el.getClientRects().length > 0);
+
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onCloseRef.current();
+      if (e.key === "Escape") {
+        onCloseRef.current();
+        return;
+      }
+      if (e.key !== "Tab" || !panel.current) return;
+      // Focus trap: Tab / Shift+Tab cycle inside the panel
+      const items = focusables();
+      const active = document.activeElement;
+      const inside = active instanceof Node && panel.current.contains(active);
+      if (!items.length) {
+        e.preventDefault();
+        panel.current.focus();
+        return;
+      }
+      const firstEl = items[0]!;
+      const lastEl = items[items.length - 1]!;
+      if (e.shiftKey && (!inside || active === firstEl || active === panel.current)) {
+        e.preventDefault();
+        lastEl.focus();
+      } else if (!e.shiftKey && (!inside || active === lastEl)) {
+        e.preventDefault();
+        firstEl.focus();
+      }
+    };
+    // Focus that escapes by other means (e.g. programmatic) is pulled back into the panel
+    const onFocusIn = (e: FocusEvent) => {
+      if (panel.current && e.target instanceof Node && !panel.current.contains(e.target)) {
+        (focusables()[0] ?? panel.current).focus();
+      }
     };
     document.addEventListener("keydown", onKey);
+    document.addEventListener("focusin", onFocusIn);
     const overflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => {
       document.removeEventListener("keydown", onKey);
+      document.removeEventListener("focusin", onFocusIn);
       document.body.style.overflow = overflow;
-      opener?.focus?.();
+      // Return focus to the control that opened the drawer
+      if (opener?.isConnected) opener.focus();
     };
   }, [open]);
 
@@ -353,8 +392,9 @@ export function Drawer({
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
+        tabIndex={-1}
         data-testid={testId}
-        className="relative flex h-full w-full max-w-md animate-drawer-in flex-col border-l border-line bg-white shadow-2xl"
+        className="relative flex outline-none h-full w-full max-w-md animate-drawer-in flex-col border-l border-line bg-white shadow-2xl"
       >
         <div className="flex items-start justify-between gap-3 border-b border-line px-5 py-4">
           <div>

@@ -113,7 +113,7 @@ function SystemHealthCard() {
     >
       <ErrorText>{error}</ErrorText>
       {data ? (
-        <div className="grid gap-4 md:grid-cols-2" data-testid="system-health">
+        <div className="grid grid-cols-[minmax(0,1fr)] gap-4 md:grid-cols-2" data-testid="system-health">
           <div>
             {data.issues.length === 0 ? (
               <p className="font-semibold text-emerald-700">✓ Her şey yolunda</p>
@@ -265,7 +265,7 @@ function OpsForm({ initial, onSaved }: { initial: OpsSettings; onSaved: () => vo
   }
 
   return (
-    <form onSubmit={save} className="grid gap-6 xl:grid-cols-2">
+    <form onSubmit={save} className="grid grid-cols-[minmax(0,1fr)] gap-6 xl:grid-cols-2">
       <Card title="Otomatik işlemler">
         <div className="space-y-3 text-sm">
           <label className="flex items-start gap-3">

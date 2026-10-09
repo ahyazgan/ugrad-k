@@ -240,6 +240,27 @@ export function createSupabaseRepo(url: string, anonKey: string): AdminRepo & { 
       }
       return rows.map(toAdminOrder);
     },
+    async navCounts() {
+      // HEAD + count=exact: no rows are transferred and list limits do not apply
+      const count = (table: string) => client.from(table).select("id", { count: "exact", head: true });
+      const [orders, leads, apps, handoff, invoices] = await Promise.all([
+        count("orders").in("status", ["beklemede", "onaylandi"]),
+        count("leads").eq("status", "yeni"),
+        count("courier_applications").eq("status", "yeni"),
+        count("assistant_conversations").eq("status", "handoff"),
+        count("invoices").eq("status", "failed"),
+      ]);
+      const n = (r: { count: number | null; error: { message: string } | null }, msg: string) => {
+        if (r.error) throw new RepoError(`${msg}: ${r.error.message}`);
+        return r.count ?? 0;
+      };
+      return {
+        unassigned: n(orders, "Sipariş sayısı okunamadı"),
+        newApplications: n(leads, "Başvuru sayısı okunamadı") + n(apps, "Kurye başvurusu sayısı okunamadı"),
+        handoff: n(handoff, "Konuşma sayısı okunamadı"),
+        failedInvoices: n(invoices, "Fatura sayısı okunamadı"),
+      };
+    },
     async getOrder(id) {
       const [o, h, of] = await Promise.all([
         client.from("orders").select(`${ORDER_SELECT}, secret:order_secrets(delivery_code, failed_attempts)`).eq("id", id).single(),

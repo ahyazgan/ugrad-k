@@ -201,7 +201,7 @@ export default function YogunlukPage() {
         </div>
       </Card>
 
-      <div className="mb-6 grid gap-6 xl:grid-cols-3">
+      <div className="mb-6 grid grid-cols-[minmax(0,1fr)] gap-6 xl:grid-cols-3">
         <Card title={`Sıcak bölgeler · ${filterLabel}`} className="xl:col-span-2">
           <LeafletMap pins={pins} fitKey={`${weeks}-${day}-${hour}-${hotspots.length}`} className="h-[420px] w-full rounded-lg" />
         </Card>

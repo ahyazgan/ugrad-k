@@ -120,7 +120,7 @@ export default function KurumsalPage() {
         actions={<Button onClick={() => setEditing({ ...EMPTY })}>+ Yeni hesap</Button>}
       />
       <ErrorText>{error}</ErrorText>
-      <div className="grid gap-6 xl:grid-cols-3">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-6 xl:grid-cols-3">
         <div className="space-y-6 xl:col-span-2">
           <Card title={`Hesaplar${accounts ? ` · ${accounts.length}` : ""}`}>
             <Table

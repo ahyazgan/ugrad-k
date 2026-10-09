@@ -106,7 +106,7 @@ export default function KuryelerPage() {
         }
       />
       <ErrorText>{error}</ErrorText>
-      <div className="grid gap-6 xl:grid-cols-3">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-6 xl:grid-cols-3">
         <div className="space-y-6 xl:col-span-2">
           <Card
             title={`Kurye listesi${data ? ` · ${active.length} aktif` : ""}`}

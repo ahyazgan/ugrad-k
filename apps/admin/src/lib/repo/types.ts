@@ -538,6 +538,18 @@ export interface CourierApplication {
   createdAt: string;
 }
 
+/** Kenar menü rozetleri: sunucuda sayılır (liste sınırlarından bağımsız) */
+export interface NavCounts {
+  /** Atama bekleyen siparişler (beklemede + onaylandı) */
+  unassigned: number;
+  /** Yeni web başvuruları (kurumsal/iletişim) + yeni kurye başvuruları */
+  newApplications: number;
+  /** Temsilci bekleyen asistan konuşmaları */
+  handoff: number;
+  /** Sağlayıcının reddettiği faturalar */
+  failedInvoices: number;
+}
+
 export interface AdminRepo {
   readonly mode: "supabase" | "demo";
   // Kimlik
@@ -553,6 +565,8 @@ export interface AdminRepo {
   /** Teslim edilemedi → göndericiye iade (yönetici; kanıt şartı yok) ve iade ücretinin eklenmesi */
   reportFailedDelivery(orderId: string, reason: FailedDeliveryReason, note: string): Promise<void>;
   subscribeOrders(onChange: () => void): () => void;
+  /** Menü rozetleri için yalnız sayılar (satır çekmez) */
+  navCounts(): Promise<NavCounts>;
   /** Kurye performans sayıları (son 30 gün); puan packages/shared courierPerformance */
   courierPerformanceStats(): Promise<Record<string, PerformanceStats>>;
   // Vardiya planı

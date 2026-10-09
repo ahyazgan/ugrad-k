@@ -54,7 +54,7 @@ export default function AsistanPage() {
           />
         </Card>
       ) : (
-        <div className="grid gap-4 lg:grid-cols-[360px_1fr]">
+        <div className="grid grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-[360px_minmax(0,1fr)]">
           <Card className="self-start p-3 lg:sticky lg:top-6">
             <div className="mb-3 flex flex-wrap gap-1.5" role="group" aria-label="Kanal">
               <Chip active={!channel} onClick={() => setChannel(null)} count={sorted.length}>

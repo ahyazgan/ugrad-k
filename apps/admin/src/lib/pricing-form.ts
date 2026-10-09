@@ -1,4 +1,4 @@
-import type { KmTier } from "@yazgan/shared";
+import type { CorporateTier, KmTier } from "@yazgan/shared";
 
 /** Kademeleri "10:25, *:18" metnine çevirir (TL). */
 export function formatKmTiers(tiers: KmTier[]): string {
@@ -34,4 +34,38 @@ export function parseCap(text: string): number | null | undefined {
   if (!t) return null;
   const n = Number(t.replace(",", "."));
   return Number.isFinite(n) && n >= 0 ? n : undefined;
+}
+
+/** Whole TL without trailing ",00" ("25", "22,5") for compact rule texts */
+const tlShort = (kurus: number) => (kurus / 100).toLocaleString("tr-TR", { maximumFractionDigits: 2 });
+
+/** "10 km'ye kadar 25 TL/km, üstü 18 TL/km" — plain-language reading of km tiers */
+export function describeKmTiers(tiers: KmTier[]): string {
+  const sorted = [...tiers].sort((a, b) => (a.uptoKm ?? Infinity) - (b.uptoKm ?? Infinity));
+  return sorted
+    .map((t) => (t.uptoKm == null ? `üstü ${tlShort(t.perKmKurus)} TL/km` : `${t.uptoKm} km'ye kadar ${tlShort(t.perKmKurus)} TL/km`))
+    .join(", ");
+}
+
+/** Corporate tiers ↔ "20:15, 50:25" (deliveries per month : discount %) */
+export function formatCorporateTiers(tiers: CorporateTier[]): string {
+  return tiers.map((t) => `${t.minDeliveries}:${t.discountPct}`).join(", ");
+}
+
+/** "20:15, 50:25" → tiers; empty text → []; invalid → null */
+export function parseCorporateTiers(text: string): CorporateTier[] | null {
+  const parsed = text
+    .split(",")
+    .map((x) => x.trim())
+    .filter(Boolean)
+    // Boş parça ("20:") Number("") = 0 olarak geçmesin
+    .map((x) => x.split(":").map((n) => (n.trim() === "" ? NaN : Number(n.trim()))));
+  if (parsed.some((p) => p.length !== 2 || p.some((n) => !Number.isFinite(n) || n < 0))) return null;
+  return parsed.map(([minDeliveries, discountPct]) => ({ minDeliveries: minDeliveries!, discountPct: discountPct! }));
+}
+
+/** "ayda 20+ teslimatta %15, 50+ teslimatta %25" */
+export function describeCorporateTiers(tiers: CorporateTier[]): string {
+  const sorted = [...tiers].sort((a, b) => a.minDeliveries - b.minDeliveries);
+  return `ayda ${sorted.map((t) => `${t.minDeliveries}+ teslimatta %${t.discountPct.toLocaleString("tr-TR")}`).join(", ")}`;
 }

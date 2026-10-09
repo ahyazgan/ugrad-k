@@ -235,7 +235,7 @@ function Applications({ onChange }: { onChange: () => void }) {
       <label className="mb-3 flex items-center gap-2 text-sm text-slate-600">
         <input type="checkbox" checked={showClosed} onChange={(e) => setShowClosed(e.target.checked)} /> Sonuçlananları da göster
       </label>
-      <div className="grid gap-4">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-4">
         {data && list.length === 0 ? (
           <Card>
             <EmptyState

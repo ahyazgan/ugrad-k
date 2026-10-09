@@ -89,15 +89,25 @@ export function AdminShell({ children }: { children: ReactNode }) {
   }, [admin, isLogin, isPublic, router]);
 
   // Badge counters: refreshed on navigation (throttled in loadNavCounts) and every 60 s
+  // while the tab is visible; a hidden tab does not poll and refreshes as soon as it is shown again.
   useEffect(() => {
     if (!signedIn || isPublic || isLogin) return;
     let alive = true;
-    const load = (force = false) => loadNavCounts(force).then((c) => alive && setCounts(c));
+    const hidden = () => document.visibilityState === "hidden";
+    const load = (force = false) => {
+      if (hidden()) return;
+      loadNavCounts(force).then((c) => alive && setCounts(c));
+    };
     load();
     const t = setInterval(() => load(true), 60_000);
+    const onVisibility = () => {
+      if (!hidden()) load(true);
+    };
+    document.addEventListener("visibilitychange", onVisibility);
     return () => {
       alive = false;
       clearInterval(t);
+      document.removeEventListener("visibilitychange", onVisibility);
     };
   }, [signedIn, pathname, isPublic, isLogin]);
 

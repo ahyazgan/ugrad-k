@@ -31,7 +31,7 @@ type Point = PickedPoint & { details?: string; contactName?: string; contactPhon
 const TIME_KIND: Record<"night" | "sunday" | "holiday", string> = { night: "Gece eki", sunday: "Pazar eki", holiday: "Resmi tatil eki" };
 
 /** Tariff at a glance before addresses are picked (same settings the quote uses) */
-function TariffSummary({ settings, holidays }: { settings: PricingSettings; holidays: Holiday[] }) {
+function TariffSummary({ settings, holidays, slaMinutes }: { settings: PricingSettings; holidays: Holiday[]; slaMinutes?: number }) {
   const now = new Date();
   const t = timeSurchargeAt(now, settings, holidays);
   const tiers = [...settings.kmTiers].sort((a, b) => (a.uptoKm ?? Infinity) - (b.uptoKm ?? Infinity));
@@ -54,7 +54,7 @@ function TariffSummary({ settings, holidays }: { settings: PricingSettings; holi
       <dl className="space-y-1.5">
         {row(`Açılış (ilk ${settings.includedKm} km dahil)`, formatTL(settings.baseFeeKurus))}
         {kmRows.map(([k, v]) => row(k, v))}
-        {row("Acil (60 dk)", `+%${settings.urgentSurchargePct}`)}
+        {row(slaMinutes ? `Acil (${slaMinutes} dk)` : "Acil", `+%${settings.urgentSurchargePct}`)}
         {row("Ekonomi (gün içi)", economyAvailableAt(now, settings, holidays) ? `−%${settings.economyDiscountPct}` : "şu an kapalı")}
         {settings.bridgeFeeKurus ? row("Köprü geçişi", formatTL(settings.bridgeFeeKurus)) : null}
       </dl>
@@ -77,6 +77,8 @@ function TariffSummary({ settings, holidays }: { settings: PricingSettings; holi
 export default function TelefonSiparisiPage() {
   const router = useRouter();
   const pricing = useLoad(() => repo.getPricing());
+  // Urgent delivery promise (minutes) lives in ops settings
+  const ops = useLoad(() => repo.getOpsSettings());
   const [phone, setPhone] = useState("");
   const [lookup, setLookup] = useState<{ phone: string; customer: PhoneCustomer | null } | null>(null);
   const [lookupError, setLookupError] = useState<string | null>(null);
@@ -180,7 +182,7 @@ export default function TelefonSiparisiPage() {
           </Link>
         }
       />
-      <form onSubmit={submit} className="grid gap-6 xl:grid-cols-3">
+      <form onSubmit={submit} className="grid grid-cols-[minmax(0,1fr)] gap-6 xl:grid-cols-3">
         <div className="space-y-6 xl:col-span-2">
           <Card title="Müşteri">
             <div className="flex flex-wrap items-end gap-2">
@@ -268,7 +270,7 @@ export default function TelefonSiparisiPage() {
           <Card title={order ? "Fiyat" : "Fiyat ve tarife"}>
             {!order ? (
               pricing.data ? (
-                <TariffSummary settings={pricing.data.settings} holidays={pricing.data.holidays} />
+                <TariffSummary settings={pricing.data.settings} holidays={pricing.data.holidays} slaMinutes={ops.data?.urgentSlaMinutes} />
               ) : (
                 <p className="text-sm text-muted">Adresleri seçince fiyat hesaplanır.</p>
               )

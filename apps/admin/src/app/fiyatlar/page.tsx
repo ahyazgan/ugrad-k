@@ -3,6 +3,7 @@
 import {
   calculatePrice,
   DEFAULT_COST_MODEL,
+  DEFAULT_PRICING_SETTINGS,
   estimateJobCost,
   formatTL,
   indexPricingSettings,
@@ -16,7 +17,15 @@ import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Button, Card, ErrorText, Input, PageHeader, Table, Td } from "@/components/ui";
 import { fmtDateTime } from "@/lib/dates";
 import { repo } from "@/lib/repo";
-import { formatKmTiers, parseCap, parseKmTiers } from "@/lib/pricing-form";
+import {
+  describeCorporateTiers,
+  describeKmTiers,
+  formatCorporateTiers,
+  formatKmTiers,
+  parseCap,
+  parseCorporateTiers,
+  parseKmTiers,
+} from "@/lib/pricing-form";
 import { useLoad } from "@/lib/use-load";
 
 type Kind = "tl" | "pct" | "int" | "kg" | "hour" | "coord";
@@ -93,6 +102,15 @@ const SCENARIOS: Array<{ label: string; input: PriceInput }> = [
   { label: "Tuzla'dan alış, 8 km", input: { distanceMeters: 8_000, pickupPoint: { lat: 40.816, lng: 29.3 }, pickupAt: DAY } },
 ];
 
+/**
+ * "İlk tarife": flat per-km fee (the shared default `perKmKurus`, used when there are no km tiers)
+ * and no surcharge cap. Kept in one place so the button label and its action cannot drift apart.
+ */
+const INITIAL_TARIFF_PER_KM_KURUS = DEFAULT_PRICING_SETTINGS.perKmKurus;
+
+/** Preview margins below this are highlighted (same value in the note under the table) */
+const LOW_MARGIN_PCT = 20;
+
 /** Senaryo hesaplanamazsa (ör. ekonomi saat dışı) null */
 const tryPrice = (input: PriceInput, s: PricingSettings) => {
   try {
@@ -123,7 +141,7 @@ export default function FiyatlarPage() {
   useEffect(() => {
     if (!data) return;
     setValues(Object.fromEntries(FIELDS.map((f) => [f.key, toInput(data.settings[f.key] as number, f.kind)])));
-    setTiers(data.settings.corporateTiers.map((t) => `${t.minDeliveries}:${t.discountPct}`).join(", "));
+    setTiers(formatCorporateTiers(data.settings.corporateTiers));
     setKmTiers(formatKmTiers(data.settings.kmTiers));
     setCap(data.settings.maxSurchargePct == null ? "" : String(data.settings.maxSurchargePct));
     setMaxWeight(data.settings.maxWeightKg == null ? "" : String(data.settings.maxWeightKg));
@@ -179,13 +197,9 @@ export default function FiyatlarPage() {
       if (v == null) errors.push(f.label);
       else (s[f.key] as number) = v;
     }
-    const parsed = tiers
-      .split(",")
-      .map((x) => x.trim())
-      .filter(Boolean)
-      .map((x) => x.split(":").map((n) => Number(n.trim())));
-    if (parsed.some((p) => p.length !== 2 || p.some((n) => !Number.isFinite(n) || n < 0))) errors.push("Kurumsal kademeler");
-    else s.corporateTiers = parsed.map(([minDeliveries, discountPct]) => ({ minDeliveries: minDeliveries!, discountPct: discountPct! }));
+    const ct = parseCorporateTiers(tiers);
+    if (ct === null) errors.push("Kurumsal kademeler");
+    else s.corporateTiers = ct;
     const kt = parseKmTiers(kmTiers);
     if (kt === null) errors.push("Km kademeleri");
     else s.kmTiers = kt;
@@ -224,6 +238,24 @@ export default function FiyatlarPage() {
     await reload();
   }
 
+  // Live plain-language reading of what is typed (no fixed example numbers)
+  const kmTiersParsed = parseKmTiers(kmTiers);
+  const kmTiersHint =
+    kmTiersParsed === null
+      ? "Biçim: toplam km'ye kadar:TL/km, son kademe *:TL/km (virgülle ayrılır)."
+      : kmTiersParsed.length
+        ? `Açılıştan sonra ${describeKmTiers(kmTiersParsed)}. Boş bırakılırsa sabit km ücreti kullanılır.`
+        : "Boş: sabit km ücreti (yukarıdaki “Ek km ücreti”) kullanılır.";
+  const capitalizeTr = (t: string) => t.charAt(0).toLocaleUpperCase("tr-TR") + t.slice(1);
+  const corporateParsed = parseCorporateTiers(tiers);
+  const corporateHint =
+    corporateParsed === null
+      ? "Biçim: aylık teslimat:indirim%, virgülle ayrılır."
+      : corporateParsed.length
+        ? `${capitalizeTr(describeCorporateTiers(corporateParsed))} indirim (ay sonu faturada, taşıma bedeline).`
+        : "Boş: kurumsal kademe indirimi yok.";
+  const halfDayHour = `${String(data?.settings.halfDayStartHour ?? DEFAULT_PRICING_SETTINGS.halfDayStartHour).padStart(2, "0")}:00`;
+
   const upcoming = (data?.holidays ?? []).filter((h) => h.date >= new Date().toISOString().slice(0, 10));
 
   return (
@@ -233,7 +265,7 @@ export default function FiyatlarPage() {
         subtitle={`Tüm tutarlar KDV hariç. Son güncelleme: ${fmtDateTime(data?.updatedAt ?? null)}`}
       />
       <ErrorText>{error}</ErrorText>
-      <div className="grid gap-6 xl:grid-cols-5">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-6 xl:grid-cols-5">
         <Card title="Tarife" className="xl:col-span-3">
           <form onSubmit={save} className="space-y-4">
             <div className="grid gap-3 sm:grid-cols-2">
@@ -252,13 +284,11 @@ export default function FiyatlarPage() {
             <div className="grid gap-3 sm:grid-cols-2">
               <div>
                 <Input label="Km kademeleri (toplam km'ye kadar : TL/km)" value={kmTiers} onChange={(e) => setKmTiers(e.target.value)} />
-                <p className="mt-1 text-xs text-muted">
-                  Örn. 10:25, *:18 → açılıştan sonra 10 km&apos;ye kadar 25 TL, üstü 18 TL. Boş bırakılırsa sabit km ücreti kullanılır.
-                </p>
+                <p className="mt-1 text-xs text-muted">{kmTiersHint}</p>
               </div>
               <div>
                 <Input label="Acil + gece toplam ek ücret tavanı (%)" value={cap} inputMode="decimal" onChange={(e) => setCap(e.target.value)} />
-                <p className="mt-1 text-xs text-muted">Örn. 75. Boş bırakılırsa tavan yok (acil + gece/Pazar/tatil toplanır).</p>
+                <p className="mt-1 text-xs text-muted">Acil ile gece/Pazar/tatil eki toplanır; toplam bu yüzdeyi aşamaz. Boş bırakılırsa tavan yok.</p>
               </div>
               <div>
                 <Input label="Motosiklet ağırlık sınırı (kg)" value={maxWeight} inputMode="decimal" onChange={(e) => setMaxWeight(e.target.value)} />
@@ -271,7 +301,7 @@ export default function FiyatlarPage() {
             </div>
             <div>
               <Input label="Kurumsal kademeler (teslimat:indirim%)" value={tiers} onChange={(e) => setTiers(e.target.value)} />
-              <p className="mt-1 text-xs text-muted">Örn. 20:15, 50:25 → ayda 20+ teslimatta %15, 50+ teslimatta %25</p>
+              <p className="mt-1 text-xs text-muted">{corporateHint}</p>
             </div>
             <div className="rounded-lg border border-line bg-canvas p-3">
               <div className="flex flex-wrap items-end gap-2">
@@ -296,13 +326,13 @@ export default function FiyatlarPage() {
                 type="button"
                 variant="secondary"
                 onClick={() => {
-                  // İlk tarife: sabit 30 TL/km, ek ücret tavanı yok (kaydetmeden önce önizlemede görünür)
+                  // İlk tarife: sabit km ücreti, ek ücret tavanı yok (kaydetmeden önce önizlemede görünür)
                   setKmTiers("");
                   setCap("");
-                  setValues((v) => ({ ...v, perKmKurus: "30" }));
+                  setValues((v) => ({ ...v, perKmKurus: toInput(INITIAL_TARIFF_PER_KM_KURUS, "tl") }));
                 }}
               >
-                İlk tarifeyi yükle (30 TL/km, tavansız)
+                İlk tarifeyi yükle ({toInput(INITIAL_TARIFF_PER_KM_KURUS, "tl")} TL/km, tavansız)
               </Button>
             </div>
           </form>
@@ -324,7 +354,7 @@ export default function FiyatlarPage() {
                       {next ? formatTL(next.subtotalKurus) : "—"}
                     </Td>
                     <Td className="whitespace-nowrap text-ink-soft">{c ? formatTL(c.totalKurus) : "—"}</Td>
-                    <Td num className={`font-semibold ${c && c.marginPct < 20 ? "text-red-700" : "text-emerald-700"}`}>
+                    <Td num className={`font-semibold ${c && c.marginPct < LOW_MARGIN_PCT ? "text-red-700" : "text-emerald-700"}`}>
                       {c ? `%${c.marginPct.toLocaleString("tr-TR")}` : "—"}
                     </Td>
                   </tr>
@@ -332,7 +362,7 @@ export default function FiyatlarPage() {
               })}
             </Table>
             <p className="mt-2 text-xs text-muted">
-              KDV hariç. Maliyet aşağıdaki kurye ödeme modeliyle tahmindir; %20 altı marj kırmızı. Kart komisyonu dahil değildir.
+              KDV hariç. Maliyet aşağıdaki kurye ödeme modeliyle tahmindir; %{LOW_MARGIN_PCT} altı marj kırmızı. Kart komisyonu dahil değildir.
             </p>
           </Card>
 
@@ -378,7 +408,7 @@ export default function FiyatlarPage() {
                 <li key={h.date} className="flex items-center justify-between gap-2">
                   <span>
                     <span className="font-mono text-muted">{h.date}</span> {h.name}
-                    {h.halfDay ? <span className="ml-1 text-xs text-amber-700">{"(13:00'ten itibaren)"}</span> : null}
+                    {h.halfDay ? <span className="ml-1 text-xs text-amber-700">({halfDayHour} ve sonrası)</span> : null}
                   </span>
                   <button className="text-xs text-red-700 underline" onClick={() => repo.deleteHoliday(h.date).then(reload)}>
                     Sil

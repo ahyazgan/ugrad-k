@@ -140,7 +140,7 @@ export default function RaporlarPage() {
             />
           </div>
 
-          <div className="mb-6 grid gap-6 xl:grid-cols-2">
+          <div className="mb-6 grid grid-cols-[minmax(0,1fr)] gap-6 xl:grid-cols-2">
             <ChartCard
               title="Günlük ciro (KDV hariç)"
               chart={
@@ -195,7 +195,7 @@ export default function RaporlarPage() {
             />
           </div>
 
-          <div className="grid gap-6 xl:grid-cols-2">
+          <div className="grid grid-cols-[minmax(0,1fr)] gap-6 xl:grid-cols-2">
             <Card title="Kurye performansı">
               <Table head={["Kurye", "Teslimat", "Ciro", "Ort. süre", "Puan"]} num={[1, 2, 3, 4]} empty="Bu dönemde teslimat yok. Tarih aralığını genişletin.">
                 {report.couriers.map((c) => (
@@ -226,7 +226,7 @@ export default function RaporlarPage() {
           </div>
 
           <Card title="Müşteri değerlendirmeleri" className="mt-6">
-            <div className="grid gap-6 md:grid-cols-[260px_1fr]" data-testid="ratings">
+            <div className="grid grid-cols-[minmax(0,1fr)] gap-6 md:grid-cols-[260px_minmax(0,1fr)]" data-testid="ratings">
               <div className="space-y-1.5">
                 {[5, 4, 3, 2, 1].map((n) => {
                   const c = report.ratingDist[n - 1] ?? 0;

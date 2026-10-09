@@ -87,7 +87,7 @@ export default function PrimlerPage() {
         subtitle="Hedef primi (gün/hafta içinde N iş → ödül, kademeli) veya seçili gün ve saatlerde hakedişe yüzde ek. Ödül dönem kapanınca otomatik hesaplanır, kuryenin hesaplaşmasına eklenir; kurye ilerlemesini uygulamada görür."
       />
       <ErrorText>{error}</ErrorText>
-      <div className="grid gap-6 xl:grid-cols-3">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-6 xl:grid-cols-3">
         <div className="space-y-6 xl:col-span-2">
           <Card title="Kampanyalar">
             <Table head={["Kampanya", "Ödül", "Kapsam", "Tarih", "Durum", ""]} empty="Henüz prim kampanyası yok. Sağdaki formdan ilk hedefi tanımlayın.">
