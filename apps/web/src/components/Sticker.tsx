@@ -26,6 +26,18 @@ const STICKERS = {
   takvim: [400, 352],
   numune: [400, 391],
   canta: [400, 381],
+  // Page and app stickers (docs/gorsel-istemleri.md §2)
+  kopru: [400, 352],
+  kalkan: [352, 400],
+  kilit: [295, 400],
+  pano: [313, 400],
+  sohbet: [400, 377],
+  kimlik: [400, 338],
+  cuzdan: [372, 400],
+  vardiya: [400, 315],
+  mesaj: [400, 340],
+  harita: [400, 297],
+  ekip: [400, 353],
 } as const;
 
 export type StickerName = keyof typeof STICKERS;
@@ -43,6 +55,50 @@ export function Sticker({ name, className = "", priority }: { name: StickerName;
       height={height}
       alt=""
       aria-hidden="true"
+      draggable={false}
+      priority={priority}
+      className={`pointer-events-none h-auto select-none ${className}`}
+    />
+  );
+}
+
+/** public/neo/sahne-<ad>.png — larger 3D scene illustrations (docs/gorsel-istemleri.md §3), max 900 px. */
+const SCENES = {
+  "sahne-teslim": [900, 854],
+  "sahne-istanbul": [900, 629],
+  "sahne-kurye": [900, 897],
+  "sahne-kurumsal": [900, 789],
+} as const;
+
+export type SceneName = keyof typeof SCENES;
+
+/**
+ * Scene illustration. Decorative by default (empty alt + aria-hidden); pass `alt` when it carries meaning.
+ * `sizes` must describe the rendered width so phones do not download the full 900 px file.
+ * Use `priority` only when the scene is part of the page hero (LCP); everything else lazy-loads.
+ */
+export function Scene({
+  name,
+  sizes,
+  className = "",
+  alt = "",
+  priority,
+}: {
+  name: SceneName;
+  sizes: string;
+  className?: string;
+  alt?: string;
+  priority?: boolean;
+}) {
+  const [width, height] = SCENES[name];
+  return (
+    <Image
+      src={`/neo/${name}.png`}
+      width={width}
+      height={height}
+      sizes={sizes}
+      alt={alt}
+      aria-hidden={alt ? undefined : true}
       draggable={false}
       priority={priority}
       className={`pointer-events-none h-auto select-none ${className}`}

@@ -76,7 +76,7 @@ const CUSTOMER = {
   lead: `${BRAND.slogan}. Siparişini buradan ver, kuryeni buradan izle.`,
   features: [
     { sticker: "fis", title: "Anında fiyat", body: "Adresi gir, fiyatı hemen gör." },
-    { sticker: "pin", title: "Canlı takip", body: "Kuryeni haritada izle." },
+    { sticker: "harita", title: "Canlı takip", body: "Kuryeni haritada izle." },
     { sticker: "kamera", title: "Teslim kanıtı", body: "Fotoğraf ve imzayla teslim." },
     { sticker: "zarf", title: "E-arşiv fatura", body: "Teslimden sonra otomatik." },
   ] as Feature[],
@@ -95,7 +95,7 @@ const COURIER = {
     { sticker: "simsek", title: "İş teklifleri", body: "Kabul et ya da nedenini seç." },
     { sticker: "donus", title: "Durak sırası", body: "Alış ve teslim sırası hazır." },
     { sticker: "kamera", title: "Teslim kanıtı", body: "Fotoğraf, imza, teslim kodu." },
-    { sticker: "kart", title: "Kazanç ve vardiya", body: "Hepsi tek ekranda." },
+    { sticker: "cuzdan", title: "Kazanç ve vardiya", body: "Hepsi tek ekranda." },
   ] as Feature[],
   links: [{ label: "İletişim", href: `${BRAND.siteUrl}/iletisim` }],
 };

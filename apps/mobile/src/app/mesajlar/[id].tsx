@@ -170,9 +170,9 @@ export default function Mesajlar() {
             <EmptyState
               testID="chat-empty"
               surface={false}
-              sticker="zarf"
+              sticker="mesaj"
               stickerSize={96}
-              rotation={-8}
+              rotation={-6}
               title="Henüz mesaj yok."
               body={me === "kurye" ? "Müşteriye hazır cevaplardan birini gönderin ya da yazın." : "Kuryenize hazır cevaplardan birini gönderin ya da yazın."}
             >

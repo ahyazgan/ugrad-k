@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { LeadForm } from "@/components/LeadForm";
 import { PageHero } from "@/components/PageHero";
-import { Sticker } from "@/components/Sticker";
+import { Scene, Sticker, type StickerName } from "@/components/Sticker";
 import { Card, SampleStamp } from "@/components/ui";
 import { corporateRows, returnLegPhrase, sampleMonthlyInvoice } from "@/lib/pricing-info";
 import { getPricingSettings } from "@/lib/pricing-settings";
@@ -26,10 +26,10 @@ const benefits = (s: PricingSettings) => [
   { title: "E-posta ve API ile sipariş", text: `Siparişinizi ${BRAND.email.orders} adresine e-postayla iletin veya sisteminizi API ile bağlayın.` },
 ];
 
-const STEPS = [
-  { title: "Başvuru", text: "Formu doldurun: firma, yetkili kişi, telefon ve tahmini aylık gönderi." },
-  { title: "Sizi arıyoruz", text: "İhtiyacınızı ve gönderi düzeninizi konuşup hesabınızı açıyoruz." },
-  { title: "Ekip davet + ay sonu tek fatura", text: "Çalışanlarınız aynı hesaptan sipariş verir; ay sonunda tek fatura kesilir." },
+const STEPS: { title: string; text: string; sticker: StickerName }[] = [
+  { sticker: "pano", title: "Başvuru", text: "Formu doldurun: firma, yetkili kişi, telefon ve tahmini aylık gönderi." },
+  { sticker: "sohbet", title: "Sizi arıyoruz", text: "İhtiyacınızı ve gönderi düzeninizi konuşup hesabınızı açıyoruz." },
+  { sticker: "ekip", title: "Ekip davet + ay sonu tek fatura", text: "Çalışanlarınız aynı hesaptan sipariş verir; ay sonunda tek fatura kesilir." },
 ];
 
 /** Sample month-end invoice (stamped "Örnek"); every amount comes from calculateMonthlyInvoice. */
@@ -87,7 +87,14 @@ export default async function KurumsalPage() {
         <div>
           <PageHero
             title="Kurumsal moto kurye"
-            sticker="bina"
+            art={
+              <Scene
+                name="sahne-kurumsal"
+                priority
+                sizes="(min-width: 1024px) 176px, (min-width: 640px) 144px, 112px"
+                className="-mb-6 w-28 shrink-0 sm:w-36 lg:-mb-4 lg:w-44"
+              />
+            }
             lead="Hukuk büroları, muhasebe ofisleri, ajanslar ve şirketler için düzenli ve acil evrak/paket teslimatı. Başvurunuzu bırakın, en kısa sürede sizi arayalım."
           >
             <a
@@ -115,10 +122,11 @@ export default async function KurumsalPage() {
               {STEPS.map((s, i) => (
                 <li key={s.title} className="flex items-start gap-4 rounded-3xl bg-white/70 p-4">
                   <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-accent font-black text-brand">{i + 1}</span>
-                  <span>
+                  <span className="flex-1">
                     <span className="block font-black text-brand">{s.title}</span>
                     <span className="block text-sm text-slate-600">{s.text}</span>
                   </span>
+                  <Sticker name={s.sticker} className="max-h-12 w-10 shrink-0 object-contain sm:w-12" />
                 </li>
               ))}
             </ol>

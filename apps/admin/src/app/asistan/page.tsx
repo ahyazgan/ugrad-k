@@ -48,7 +48,7 @@ export default function AsistanPage() {
       {data && data.length === 0 ? (
         <Card>
           <EmptyState
-            sticker="zarf"
+            sticker="sohbet"
             title="Henüz konuşma yok."
             description="WhatsApp botu ve sesli asistan bağlandığında konuşmalar burada görünür."
           />

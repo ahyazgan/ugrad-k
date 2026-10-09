@@ -2,7 +2,7 @@ import { BRAND, type PricingSettings } from "@yazgan/shared";
 import Link from "next/link";
 import { FaqAccordion } from "@/components/FaqAccordion";
 import { PriceCalculator } from "@/components/PriceCalculator";
-import { Sticker, type StickerName } from "@/components/Sticker";
+import { Scene, Sticker, type StickerName } from "@/components/Sticker";
 import { Card, HandNote, SampleStamp } from "@/components/ui";
 import { DISTRICTS } from "@/lib/districts";
 import { faqItems } from "@/lib/faq";
@@ -33,14 +33,14 @@ function services(s: PricingSettings): { title: string; text: string; sticker: S
 }
 
 /** Only rules the system actually enforces (pricing.ts, SLA credit, invoice queue). */
-function promises(s: PricingSettings) {
+function promises(s: PricingSettings): { big: string; title: string; text: string; sticker: StickerName }[] {
   return [
-    { big: "60 dk", title: "Acil teslim taahhüdü", text: "Kaçırırsak acil ek ücreti sonraki siparişinizden otomatik düşülür." },
-    { big: "0 TL", title: "Gizli ücret", text: "Her kalem sipariş öncesinde ayrı satırda görünür; sonradan sürpriz yok." },
+    { sticker: "kronometre", big: "60 dk", title: "Acil teslim taahhüdü", text: "Kaçırırsak acil ek ücreti sonraki siparişinizden otomatik düşülür." },
+    { sticker: "kalkan", big: "0 TL", title: "Gizli ücret", text: "Her kalem sipariş öncesinde ayrı satırda görünür; sonradan sürpriz yok." },
     ...(s.maxWeightKg != null
-      ? [{ big: `${s.maxWeightKg} kg`, title: "Motosiklet sınırı", text: "Daha ağır gönderiler sipariş aşamasında reddedilir; yolda sürpriz olmaz." }]
+      ? [{ sticker: "kutu" as const, big: `${s.maxWeightKg} kg`, title: "Motosiklet sınırı", text: "Daha ağır gönderiler sipariş aşamasında reddedilir; yolda sürpriz olmaz." }]
       : []),
-    { big: "e-arşiv", title: "Otomatik fatura", text: "Teslimattan sonra faturanız kendiliğinden kesilir; kurumsala ay sonu tek fatura." },
+    { sticker: "fis", big: "e-arşiv", title: "Otomatik fatura", text: "Teslimattan sonra faturanız kendiliğinden kesilir; kurumsala ay sonu tek fatura." },
   ];
 }
 
@@ -50,18 +50,14 @@ const SECTION = "mx-auto max-w-6xl px-4 py-16 lg:py-20";
 function ProofMock() {
   return (
     <div className="relative mx-auto w-full max-w-md">
-      <Sticker name="kamera" className="absolute top-20 -left-3 z-10 w-20 -rotate-6 sm:top-24 sm:-left-10 sm:w-24" />
       <Card className="relative p-5 sm:p-6">
         <div className="flex items-center justify-between gap-3">
           <span className="text-xs font-extrabold tracking-[0.14em] text-neo-muted uppercase">Teslim fişi</span>
           <SampleStamp className="rotate-6" />
         </div>
-        {/* Photo placeholder: no stock photo, just a framed area */}
-        <div
-          aria-hidden="true"
-          className="mt-4 flex aspect-[4/3] items-center justify-center rounded-2xl bg-[repeating-linear-gradient(135deg,#ece6fd_0_14px,#f5f2fe_14px_28px)] text-sm font-bold text-neo-inactive"
-        >
-          teslim fotoğrafı
+        {/* Delivery photo slot: illustrated scene (decorative; the receipt is already stamped "Örnek"), never a stock photo */}
+        <div className="mt-4 flex aspect-[4/3] items-center justify-center rounded-2xl bg-neo-bg p-3">
+          <Scene name="sahne-teslim" sizes="(min-width: 640px) 376px, calc(100vw - 96px)" className="h-full w-auto max-w-full object-contain" />
         </div>
         <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
           <div>
@@ -226,6 +222,10 @@ export default async function Home() {
           <ul className="mt-6 grid grid-cols-2 gap-x-4 gap-y-6 lg:grid-cols-4 lg:gap-8">
             {promises(settings).map((p) => (
               <li key={p.title} className="border-t border-white/15 pt-4">
+                {/* Fixed-height slot keeps the numbers aligned across stickers of different proportions */}
+                <div className="mb-3 flex h-14 items-end">
+                  <Sticker name={p.sticker} className="max-h-14 w-12 object-contain [object-position:left_bottom]" />
+                </div>
                 <div className="text-3xl font-black tracking-[-0.04em] text-accent sm:text-4xl">{p.big}</div>
                 <div className="mt-2 font-extrabold">{p.title}</div>
                 <p className="mt-1 text-sm text-white/70">{p.text}</p>

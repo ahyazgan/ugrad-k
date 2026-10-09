@@ -80,7 +80,7 @@ export default function Vardiyam() {
     <View key="head" style={{ gap: 14, marginBottom: 4 }}>
       <View style={{ marginTop: 6 }}>
         <BigTitle size={52}>Vardiyam.</BigTitle>
-        <Sticker name="kronometre" size={58} rotation={10} style={{ position: "absolute", right: 8, top: -10 }} />
+        <Sticker name="vardiya" size={68} rotation={6} style={{ position: "absolute", right: 8, top: -6 }} />
       </View>
       <Card style={{ gap: 4 }}>
         <Txt style={type.label}>PLANIM · 14 GÜN</Txt>
