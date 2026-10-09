@@ -28,7 +28,7 @@ export const BRAND = {
     noreply: `bildirim@${DOMAIN}`,
   },
   /** Müşteri hattı (E.164). Boş bırakılırsa sitede gösterilmez. */
-  phone: "" as string,
+  phone: "+905393308617" as string,
   /** WhatsApp Business numarası (E.164, + olmadan wa.me için kullanılır). Boşsa gizlenir. */
   whatsapp: "" as string,
   /** Google İşletme Profili "yorum yaz" bağlantısı (5 puan verenler yönlendirilir). Boşsa yönlendirme yapılmaz. */
