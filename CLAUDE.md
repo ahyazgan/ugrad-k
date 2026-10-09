@@ -69,7 +69,7 @@ Ek: `iptal`, `sorunlu`; teslim edilemezse `yolda → geri_donuyor → geri_tesli
     yapılır ve `docs/kurulum.md` içinde kullanıcıya bırakılır.
 
 ## Kod yapısı ve komutlar
-- **Marka/alan adı tek kaynak: `packages/shared/brand.ts`** (kullanıcı yeni marka adı alacak; kodda marka adı veya alan adı sabit yazılmaz, `BRAND`/`trackingBaseUrl`/`kvkkUrl` kullanılır)
+- **Marka/alan adı tek kaynak: `packages/shared/brand.ts`** (kullanıcı yeni marka adı alacak; kodda marka adı veya alan adı sabit yazılmaz, `BRAND`/`trackingBaseUrl`/`kvkkUrl` kullanılır). Tüm marka görselleri (ikonlar, splash, favicon, OG, `store/` mağaza görselleri) `scripts/brand-assets.mts` ile BRAND'den üretilir: `pnpm brand:assets && pnpm brand:store` — elle düzenlemeyin
 - `apps/web/` — Next.js tanıtım sitesi: fiyat hesaplayıcı, ilçe SEO sayfaları (`lib/districts.ts`, Türkçe ekler `lib/tr.ts`), kurumsal başvuru, kurye başvurusu (belge yükleme), API belgeleri, sitemap/robots/JSON-LD. Supabase env yoksa demo. `/api/v1/*` → Edge Function `api` (rewrite). `pnpm --filter @yazgan/web e2e:web`
 - `packages/shared/` — tiles.ts (harita karo hesabı; mobil `TileMap` yerel modülsüz OSM haritası), pricing.ts (tek fiyat kaynağı), cost.ts (maliyet/marj, endeks), orders.ts (durumlar), geo.ts (yaka/köprü), maps.ts (Google Places New + Routes API, mock), quote.ts (istek doğrulama + teklif), db.ts (satır ↔ tip)
 - `supabase/migrations/` — şema, RLS, RPC, storage, sabit veriler; `supabase/functions/` — Edge Functions (Deno, `packages/shared`'ı doğrudan import eder; deploy `--use-api`)

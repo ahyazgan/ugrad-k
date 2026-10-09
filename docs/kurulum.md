@@ -350,6 +350,14 @@ Ayrıca elle güncellenecekler:
 - SMS başlığı: Netgsm'de onaylı başlık (`NETGSM_HEADER`).
 - WhatsApp Business görünen adı (Meta onayı gerekir).
 
+**Görselleri yeniden üretin.** Uygulama ikonu (baş harf = `shortName`'in ilk harfi + limon ok), açılış ekranı, Android uyarlanabilir ikonları, favicon'lar, web OG/Twitter görseli (ad + `tagline` + `slogan` + alan adı) ve mağaza görselleri `brand.ts`'ten üretilir; elle çizilmiş dosya yoktur. `brand.ts`'i güncelledikten sonra:
+
+```bash
+pnpm brand:assets && pnpm brand:store
+```
+
+`brand:store` için Expo web DEMO modunda açık olmalı (ayrıntı ve statik derleme seçeneği: `docs/magaza.md` → Ekran görüntüleri). Betik Node 24 gerektirir (TypeScript'i doğrudan çalıştırır). Üretilenler: `apps/mobile/assets/*.png`, `apps/web/src/app/{favicon.ico,icon.png,apple-icon.png,opengraph-image.png,twitter-image.png,*.alt.txt}`, `apps/admin/src/app/{favicon.ico,icon.png,apple-icon.png}`, `store/**`. Betik sonunda her dosyanın boyutunu ve alfa durumunu listeler. Renkler değişirse `apps/mobile/app.json` içindeki `adaptiveIcon.backgroundColor` ve `expo-splash-screen` → `backgroundColor` değerlerini de `BRAND.neo` ile aynı yapın.
+
 ## 17. Web sitesi
 
 `apps/web` tanıtım sitesidir: fiyat hesaplayıcı, fiyatlar, kurumsal başvuru, ilçe sayfaları (SEO), SSS, kurye başvurusu, API belgeleri, KVKK/gizlilik.

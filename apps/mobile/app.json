@@ -18,7 +18,7 @@
     "android": {
       "package": "com.yazgankurye.app",
       "adaptiveIcon": {
-        "backgroundColor": "#0F3D6E",
+        "backgroundColor": "#111114",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
@@ -47,6 +47,15 @@
     "plugins": [
       "expo-router",
       [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 200,
+          "resizeMode": "contain",
+          "backgroundColor": "#ECE6FD"
+        }
+      ],
+      [
         "expo-location",
         {
           "locationWhenInUsePermission": "Teslimat adreslerini ve kurye vardiyası sırasında konumunuzu göstermek için konumunuz kullanılır.",
@@ -67,7 +76,7 @@
       [
         "expo-notifications",
         {
-          "color": "#0F3D6E"
+          "color": "#111114"
         }
       ]
     ],
@@ -80,6 +89,6 @@
       }
     },
     "description": "Acil evrak ve paketleriniz için İstanbul moto kurye: anında fiyat, canlı takip, teslim kanıtı.",
-    "primaryColor": "#0F3D6E"
+    "primaryColor": "#111114"
   }
 }
