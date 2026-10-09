@@ -6,7 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import { LeafletMap } from "@/components/LeafletMap";
 import { ACTIVE_STATUSES as ACTIVE, buildMapLayers, district, MapLegend, minutesSince, UNASSIGNED_STATUSES as UNASSIGNED } from "@/components/MapLayers";
 import { StatusBadge } from "@/components/StatusBadge";
-import { Card, ErrorText, PageHeader } from "@/components/ui";
+import { Card, EmptyState, ErrorText, PageHeader } from "@/components/ui";
 import { repo } from "@/lib/repo";
 import { useLoad } from "@/lib/use-load";
 
@@ -77,7 +77,14 @@ export default function HaritaPage() {
         </div>
         <div className="space-y-4">
           <Card title={`Vardiyadaki kuryeler (${onShift.length})`}>
-            {onShift.length === 0 ? <p className="text-sm text-muted">Vardiyada kurye yok.</p> : null}
+            {onShift.length === 0 ? (
+              <EmptyState
+                sticker="harita"
+                title="Vardiyada kurye yok."
+                description="Kuryeler uygulamada vardiya başlatınca konumları haritada görünür."
+                className="py-3"
+              />
+            ) : null}
             <ul className="divide-y divide-line" data-testid="map-couriers">
               {onShift.map((c) => {
                 const stale = !c.lastLocationAt || minutesSince(c.lastLocationAt) > (data?.ops.locationMaxAgeMinutes ?? 10);

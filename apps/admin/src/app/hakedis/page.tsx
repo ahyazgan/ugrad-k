@@ -3,7 +3,7 @@
 import { courierBalance, formatTL } from "@yazgan/shared";
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { Button, Card, ErrorText, Input, PageHeader, Stat, Table, Td } from "@/components/ui";
+import { Button, Card, EmptyState, ErrorText, Input, PageHeader, Stat, Table, Td } from "@/components/ui";
 import { downloadCsv, kurusToCsv } from "@/lib/csv";
 import { fmtDateTime } from "@/lib/dates";
 import { repo, type CashCollection, type EarningRow, type IncentiveAward } from "@/lib/repo";
@@ -119,7 +119,9 @@ export default function HakedisPage() {
       </div>
 
       <Card title="Ödenmemiş hakedişler" className="mb-6">
-        <Table head={["Kurye", "Teslimat", "Hakediş", "Prim", "Kuryedeki nakit", "Net", ""]} num={[1, 2, 3, 4, 5]} empty="Ödenmemiş hakediş yok. Teslimatların hakedişi 5 dakikada bir otomatik yazılır.">
+        <Table head={["Kurye", "Teslimat", "Hakediş", "Prim", "Kuryedeki nakit", "Net", ""]} num={[1, 2, 3, 4, 5]}
+          empty={<EmptyState sticker="cuzdan" title="Ödenmemiş hakediş yok." description="Teslimatların hakedişi 5 dakikada bir otomatik yazılır." />}
+        >
           {byCourier.map((g) => (
             <tr key={g.courierId} data-testid={`balance-${g.courierId}`}>
               <Td>
