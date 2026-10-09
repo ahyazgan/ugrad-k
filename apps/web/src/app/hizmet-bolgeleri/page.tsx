@@ -1,4 +1,3 @@
-import { DEFAULT_PRICING_SETTINGS } from "@yazgan/shared";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { CoverageMap } from "@/components/CoverageMap";
@@ -6,7 +5,11 @@ import { PageHero } from "@/components/PageHero";
 import { Sticker } from "@/components/Sticker";
 import { CARD } from "@/components/ui";
 import { DISTRICTS } from "@/lib/districts";
-import { tl } from "@/lib/pricing-info";
+import { bridgeRuleText, tl } from "@/lib/pricing-info";
+import { getPricingSettings } from "@/lib/pricing-settings";
+
+// ISR: re-read the live tariff (pricing_settings) at most once an hour.
+export const revalidate = 3600;
 
 export const metadata: Metadata = {
   title: "Hizmet bölgeleri — İstanbul moto kurye",
@@ -16,10 +19,10 @@ export const metadata: Metadata = {
 
 const DISTRICT_CARD = `${CARD} p-5 transition hover:-translate-y-0.5`;
 
-export default function BolgelerPage() {
+export default async function BolgelerPage() {
+  const settings = await getPricingSettings();
   const anadolu = DISTRICTS.filter((d) => d.side === "anadolu");
   const avrupa = DISTRICTS.filter((d) => d.side === "avrupa");
-  const bridge = tl(DEFAULT_PRICING_SETTINGS.bridgeFeeKurus);
   return (
     <div className="mx-auto max-w-6xl px-4 pt-10 lg:pt-14">
       <div className="grid items-center gap-8 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-12">
@@ -73,8 +76,8 @@ export default function BolgelerPage() {
           <div className="flex items-center gap-4 rounded-3xl bg-brand p-5 text-white">
             <Sticker name="donus" className="w-12 shrink-0 -rotate-6" />
             <div>
-              <div className="font-black">Köprü geçişi +{bridge}</div>
-              <p className="mt-1 text-sm text-white/75">Yalnız Anadolu → Avrupa yönü ücretli; fiyat özetinde ayrı satır.</p>
+              <div className="font-black">Köprü geçişi +{tl(settings.bridgeFeeKurus)}</div>
+              <p className="mt-1 text-sm text-white/75">{bridgeRuleText(settings)} Fiyat özetinde ayrı satırda görünür.</p>
             </div>
           </div>
         </div>

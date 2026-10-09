@@ -1,13 +1,18 @@
-import { BRAND, DEFAULT_PRICING_SETTINGS } from "@yazgan/shared";
+import { BRAND, type PricingSettings } from "@yazgan/shared";
 import Link from "next/link";
 import { FaqAccordion } from "@/components/FaqAccordion";
 import { PriceCalculator } from "@/components/PriceCalculator";
+import { ServiceIcon, type ServiceIconName } from "@/components/ServiceIcon";
 import { Sticker, type StickerName } from "@/components/Sticker";
 import { Card, HandNote, SampleStamp } from "@/components/ui";
 import { DISTRICTS } from "@/lib/districts";
-import { FAQ } from "@/lib/faq";
-import { corporateRows } from "@/lib/pricing-info";
+import { faqItems } from "@/lib/faq";
+import { corporateRows, corporateTiers, returnLegPhrase } from "@/lib/pricing-info";
+import { getPricingSettings } from "@/lib/pricing-settings";
 import { APP_URL, whatsappLink } from "@/lib/site";
+
+// ISR: re-read the live tariff (pricing_settings) at most once an hour (= PRICING_REVALIDATE_SECONDS).
+export const revalidate = 3600;
 
 const STEPS: { n: string; title: string; text: string; sticker: StickerName }[] = [
   { n: "1", sticker: "ev", title: "Adresleri girin", text: "Alış ve teslim adresini yazın; sürüş mesafesine göre fiyat anında çıkar." },
@@ -16,26 +21,29 @@ const STEPS: { n: string; title: string; text: string; sticker: StickerName }[] 
   { n: "4", sticker: "imza", title: "Teslim kanıtı", text: "Teslimatta fotoğraf ve imza alınır, faturanız otomatik kesilir." },
 ];
 
-const SERVICES: { title: string; text: string; sticker: StickerName; tilt: string }[] = [
-  { sticker: "zarf", tilt: "-rotate-6", title: "Acil evrak", text: "Sözleşme, vekâletname, ihale dosyası: 60 dakika içinde teslim hedefiyle, başka iş yapılmadan doğrudan." },
-  { sticker: "bina", tilt: "rotate-3", title: "Adliye ve resmi kurum", text: "Anadolu ve İstanbul adliyelerine, icra dairelerine, noterlere dosya ve dilekçe teslimi." },
-  { sticker: "donus", tilt: "rotate-6", title: "Gidiş-dönüş imza", text: "Belgeyi götürür, imzalatır, geri getiririz. Dönüş ayağı yarı fiyatına." },
-  { sticker: "kronometre", tilt: "-rotate-3", title: "Planlı gönderi", text: "Yarın sabah için şimdiden sipariş verin; kurye alış saatinden önce yola çıkar." },
-  { sticker: "kutu", tilt: "rotate-6", title: "Numune ve küçük paket", text: "Yedek parça, numune, ilaç dışı sağlık malzemesi ve küçük paketler." },
-  { sticker: "kart", tilt: "-rotate-6", title: "Kurumsal hesap", text: "Aylık hacme göre indirim, tek fatura, ekip için ortak hesap ve API entegrasyonu." },
-];
-
-const S = DEFAULT_PRICING_SETTINGS;
+/** Service grid: plain ink line icons (no tilted 3D stickers) to keep the B2B section sober. */
+function services(s: PricingSettings): { title: string; text: string; icon: ServiceIconName }[] {
+  return [
+    { icon: "envelope", title: "Acil evrak", text: "Sözleşme, vekâletname, ihale dosyası: 60 dakika içinde teslim hedefiyle, başka iş yapılmadan doğrudan." },
+    { icon: "courthouse", title: "Adliye ve resmi kurum", text: "Anadolu ve İstanbul adliyelerine, icra dairelerine, noterlere dosya ve dilekçe teslimi." },
+    { icon: "roundTrip", title: "Gidiş-dönüş imza", text: `Belgeyi götürür, imzalatır, geri getiririz. Dönüş ayağı ${returnLegPhrase(s)}.` },
+    { icon: "calendar", title: "Planlı gönderi", text: "Yarın sabah için şimdiden sipariş verin; kurye alış saatinden önce yola çıkar." },
+    { icon: "box", title: "Numune ve küçük paket", text: "Yedek parça, numune, ilaç dışı sağlık malzemesi ve küçük paketler." },
+    { icon: "briefcase", title: "Kurumsal hesap", text: "Aylık hacme göre indirim, tek fatura, ekip için ortak hesap ve API entegrasyonu." },
+  ];
+}
 
 /** Only rules the system actually enforces (pricing.ts, SLA credit, invoice queue). */
-const PROMISES = [
-  { big: "60 dk", title: "Acil teslim taahhüdü", text: "Kaçırırsak acil ek ücreti sonraki siparişinizden otomatik düşülür." },
-  { big: "0 TL", title: "Gizli ücret", text: "Her kalem sipariş öncesinde ayrı satırda görünür; sonradan sürpriz yok." },
-  ...(S.maxWeightKg != null
-    ? [{ big: `${S.maxWeightKg} kg`, title: "Motosiklet sınırı", text: "Daha ağır gönderiler sipariş aşamasında reddedilir; yolda sürpriz olmaz." }]
-    : []),
-  { big: "e-arşiv", title: "Otomatik fatura", text: "Teslimattan sonra faturanız kendiliğinden kesilir; kurumsala ay sonu tek fatura." },
-];
+function promises(s: PricingSettings) {
+  return [
+    { big: "60 dk", title: "Acil teslim taahhüdü", text: "Kaçırırsak acil ek ücreti sonraki siparişinizden otomatik düşülür." },
+    { big: "0 TL", title: "Gizli ücret", text: "Her kalem sipariş öncesinde ayrı satırda görünür; sonradan sürpriz yok." },
+    ...(s.maxWeightKg != null
+      ? [{ big: `${s.maxWeightKg} kg`, title: "Motosiklet sınırı", text: "Daha ağır gönderiler sipariş aşamasında reddedilir; yolda sürpriz olmaz." }]
+      : []),
+    { big: "e-arşiv", title: "Otomatik fatura", text: "Teslimattan sonra faturanız kendiliğinden kesilir; kurumsala ay sonu tek fatura." },
+  ];
+}
 
 const SECTION = "mx-auto max-w-6xl px-4 py-16 lg:py-20";
 
@@ -93,8 +101,10 @@ function ProofMock() {
   );
 }
 
-export default function Home() {
+export default async function Home() {
+  const settings = await getPricingSettings();
   const wa = whatsappLink("Merhaba, kurye istiyorum.");
+  const firstTier = corporateTiers(settings)[0];
   return (
     <>
       <section>
@@ -115,14 +125,6 @@ export default function Home() {
               <br />
               <span className="bg-[linear-gradient(transparent_68%,var(--color-neo-lime)_68%,var(--color-neo-lime)_92%,transparent_92%)]">Kapında.</span>
             </h1>
-            <span
-              aria-hidden="true"
-              className="absolute top-24 right-2 hidden -rotate-12 rounded-xl bg-accent px-3 pt-1.5 pb-1 font-[family-name:var(--font-hand)] text-2xl leading-none sm:inline-block"
-            >
-              MESAFE
-              <br />
-              YOK
-            </span>
             <p className="mt-6 max-w-xl text-lg font-semibold text-neo-muted-dark">
               {BRAND.name}: hukuk büroları, muhasebeciler ve şirketler için moto kurye. Acil evrakınız bir saatte yerinde; fiyatı önceden görün, kuryeyi canlı takip edin, teslim kanıtını alın.
             </p>
@@ -152,7 +154,7 @@ export default function Home() {
               <Sticker name="motor" priority className="-mt-4 -mb-2 w-28 shrink-0 -rotate-3 sm:w-40 lg:-mt-10 lg:w-48" />
             </div>
             {/* Hero already carries four stickers on desktop: keep the receipt sticker for smaller screens only */}
-            <PriceCalculator receiptStickerClassName="lg:hidden" />
+            <PriceCalculator settings={settings} receiptStickerClassName="lg:hidden" />
           </div>
         </div>
       </section>
@@ -176,9 +178,11 @@ export default function Home() {
       <section className={SECTION}>
         <h2 className="text-3xl font-black">Ne taşıyoruz?</h2>
         <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {SERVICES.map((s) => (
+          {services(settings).map((s) => (
             <Card key={s.title} className="flex items-start gap-4 p-5">
-              <Sticker name={s.sticker} className={`w-12 shrink-0 ${s.tilt}`} />
+              <span aria-hidden="true" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-neo-bg text-brand">
+                <ServiceIcon name={s.icon} className="h-6 w-6" />
+              </span>
               <div>
                 <h3 className="text-lg font-black tracking-tight">{s.title}</h3>
                 <p className="mt-1 text-sm text-slate-600">{s.text}</p>
@@ -221,7 +225,7 @@ export default function Home() {
             Taahhütlerimiz
           </h2>
           <ul className="mt-6 grid grid-cols-2 gap-x-4 gap-y-6 lg:grid-cols-4 lg:gap-8">
-            {PROMISES.map((p) => (
+            {promises(settings).map((p) => (
               <li key={p.title} className="border-t border-white/15 pt-4">
                 <div className="text-3xl font-black tracking-[-0.04em] text-accent sm:text-4xl">{p.big}</div>
                 <div className="mt-2 font-extrabold">{p.title}</div>
@@ -237,9 +241,11 @@ export default function Home() {
           <div className="flex items-start gap-5">
             <Sticker name="bina" className="hidden w-24 shrink-0 -rotate-6 sm:block" />
             <div>
-              <h2 className="text-2xl font-extrabold">Ayda 20&apos;den fazla gönderiniz mi var?</h2>
+              <h2 className="text-2xl font-extrabold">
+                {firstTier ? `Ayda ${firstTier.minDeliveries} ve üzeri gönderiniz mi var?` : "Düzenli gönderiniz mi var?"}
+              </h2>
               <p className="mt-2 max-w-2xl text-neo-muted-dark">
-                Kurumsal hesapla {corporateRows()
+                Kurumsal hesapla {corporateRows(settings)
                   .map((r) => `${r.label.toLocaleLowerCase("tr-TR")} ${r.value}`)
                   .join(", ")}
                 ; tüm ay tek faturada. Ekibiniz aynı hesaptan sipariş verir, isterseniz sisteminize API ile bağlanırız.
@@ -279,7 +285,7 @@ export default function Home() {
               Tüm sorular →
             </Link>
           </div>
-          <FaqAccordion items={FAQ.slice(0, 5)} />
+          <FaqAccordion items={faqItems(settings).slice(0, 5)} />
         </div>
       </section>
     </>

@@ -1,11 +1,15 @@
-import { BRAND, COMPANY, DEFAULT_PRICING_SETTINGS } from "@yazgan/shared";
+import { BRAND, COMPANY, type PricingSettings } from "@yazgan/shared";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { LeadForm } from "@/components/LeadForm";
 import { PageHero } from "@/components/PageHero";
 import { Sticker, type StickerName } from "@/components/Sticker";
 import { Card, CARD } from "@/components/ui";
+import { getPricingSettings } from "@/lib/pricing-settings";
 import { displayPhone, phoneLink, whatsappLink } from "@/lib/site";
+
+// ISR: the head office pin comes from pricing_settings (service centre); re-read at most once an hour.
+export const revalidate = 3600;
 
 export const metadata: Metadata = {
   title: "İletişim",
@@ -20,8 +24,8 @@ const QUICK: { href: string; title: string; text: string; sticker: StickerName; 
 ];
 
 /** Stylised (not geographic) street sketch around the head office; the real map opens on OpenStreetMap via link only. */
-function HeadOfficeCard() {
-  const { serviceCenterLat: lat, serviceCenterLng: lng } = DEFAULT_PRICING_SETTINGS;
+function HeadOfficeCard({ settings }: { settings: PricingSettings }) {
+  const { serviceCenterLat: lat, serviceCenterLng: lng } = settings;
   const osm = `https://www.openstreetmap.org/?mlat=${lat}&mlon=${lng}#map=16/${lat}/${lng}`;
   return (
     <Card className="overflow-hidden">
@@ -48,7 +52,8 @@ function HeadOfficeCard() {
   );
 }
 
-export default function IletisimPage() {
+export default async function IletisimPage() {
+  const settings = await getPricingSettings();
   const wa = whatsappLink("Merhaba,");
   return (
     <div className="mx-auto max-w-6xl px-4 pt-10 lg:pt-14">
@@ -101,7 +106,7 @@ export default function IletisimPage() {
                 </div>
               </dl>
             </Card>
-            <HeadOfficeCard />
+            <HeadOfficeCard settings={settings} />
           </div>
         </div>
         <div className="lg:sticky lg:top-24">

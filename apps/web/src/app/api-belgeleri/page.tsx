@@ -3,6 +3,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { PageHero } from "@/components/PageHero";
+import { economyWindowText, tl } from "@/lib/pricing-info";
+import { getPricingSettings } from "@/lib/pricing-settings";
 import { SITE_URL } from "@/lib/site";
 
 export const metadata: Metadata = {
@@ -10,6 +12,9 @@ export const metadata: Metadata = {
   description: `${BRAND.name} kurumsal API: fiyat alma, sipariş oluşturma, sipariş durumu ve webhook bildirimleri.`,
   alternates: { canonical: "/api-belgeleri" },
 };
+
+// ISR: limits quoted below follow the live tariff; re-read at most once an hour.
+export const revalidate = 3600;
 
 const BASE = `${SITE_URL}/api/v1`;
 
@@ -109,7 +114,8 @@ app.post("/kurye-webhook", express.text({ type: "application/json" }), (req, res
   res.status(200).end();
 });`;
 
-export default function ApiDocsPage() {
+export default async function ApiDocsPage() {
+  const settings = await getPricingSettings();
   return (
     <div className="mx-auto max-w-6xl px-4 pt-10 lg:pt-14">
       <PageHero
@@ -174,9 +180,14 @@ export default function ApiDocsPage() {
             <Code>{orderExample}</Code>
             <p className="mt-3">
               <code className="font-mono">serviceLevel</code>: <code className="font-mono">&quot;standart&quot;</code> (varsayılan), <code className="font-mono">&quot;acil&quot;</code> (60 dk, ek ücretli) veya{" "}
-              <code className="font-mono">&quot;ekonomi&quot;</code> (gün içinde, indirimli; yalnızca Pazartesi–Cumartesi öğleden önceki alışlarda). Eski{" "}
-              <code className="font-mono">&quot;urgent&quot;: true</code> alanı hâlâ kabul edilir. 20 kg üzeri gönderiler <code className="font-mono">400</code> ile reddedilir.{" "}
-              <code className="font-mono">declaredValueKurus</code>: gönderi değeri (kuruş); 1.000 TL üstü kısım için sigorta ücreti fiyata eklenir.{" "}
+              <code className="font-mono">&quot;ekonomi&quot;</code> (gün içinde, indirimli; yalnızca {economyWindowText(settings)} arası alışlarda). Eski{" "}
+              <code className="font-mono">&quot;urgent&quot;: true</code> alanı hâlâ kabul edilir.{" "}
+              {settings.maxWeightKg != null ? (
+                <>
+                  {settings.maxWeightKg.toLocaleString("tr-TR")} kg üzeri gönderiler <code className="font-mono">400</code> ile reddedilir.{" "}
+                </>
+              ) : null}
+              <code className="font-mono">declaredValueKurus</code>: gönderi değeri (kuruş); {tl(settings.freeCoverageKurus)} üstü kısım için sigorta ücreti fiyata eklenir.{" "}
               <code className="font-mono">deliveryCode</code>: <code className="font-mono">true</code> ise alıcıya SMS ile 4 haneli teslim kodu gider, kurye kodu
               almadan teslim edemez; kod oluşturma yanıtında <code className="font-mono">order.deliveryCode</code> olarak da döner.{" "}
               <code className="font-mono">promoCode</code>: kampanya kodu (geçersizse <code className="font-mono">400</code>, alan <code className="font-mono">promoCode</code>).

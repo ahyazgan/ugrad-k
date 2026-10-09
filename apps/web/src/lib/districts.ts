@@ -5,6 +5,8 @@ export interface District {
   slug: string;
   name: string;
   side: "anadolu" | "avrupa";
+  /** Yaklaşık ilçe merkezi; yalnız ilçe sayfasındaki tahmini örnek fiyat için (gerçek fiyat adreslerden hesaplanır) */
+  center: { lat: number; lng: number };
   /** Sık gidilen mahalleler/semtler */
   areas: string[];
   /** İlçeye özgü tanıtım cümlesi */
@@ -18,6 +20,7 @@ export const DISTRICTS: District[] = [
     slug: "beykoz",
     name: "Beykoz",
     side: "anadolu",
+    center: { lat: 41.1340, lng: 29.0920 },
     areas: ["Kavacık", "Paşabahçe", "Çubuklu", "Anadoluhisarı", "Acarlar", "Kılıçlı"],
     intro:
       "Merkezimiz Beykoz'da. Kavacık'taki iş merkezlerinden Boğaz kıyısındaki ofislere kadar ilçenin her noktasına en kısa sürede ulaşıyoruz.",
@@ -27,6 +30,7 @@ export const DISTRICTS: District[] = [
     slug: "kadikoy",
     name: "Kadıköy",
     side: "anadolu",
+    center: { lat: 40.9903, lng: 29.0290 },
     areas: ["Moda", "Fenerbahçe", "Göztepe", "Erenköy", "Bostancı", "Acıbadem", "Koşuyolu"],
     intro:
       "Kadıköy'ün yoğun trafiğinde moto kurye en hızlı seçenektir. Muayenehaneler, ajanslar ve ofisler arasında aynı saat içinde teslimat yapıyoruz.",
@@ -36,6 +40,7 @@ export const DISTRICTS: District[] = [
     slug: "atasehir",
     name: "Ataşehir",
     side: "anadolu",
+    center: { lat: 40.9833, lng: 29.1167 },
     areas: ["Barbaros", "Atatürk", "İçerenköy", "Küçükbakkalköy", "Kayışdağı"],
     intro:
       "Ataşehir'deki plazalar ve finans ofisleri için acil evrak teslimatı yapıyoruz; imzaya giden belgeler aynı gün geri dönebilir.",
@@ -45,6 +50,7 @@ export const DISTRICTS: District[] = [
     slug: "uskudar",
     name: "Üsküdar",
     side: "anadolu",
+    center: { lat: 41.0227, lng: 29.0150 },
     areas: ["Altunizade", "Acıbadem", "Çengelköy", "Kuzguncuk", "Beylerbeyi", "Ünalan"],
     intro:
       "Altunizade'deki iş merkezlerinden Boğaz semtlerine Üsküdar'ın her yerine moto kuryeyle hızlı teslimat yapıyoruz. Köprüye yakınlık Avrupa yakası işlerini de kısaltır.",
@@ -54,6 +60,7 @@ export const DISTRICTS: District[] = [
     slug: "umraniye",
     name: "Ümraniye",
     side: "anadolu",
+    center: { lat: 41.0256, lng: 29.0963 },
     areas: ["Çakmak", "Ihlamurkuyu", "Yukarı Dudullu", "Esenşehir", "Atakent", "Şerifali"],
     intro:
       "Ümraniye ve Dudullu'daki şirket merkezleri, depolar ve organize sanayi bölgesi için gün içinde düzenli kurye hizmeti veriyoruz.",
@@ -63,6 +70,7 @@ export const DISTRICTS: District[] = [
     slug: "kartal",
     name: "Kartal",
     side: "anadolu",
+    center: { lat: 40.8889, lng: 29.1856 },
     areas: ["Kordonboyu", "Soğanlık", "Yakacık", "Uğur Mumcu", "Atalar"],
     intro:
       "Kartal'daki İstanbul Anadolu Adliyesi'ne dosya ve dilekçe teslimi en sık yaptığımız işler arasında. Hukuk bürolarına süreli işlerde zamanında teslim sağlıyoruz.",
@@ -72,6 +80,7 @@ export const DISTRICTS: District[] = [
     slug: "maltepe",
     name: "Maltepe",
     side: "anadolu",
+    center: { lat: 40.9350, lng: 29.1310 },
     areas: ["Bağlarbaşı", "Altayçeşme", "Küçükyalı", "İdealtepe", "Cevizli", "Feyzullah"],
     intro:
       "Maltepe'den Anadolu Adliyesi'ne ve Kadıköy–Ataşehir hattına kısa sürede ulaşıyoruz. Sahil yolu ve E-5 arasındaki tüm iş yerlerine hizmet veriyoruz.",
@@ -81,6 +90,7 @@ export const DISTRICTS: District[] = [
     slug: "pendik",
     name: "Pendik",
     side: "anadolu",
+    center: { lat: 40.8775, lng: 29.2353 },
     areas: ["Kurtköy", "Kaynarca", "Güzelyalı", "Yenişehir", "Esenyalı"],
     intro:
       "Kurtköy'deki iş merkezleri ve sanayi bölgelerinden İstanbul'un geri kalanına acil gönderileriniz için moto kurye sağlıyoruz.",
@@ -90,6 +100,7 @@ export const DISTRICTS: District[] = [
     slug: "tuzla",
     name: "Tuzla",
     side: "anadolu",
+    center: { lat: 40.8161, lng: 29.3006 },
     areas: ["Aydınlı", "İçmeler", "Postane", "Tuzla OSB", "Şifa"],
     intro:
       "Tuzla'daki tersaneler, organize sanayi ve lojistik firmaları için şehir içi acil parça ve belge taşıyoruz.",
@@ -99,6 +110,7 @@ export const DISTRICTS: District[] = [
     slug: "cekmekoy",
     name: "Çekmeköy",
     side: "anadolu",
+    center: { lat: 41.0347, lng: 29.1792 },
     areas: ["Taşdelen", "Alemdağ", "Ömerli"],
     intro:
       "Çekmeköy ve Taşdelen'den Ümraniye, Ataşehir ve Beykoz'a hızlı moto kurye bağlantısı sunuyoruz.",
@@ -108,6 +120,7 @@ export const DISTRICTS: District[] = [
     slug: "sancaktepe",
     name: "Sancaktepe",
     side: "anadolu",
+    center: { lat: 41.0003, lng: 29.2307 },
     areas: ["Samandıra", "Sarıgazi", "Yenidoğan"],
     intro:
       "Samandıra ve çevresindeki atölye ve işletmelerin acil gönderilerini Anadolu yakasının her noktasına taşıyoruz.",
@@ -117,6 +130,7 @@ export const DISTRICTS: District[] = [
     slug: "besiktas",
     name: "Beşiktaş",
     side: "avrupa",
+    center: { lat: 41.0430, lng: 29.0070 },
     areas: ["Levent", "Etiler", "Gayrettepe", "Ortaköy", "Balmumcu", "Bebek"],
     intro:
       "Anadolu yakasından Levent ve Gayrettepe'deki plazalara günün her saati geçiş yapıyoruz; köprü geçişi fiyata şeffaf olarak eklenir.",
@@ -126,6 +140,7 @@ export const DISTRICTS: District[] = [
     slug: "sisli",
     name: "Şişli",
     side: "avrupa",
+    center: { lat: 41.0602, lng: 28.9877 },
     areas: ["Mecidiyeköy", "Esentepe", "Fulya", "Nişantaşı", "Bomonti"],
     intro:
       "Mecidiyeköy ve Esentepe'deki iş merkezlerine Anadolu yakasından acil evrak ve paket götürüyoruz.",
@@ -135,6 +150,7 @@ export const DISTRICTS: District[] = [
     slug: "sariyer",
     name: "Sarıyer",
     side: "avrupa",
+    center: { lat: 41.1677, lng: 29.0503 },
     areas: ["Maslak", "İstinye", "Ayazağa", "Tarabya", "Emirgan"],
     intro:
       "Beykoz'dan köprüyle Maslak ve İstinye'ye en kısa sürede ulaşıyoruz. Maslak'taki şirket merkezlerine düzenli teslimat yapıyoruz.",
@@ -144,6 +160,7 @@ export const DISTRICTS: District[] = [
     slug: "kagithane",
     name: "Kağıthane",
     side: "avrupa",
+    center: { lat: 41.0810, lng: 28.9732 },
     areas: ["Çağlayan", "Talatpaşa", "Gürsel", "Hamidiye", "Merkez"],
     intro:
       "Çağlayan'daki İstanbul Adliyesi'ne Anadolu yakasındaki hukuk bürolarından dosya ve dilekçe teslimi yapıyoruz.",
@@ -153,6 +170,7 @@ export const DISTRICTS: District[] = [
     slug: "beyoglu",
     name: "Beyoğlu",
     side: "avrupa",
+    center: { lat: 41.0370, lng: 28.9770 },
     areas: ["Karaköy", "Cihangir", "Taksim", "Kasımpaşa", "Galata"],
     intro:
       "Karaköy ve Taksim çevresindeki ofis, ajans ve otellere Anadolu yakasından acil gönderi taşıyoruz.",

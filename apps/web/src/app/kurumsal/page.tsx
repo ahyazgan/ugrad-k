@@ -1,11 +1,15 @@
-import { BRAND, DEFAULT_PRICING_SETTINGS, formatTL } from "@yazgan/shared";
+import { BRAND, formatTL, type PricingSettings } from "@yazgan/shared";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { LeadForm } from "@/components/LeadForm";
 import { PageHero } from "@/components/PageHero";
 import { Sticker } from "@/components/Sticker";
 import { Card, SampleStamp } from "@/components/ui";
-import { corporateRows, sampleMonthlyInvoice } from "@/lib/pricing-info";
+import { corporateRows, returnLegPhrase, sampleMonthlyInvoice } from "@/lib/pricing-info";
+import { getPricingSettings } from "@/lib/pricing-settings";
+
+// ISR: re-read the live tariff (pricing_settings) at most once an hour.
+export const revalidate = 3600;
 
 export const metadata: Metadata = {
   title: "Kurumsal kurye hizmeti — hukuk büroları ve şirketler için",
@@ -13,12 +17,12 @@ export const metadata: Metadata = {
   alternates: { canonical: "/kurumsal" },
 };
 
-const BENEFITS = [
+const benefits = (s: PricingSettings) => [
   { title: "Ay sonu tek fatura", text: "Her teslimat için ayrı ödeme yok; ay sonunda tüm gönderiler tek e-faturada." },
-  { title: "Hacim indirimi", text: corporateRows().map((r) => `${r.label}: ${r.value}`).join(" · ") },
+  { title: "Hacim indirimi", text: corporateRows(s).map((r) => `${r.label}: ${r.value}`).join(" · ") },
   { title: "Teslim kanıtı", text: "Her teslimatta fotoğraf, teslim alan kişi ve imza. Süreli işlerde ispat elinizde." },
   { title: "Ekip hesabı", text: "Çalışanlarınız kendi telefonlarıyla aynı kurumsal hesaptan sipariş verir." },
-  { title: "Gidiş-dönüş imza turu", text: "Belgeyi götürür, imzalatır, geri getiririz; dönüş ayağı yarı fiyatına." },
+  { title: "Gidiş-dönüş imza turu", text: `Belgeyi götürür, imzalatır, geri getiririz; dönüş ayağı ${returnLegPhrase(s)}.` },
   { title: "E-posta ve API ile sipariş", text: `Siparişinizi ${BRAND.email.orders} adresine e-postayla iletin veya sisteminizi API ile bağlayın.` },
 ];
 
@@ -29,9 +33,8 @@ const STEPS = [
 ];
 
 /** Sample month-end invoice (stamped "Örnek"); every amount comes from calculateMonthlyInvoice. */
-function InvoiceMock() {
-  const inv = sampleMonthlyInvoice();
-  const S = DEFAULT_PRICING_SETTINGS;
+function InvoiceMock({ settings: S }: { settings: PricingSettings }) {
+  const inv = sampleMonthlyInvoice(S);
   const rows: Array<[string, number, string?]> = [
     [`Taşıma bedeli (${inv.deliveryCount} teslimat)`, inv.discountableKurus],
     [`Köprü geçişleri (${inv.bridgeJobs} ×, indirimsiz)`, inv.undiscountedKurus],
@@ -41,7 +44,8 @@ function InvoiceMock() {
   ];
   return (
     <div className="relative">
-      <Sticker name="fis" className="absolute -top-8 -right-2 z-10 w-16 rotate-6 sm:-right-4 sm:w-20" />
+      {/* Stays inside the card edge (rotated sticker overflowed the viewport by ~5px at 768px) */}
+      <Sticker name="fis" className="absolute -top-8 right-0 z-10 w-16 rotate-6 sm:w-20" />
       <Card className="p-5 sm:p-6">
         <div className="flex items-center gap-3 pr-14">
           <span className="text-xs font-extrabold tracking-[0.14em] text-neo-muted uppercase">Ay sonu faturası</span>
@@ -60,11 +64,11 @@ function InvoiceMock() {
           <span className="text-2xl font-black text-brand">{formatTL(inv.totalKurus)}</span>
         </div>
         <p className="mt-3 text-xs text-neo-muted">
-          Örnek ay: {inv.deliveryCount - inv.bridgeJobs} × 8 km aynı yaka + {inv.bridgeJobs} × 12 km Avrupa geçişli, standart, hafta içi gündüz. İndirim yalnız taşıma bedeline uygulanır; köprü, bekleme, ağır
+          Örnek ay: {inv.deliveryCount - inv.bridgeJobs} × {inv.localKm} km aynı yaka + {inv.bridgeJobs} × {inv.crossKm} km Avrupa geçişli, standart, hafta içi gündüz. İndirim yalnız taşıma bedeline uygulanır; köprü, bekleme, ağır
           paket ve uzak alış indirimsizdir.
         </p>
         <div className="mt-4 flex flex-wrap gap-2">
-          {corporateRows().map((r) => (
+          {corporateRows(S).map((r) => (
             <span key={r.label} className="rounded-full bg-neo-bg px-3 py-1.5 text-xs font-bold text-brand">
               {r.label}: {r.value}
             </span>
@@ -75,9 +79,10 @@ function InvoiceMock() {
   );
 }
 
-export default function KurumsalPage() {
+export default async function KurumsalPage() {
+  const settings = await getPricingSettings();
   return (
-    <div className="mx-auto max-w-6xl px-4 pt-10 lg:pt-14">
+    <div className="mx-auto max-w-6xl overflow-x-clip px-4 pt-10 lg:pt-14">
       <div className="grid items-start gap-10 lg:grid-cols-2 lg:gap-12">
         <div>
           <PageHero
@@ -94,7 +99,7 @@ export default function KurumsalPage() {
           </PageHero>
 
           <div className="mt-8 grid gap-4 sm:grid-cols-2">
-            {BENEFITS.map((b) => (
+            {benefits(settings).map((b) => (
               <Card key={b.title} className="p-5">
                 <h2 className="font-black tracking-tight text-brand">{b.title}</h2>
                 <p className="mt-1 text-sm text-slate-600">{b.text}</p>
@@ -123,7 +128,7 @@ export default function KurumsalPage() {
             <h2 id="fatura" className="mb-5 text-2xl font-black tracking-[-0.03em]">
               Ay sonunda tek fatura
             </h2>
-            <InvoiceMock />
+            <InvoiceMock settings={settings} />
           </section>
 
           <p className="mt-8 text-sm text-slate-600">

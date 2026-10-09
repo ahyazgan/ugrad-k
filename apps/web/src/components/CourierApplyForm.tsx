@@ -41,7 +41,7 @@ function FileDrop({ kind, file, onChange }: { kind: DocKind; file: File | undefi
         const dropped = e.dataTransfer.files?.[0];
         if (dropped) onChange(dropped);
       }}
-      className={`rounded-2xl border-2 border-dashed p-3 text-sm transition focus-within:border-brand focus-within:ring-2 focus-within:ring-brand/20 ${
+      className={`rounded-2xl border-2 border-dashed p-3 text-sm transition has-[:focus-visible]:border-brand has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-brand/60 has-[:focus-visible]:ring-offset-2 ${
         over ? "border-brand bg-brand-light" : file ? "border-neo-dot bg-[#f6fde0]" : "border-slate-300 bg-neo-bg/40"
       }`}
     >
@@ -113,7 +113,7 @@ export function CourierApplyForm() {
     );
   }
 
-  const input = "w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 outline-none focus:border-brand focus:ring-2 focus:ring-brand/20";
+  const input = "w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 outline-none focus:border-brand focus-visible:ring-2 focus-visible:ring-brand/60 focus-visible:ring-offset-2";
   const bad = (k: string) => (error?.field === k ? " border-red-500" : "");
   const label = "grid gap-1 text-sm font-semibold text-slate-700";
   return (
@@ -156,7 +156,7 @@ export function CourierApplyForm() {
         </label>
       </div>
       <label className="flex items-center gap-2 text-sm font-semibold text-slate-700">
-        <input type="checkbox" checked={f.hasMotorcycle} onChange={(e) => setF({ ...f, hasMotorcycle: e.target.checked })} className="h-4 w-4" />
+        <input type="checkbox" checked={f.hasMotorcycle} onChange={(e) => setF({ ...f, hasMotorcycle: e.target.checked })} className="h-4 w-4 accent-[#111114] focus-visible:ring-2 focus-visible:ring-brand/60 focus-visible:ring-offset-2 focus-visible:outline-none" />
         Kendi motosikletim var
       </label>
       {f.hasMotorcycle ? (
@@ -191,7 +191,7 @@ export function CourierApplyForm() {
       </label>
       <input className="hidden" tabIndex={-1} autoComplete="off" aria-hidden="true" name="website" value={f.website ?? ""} onChange={set("website")} />
       <label className={`flex items-start gap-2 text-sm text-slate-600 ${error?.field === "kvkkConsent" ? "text-red-700" : ""}`}>
-        <input type="checkbox" data-testid="apply-consent" className="mt-1 h-4 w-4" checked={f.kvkkConsent} onChange={(e) => setF({ ...f, kvkkConsent: e.target.checked })} />
+        <input type="checkbox" data-testid="apply-consent" className="mt-1 h-4 w-4 accent-[#111114] focus-visible:ring-2 focus-visible:ring-brand/60 focus-visible:ring-offset-2 focus-visible:outline-none" checked={f.kvkkConsent} onChange={(e) => setF({ ...f, kvkkConsent: e.target.checked })} />
         <span>
           Başvuru bilgilerimin ve belgelerimin işe alım değerlendirmesi amacıyla işlenmesine ve en fazla 1 yıl saklanmasına ilişkin{" "}
           <Link href="/kvkk#basvuru" className="text-brand underline" target="_blank">
@@ -201,7 +201,7 @@ export function CourierApplyForm() {
         </span>
       </label>
       {error ? <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error.message}</p> : null}
-      <button type="submit" data-testid="apply-submit" disabled={state === "sending"} className="rounded-full bg-brand px-6 py-3.5 font-extrabold text-white hover:bg-black disabled:opacity-60">
+      <button type="submit" data-testid="apply-submit" disabled={state === "sending"} className="rounded-full bg-brand px-6 py-3.5 font-extrabold text-white hover:bg-black focus-visible:ring-2 focus-visible:ring-brand/60 focus-visible:ring-offset-2 focus-visible:outline-none disabled:opacity-60">
         {state === "sending" ? "Gönderiliyor…" : "Başvuruyu gönder"}
       </button>
     </form>

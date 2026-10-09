@@ -6,7 +6,8 @@ import { JsonLd } from "@/components/JsonLd";
 import { PageHero } from "@/components/PageHero";
 import { Sticker } from "@/components/Sticker";
 import { Card } from "@/components/ui";
-import { FAQ, FAQ_CATEGORIES } from "@/lib/faq";
+import { FAQ_CATEGORIES, faqItems } from "@/lib/faq";
+import { getPricingSettings } from "@/lib/pricing-settings";
 import { displayPhone, phoneLink, whatsappLink } from "@/lib/site";
 
 export const metadata: Metadata = {
@@ -15,7 +16,11 @@ export const metadata: Metadata = {
   alternates: { canonical: "/sss" },
 };
 
-const CHIP = "flex min-h-11 shrink-0 items-center rounded-full bg-white px-4 text-sm font-bold whitespace-nowrap text-brand hover:bg-brand hover:text-white";
+// ISR: answers (and the FAQPage JSON-LD) follow the live tariff; re-read at most once an hour.
+export const revalidate = 3600;
+
+const CHIP =
+  "group flex min-h-11 shrink-0 items-center rounded-full bg-white px-4 text-sm font-bold whitespace-nowrap text-brand hover:bg-brand hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/60 focus-visible:ring-offset-2 focus-visible:ring-offset-neo-bg";
 
 function HelpCard() {
   const wa = whatsappLink("Merhaba, bir sorum var.");
@@ -46,7 +51,8 @@ function HelpCard() {
   );
 }
 
-export default function SssPage() {
+export default async function SssPage() {
+  const FAQ = faqItems(await getPricingSettings());
   return (
     <div className="mx-auto max-w-6xl px-4 pt-10 lg:pt-14">
       <JsonLd
@@ -66,7 +72,7 @@ export default function SssPage() {
               <li key={c.id} className="shrink-0">
                 <a href={`#${c.id}`} className={CHIP}>
                   {c.label}
-                  <span className="ml-2 text-xs text-neo-inactive">{FAQ.filter((f) => f.category === c.id).length}</span>
+                  <span className="ml-2 text-xs text-neo-muted group-hover:text-white/80">{FAQ.filter((f) => f.category === c.id).length}</span>
                 </a>
               </li>
             ))}

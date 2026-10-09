@@ -51,11 +51,11 @@ export function CoverageMap({ className = "" }: { className?: string }) {
             return <circle key={d.slug} cx={p[0]} cy={p[1]} r={d.slug === "beykoz" ? 7 : 5} fill={d.side === "anadolu" ? "#9bc20f" : "#111114"} stroke="#fff" strokeWidth="2" />;
           })}
         </svg>
-        {/* HTML labels stay readable when the map scales down on phones */}
-        <span className="absolute top-[14%] left-[3%] text-[10px] font-black tracking-[0.16em] text-neo-muted sm:text-xs">AVRUPA YAKASI</span>
-        <span className="absolute top-[14%] right-[3%] text-right text-[10px] font-black tracking-[0.16em] text-brand sm:text-xs">ANADOLU YAKASI</span>
-        <span className="absolute top-[1.5%] left-1/2 -translate-x-1/2 text-[9px] font-bold tracking-[0.14em] text-neo-inactive sm:text-[11px]">KARADENİZ</span>
-        <span className="absolute bottom-[3%] left-[18%] text-[9px] font-bold tracking-[0.14em] text-neo-inactive sm:text-[11px]">MARMARA</span>
+        {/* HTML labels stay readable when the map scales down on phones (sea labels: ≥11px, AA contrast on the lilac sea) */}
+        <span className="absolute top-[14%] left-[3%] text-[11px] font-black tracking-[0.16em] text-neo-muted sm:text-xs">AVRUPA YAKASI</span>
+        <span className="absolute top-[14%] right-[3%] text-right text-[11px] font-black tracking-[0.16em] text-brand sm:text-xs">ANADOLU YAKASI</span>
+        <span className="absolute top-[1.5%] left-1/2 -translate-x-1/2 text-[11px] font-bold tracking-[0.14em] text-neo-muted-dark sm:text-xs">KARADENİZ</span>
+        <span className="absolute bottom-[3%] left-[18%] text-[11px] font-bold tracking-[0.14em] text-neo-muted-dark sm:text-xs">MARMARA</span>
         {DISTRICTS.map((d) => {
           const p = POS[d.slug];
           if (!p || d.slug === "beykoz") return null;

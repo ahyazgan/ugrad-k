@@ -5,7 +5,11 @@ import { PageHero } from "@/components/PageHero";
 import { PriceCalculator } from "@/components/PriceCalculator";
 import { Sticker, type StickerName } from "@/components/Sticker";
 import { Card, SampleStamp } from "@/components/ui";
-import { corporateRows, exampleRoutes, tariffGroups, VAT_PCT, type TariffGroup } from "@/lib/pricing-info";
+import { corporateRows, exampleRoutes, tariffGroups, type TariffGroup } from "@/lib/pricing-info";
+import { getPricingSettings } from "@/lib/pricing-settings";
+
+// ISR: re-read the live tariff (pricing_settings) at most once an hour.
+export const revalidate = 3600;
 
 export const metadata: Metadata = {
   title: "Moto kurye fiyatları ve fiyat hesaplama",
@@ -50,16 +54,17 @@ function SubGroup({ group, sticker, tilt }: { group: TariffGroup; sticker?: Stic
   );
 }
 
-export default function FiyatlarPage() {
-  const g = tariffGroups();
-  const examples = exampleRoutes();
+export default async function FiyatlarPage() {
+  const settings = await getPricingSettings();
+  const g = tariffGroups(settings);
+  const examples = exampleRoutes(settings);
   return (
     <div className="mx-auto max-w-6xl px-4 pt-10 lg:pt-14">
       <PageHero
         title="Fiyatlar"
         lead={
           <>
-            Fiyat, alış ve teslim adresleri arasındaki gerçek sürüş mesafesinden hesaplanır. Tüm kalemler sipariş öncesinde açıkça gösterilir. Tutarlara %{VAT_PCT} KDV
+            Fiyat, alış ve teslim adresleri arasındaki gerçek sürüş mesafesinden hesaplanır. Tüm kalemler sipariş öncesinde açıkça gösterilir. Tutarlara %{settings.vatPct} KDV
             eklenir.
           </>
         }
@@ -69,7 +74,7 @@ export default function FiyatlarPage() {
         {/* Calculator first on mobile; sticky beside the tariff on desktop */}
         <div className="order-first lg:sticky lg:top-24 lg:order-last">
           <h2 className="mb-3 text-2xl font-black tracking-[-0.03em]">Hesaplayın</h2>
-          <PriceCalculator compact />
+          <PriceCalculator settings={settings} compact />
         </div>
 
         <div className="grid gap-5" data-testid="tariff">
@@ -111,7 +116,7 @@ export default function FiyatlarPage() {
           <Card className="p-5 sm:p-6">
             <h3 className="text-xl font-black tracking-tight text-brand">Kurumsal indirim</h3>
             <div className="mt-3">
-              <Rows rows={corporateRows()} />
+              <Rows rows={corporateRows(settings)} />
             </div>
             <p className="mt-3 text-sm text-neo-muted">
               İndirim ay sonu faturasındaki taşıma bedeline (açılış, km, hizmet ve zaman ekleri) uygulanır; köprü, bekleme, ağır paket ve uzak alış ücretleri indirimsizdir.{" "}
