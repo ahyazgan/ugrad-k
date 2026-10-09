@@ -10,7 +10,9 @@
     "test:functions": "deno test --node-modules-dir=none --allow-env --allow-read supabase/functions/tests/",
     "check:functions": "deno check --node-modules-dir=none supabase/functions/*/index.ts",
     "test:all": "pnpm test && pnpm test:functions && pnpm test:db",
-    "deploy:functions": "supabase functions deploy --use-api"
+    "deploy:functions": "supabase functions deploy --use-api",
+    "brand:assets": "node scripts/brand-assets.mts",
+    "brand:store": "node scripts/brand-assets.mts --store"
   },
   "engines": {
     "node": ">=20"

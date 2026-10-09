@@ -43,9 +43,30 @@ pnpm submit:prod         # App Store Connect + Google Play (internal test kanal�
 **Hesap silme URL'si (Google zorunlu):** https://panel.yazgankurye.com/hesap-silme
 
 ## Ekran görüntüleri
-Demo modunda tarayıcıdan alınmış örnekler: `apps/mobile/e2e/shots/` (`pnpm --filter @yazgan/mobile e2e:web` ile yeniden üretilir). Mağaza için gerçek cihaz/simülatörden şu ekranlar önerilir: giriş, gönderi formu, fiyat özeti, sipariş takibi (zaman çizelgesi + kurye), siparişlerim, kurye iş listesi, teslim kanıtı.
-- iOS: 6.9" (1320×2868) ve 6.5" (1284×2778) en az 3'er adet.
-- Android: telefon için en az 2 adet; özellik grafiği 1024×500.
+Mağazaya yüklenecek görseller repo kökündeki **`store/`** klasöründedir. Hepsi Neo dilinde "pazarlama çerçevesi"dir: üstte kısa Türkçe başlık, altında telefon çerçevesi içinde **gerçek uygulama ekranı** (DEMO modunda tarayıcıdan, 430×932 @3x; durum çubuğu ve tarayıcı arayüzü yok, saat hafta içi 10:30'a sabitlenir ki gece/Pazar eki görünmesin).
+
+| Klasör | Boyut | Adet | Not |
+|---|---|---|---|
+| `store/ios-6.9/` | 1320×2868 | 6 | iPhone 6.9", alfa kanalı yok |
+| `store/ios-6.5/` | 1284×2778 | 6 | iPhone 6.5", alfa kanalı yok |
+| `store/android/0*.png` | 1080×1920 | 6 | Play telefon ekran görüntüsü (en-boy oranı ≤ 2:1 kuralına uyar) |
+| `store/android/feature-graphic-1024x500.png` | 1024×500 | 1 | Özellik grafiği; logo ve yazı ortadaki güvenli alanda |
+| `store/android/play-icon-512.png` | 512×512 | 1 | Play ikonu, 32-bit PNG (köşe maskesini Play uygular) |
+
+Sıra (her iki mağazada aynı): 01 sipariş formu · 02 fiyat özeti · 03 canlı takip (harita + zaman çizelgesi) · 04 teslim sonrası değerlendirme · 05 kurye iş teklifleri · 06 kurye teslim (fotoğraf + imza + teslim kodu).
+
+**Yeniden üretme** (marka adı, slogan veya ekranlar değişince):
+```bash
+pnpm brand:assets   # ikonlar, açılış ekranı, favicon'lar, OG görseli, özellik grafiği, Play ikonu
+pnpm brand:store    # ekran görüntüleri — Expo web DEMO modunda çalışıyor olmalı (varsayılan http://localhost:8081)
+```
+Expo geliştirme sunucusu yavaşsa statik derlemeden alın:
+```bash
+pnpm --filter @yazgan/mobile export:web
+node apps/mobile/e2e/serve.cjs apps/mobile/dist 8099      # ayrı terminalde açık kalsın
+pnpm brand:store --url=http://localhost:8099
+```
+Başlık/alt yazılar `scripts/brand-assets.mts` içindeki `SHOTS` listesindedir (başlık en fazla 5 kelime; sığmayan yazı betiği hatayla durdurur, kesik görsel üretmez). Harita karoları OSM'e erişilebiliyorsa gerçek, yoksa e2e'deki sahte karodur. Daha eski e2e örnekleri: `apps/mobile/e2e/shots/`.
 
 ## İnceleme notları (App Review / Play)
 İncelemecilerin giriş yapabilmesi için Supabase'de **test numaraları** tanımlayın (kurulum §4) ve şu notu ekleyin:
